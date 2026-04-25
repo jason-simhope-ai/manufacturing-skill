@@ -1,0 +1,36 @@
+{
+  "name": "food-processing",
+  "displayName": "食品加工",
+  "displayNameEn": "Food Processing",
+  "version": "0.0.1-stub",
+  "status": "stub",
+  "extends-core": true,
+  "description": "食品加工製造（含 HACCP / GMP / 追溯體系）。歡迎 contribute。",
+  "applicableTo": ["bakery", "beverage", "frozen", "ready-meal", "snack"],
+  "tags": ["food", "haccp", "fda", "gmp"],
+  "agents": [],
+  "skills": [],
+  "knowHow": [],
+  "hooks": [],
+  "wantedContributions": [
+    "haccp-coordinator agent (Hazard Analysis Critical Control Point)",
+    "batch-coordinator agent (批次追溯)",
+    "ccp-monitoring skill (關鍵管制點監控)",
+    "allergen-management skill",
+    "shelf-life-prediction skill",
+    "cleaning-validation skill (CIP/SIP)",
+    "haccp know-how",
+    "gmp-food know-how",
+    "iso-22000 know-how",
+    "halal-kosher know-how (依市場)",
+    "fda-21cfr know-how (出口美國)"
+  ],
+  "complianceFrameworks": [
+    "HACCP",
+    "ISO 22000",
+    "GMP (food)",
+    "FSSC 22000",
+    "FDA 21 CFR (US export)",
+    "Halal / Kosher (regional)"
+  ]
+}

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-plugin — 給 IT 部門看的系統說明</title>
+<style>
+  @page { size: A3 landscape; margin: 1cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: #f5f6fa; color: #2c2a3e;
+    font-size: 12px; line-height: 1.5;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .title { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .subtitle { font-size: 13px; color: #5a6080; margin-top: 4px; }
+  .meta { font-family: "JetBrains Mono", "Consolas", monospace; font-size: 10px; color: #7a8090; }
+  .meta strong { color: #2c2a3e; }
+
+  .container { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+
+  .layers { display: flex; flex-direction: column; gap: 8px; }
+  .layer {
+    display: grid; grid-template-columns: 80px 1fr;
+    border: 1px solid #c5c8d4; border-radius: 6px;
+    background: #fff;
+  }
+  .layer-num {
+    background: var(--color); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-direction: column;
+    border-radius: 6px 0 0 6px; padding: 8px;
+  }
+  .layer-num small { font-size: 9px; opacity: 0.85; font-weight: normal; margin-top: 2px; }
+  .layer-content { padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .item {
+    border: 1px solid #c5c8d4; border-radius: 4px;
+    padding: 5px 8px; background: #f5f6fa;
+    font-size: 11px; flex: 1; min-width: 130px;
+  }
+  .item-name { font-weight: 600; color: #2c2a3e; font-family: "JetBrains Mono", monospace; }
+  .item-desc { font-size: 9.5px; color: #5a6080; margin-top: 2px; }
+
+  .l1 { --color: #4a6fa5; }
+  .l2 { --color: #5a8a6f; }
+  .l3 { --color: #8a7050; }
+  .l4 { --color: #6f4a8a; }
+  .l5 { --color: #4a8a8a; }
+  .l6 { --color: #a55050; }
+
+  .sidebar { display: flex; flex-direction: column; gap: 10px; }
+  .panel {
+    border: 1px solid #c5c8d4; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 700; color: #5a6080;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .stat { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .stat-num { font-size: 18px; font-weight: 700; color: #2c2a3e; }
+  .stat-label { font-size: 10px; color: #5a6080; }
+  .panel-row { font-size: 11px; margin-bottom: 4px; }
+  .panel-row strong { display: inline-block; min-width: 70px; color: #5a6080; font-weight: 500; }
+
+  .reasons {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; margin-top: 12px;
+  }
+  .reason-card {
+    border: 1px solid #c5c8d4; border-radius: 6px;
+    padding: 8px; background: #fff;
+  }
+  .reason-card-title { font-size: 11px; font-weight: 700; color: #4a6fa5; margin-bottom: 3px; }
+  .reason-card-body { font-size: 10px; color: #3a3a4a; line-height: 1.4; }
+
+  .glossary {
+    margin-top: 12px;
+    border: 1px solid #c5c8d4; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .glossary-title { font-size: 11px; font-weight: 700; color: #5a6080; margin-bottom: 6px; }
+  .glossary-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .glossary-item { font-size: 10px; }
+  .glossary-item strong { display: block; color: #2c2a3e; font-size: 11px; margin-bottom: 2px; font-family: "JetBrains Mono", monospace; }
+  .glossary-item span { color: #5a6080; line-height: 1.4; }
+
+  .footer { text-align: center; margin-top: 14px; font-size: 9px; color: #7a8090; }
+
+  @media print {
+    body { background: white; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">manufacturing-plugin — 給 IT 部門看的系統說明</div>
+  <div class="subtitle">Infra · Security · Ops Perspective</div>
+  <div class="meta">
+    Source: <strong>GitHub MIT</strong> ·
+    Compute: <strong>GB10 / Ollama local</strong> ·
+    LLM: <strong>本地 + Anthropic API</strong> ·
+    CI/CD: <strong>GitHub Actions</strong> ·
+    v0.1 · 2026-04-26
+  </div>
+</div>
+
+<div class="container">
+  <div class="layers">
+
+    <div class="layer l1">
+      <div class="layer-num">1.<small>EDGE</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">內網部署</div><div class="item-desc">無公網 IP / NAT 後</div></div>
+        <div class="item"><div class="item-name">DNS 內網</div><div class="item-desc">manufacturing.local</div></div>
+        <div class="item"><div class="item-name">無外部入口</div><div class="item-desc">使用者透過 Claude Code GUI 訪問</div></div>
+        <div class="item"><div class="item-name">VPN 遠端</div><div class="item-desc">外勤透過公司 VPN</div></div>
+      </div>
+    </div>
+
+    <div class="layer l2">
+      <div class="layer-num">2.<small>APP</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">Claude Code Plugin</div><div class="item-desc">~/.claude/plugins/manufacturing-plugin/</div></div>
+        <div class="item"><div class="item-name">Markdown-based</div><div class="item-desc">無 binary、可審查、可 diff</div></div>
+        <div class="item"><div class="item-name">install.sh 安裝</div><div class="item-desc">Bash 腳本、無 root 需求</div></div>
+        <div class="item"><div class="item-name">多 profile</div><div class="item-desc">CNC / PCB / 食品 ... 切換</div></div>
+      </div>
+    </div>
+
+    <div class="layer l3">
+      <div class="layer-num">3.<small>DATA</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">Git + Markdown</div><div class="item-desc">無 DB、純文字、Git 當 storage</div></div>
+        <div class="item"><div class="item-name">Mock data JSON</div><div class="item-desc">infra/mcp-servers/*/mock-data/</div></div>
+        <div class="item"><div class="item-name">圖紙 / BOM</div><div class="item-desc">不進 repo、.gitignore 排除</div></div>
+        <div class="item"><div class="item-name">Audit log</div><div class="item-desc">所有 AI 動作記 logs/</div></div>
+      </div>
+    </div>
+
+    <div class="layer l4">
+      <div class="layer-num">4.<small>COMPUTE</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">GB10 Spark</div><div class="item-desc">NVIDIA GB10 / 128GB unified / Ubuntu 24.04 ARM64</div></div>
+        <div class="item"><div class="item-name">Ollama runtime</div><div class="item-desc">localhost:11434 / qwen2.5-32b</div></div>
+        <div class="item"><div class="item-name">線上 fallback</div><div class="item-desc">Anthropic API（可禁用）</div></div>
+        <div class="item"><div class="item-name">MCP servers</div><div class="item-desc">Python stdio</div></div>
+      </div>
+    </div>
+
+    <div class="layer l5">
+      <div class="layer-num">5.<small>DEPLOY</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">GitHub repo</div><div class="item-desc">jason-simhope-ai/manufacturing-skill</div></div>
+        <div class="item"><div class="item-name">git pull 升級</div><div class="item-desc">無 binary 升級、純文字 diff</div></div>
+        <div class="item"><div class="item-name">install.sh 重灌</div><div class="item-desc">自動備份舊版（.bak）</div></div>
+        <div class="item"><div class="item-name">CI 驗證</div><div class="item-desc">GitHub Actions（v0.2 計畫）</div></div>
+      </div>
+    </div>
+
+    <div class="layer l6">
+      <div class="layer-num">6.<small>SECURITY</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">Repo private 選項</div><div class="item-desc">客製 profile 可放私 repo</div></div>
+        <div class="item"><div class="item-name">資料不外流</div><div class="item-desc">禁 anthropic.com → 完全 air-gap</div></div>
+        <div class="item"><div class="item-name">Service account</div><div class="item-desc">ERP/MCP 用專屬帳號 + read-only</div></div>
+        <div class="item"><div class="item-name">IATF 16949 ready</div><div class="item-desc">audit log 對得上稽核</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">OPS 指標</div>
+      <div class="stat"><div class="stat-num">~30s</div><div class="stat-label">install 時間</div></div>
+      <div class="stat"><div class="stat-num">~60s</div><div class="stat-label">/quote 回應（Ollama 32b）</div></div>
+      <div class="stat"><div class="stat-num">~3K</div><div class="stat-label">月維運成本（NT$）</div></div>
+      <div class="stat"><div class="stat-num">0</div><div class="stat-label">DB / VM 維護</div></div>
+      <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Git 版控可追溯</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">技術棧</div>
+      <div class="panel-row"><strong>FRONT</strong> Claude Code CLI</div>
+      <div class="panel-row"><strong>RUNTIME</strong> Bash + Python 3.12</div>
+      <div class="panel-row"><strong>STORAGE</strong> Git + Markdown</div>
+      <div class="panel-row"><strong>HOST</strong> GB10 Ubuntu</div>
+      <div class="panel-row"><strong>LLM</strong> Ollama 本地</div>
+      <div class="panel-row"><strong>API</strong> MCP (stdio)</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">IT 常見疑問</div>
+      <div class="panel-row"><strong>DB?</strong> 沒有，純文字 + Git</div>
+      <div class="panel-row"><strong>Server?</strong> 一台 GB10 即可</div>
+      <div class="panel-row"><strong>備份?</strong> Git remote + GB10 SSD</div>
+      <div class="panel-row"><strong>監控?</strong> systemd + 自寫 healthcheck</div>
+      <div class="panel-row"><strong>Auth?</strong> 用 Claude Code 自帶 + ERP service account</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">合規</div>
+      <div class="panel-row"><strong>授權</strong> MIT</div>
+      <div class="panel-row"><strong>ISO 9001</strong> ✅ 對齊</div>
+      <div class="panel-row"><strong>IATF 16949</strong> ✅ 對齊</div>
+      <div class="panel-row"><strong>客戶稽核</strong> 拿此圖給看</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="reasons">
+  <div class="reason-card">
+    <div class="reason-card-title">零維運成本</div>
+    <div class="reason-card-body">無自家 Server / DB / 託管，純文字 + Git，IT 不用養 DBA</div>
+  </div>
+  <div class="reason-card">
+    <div class="reason-card-title">資料可攜</div>
+    <div class="reason-card-body">純 Markdown + Git，要換工具 / 換廠商不被 lock-in</div>
+  </div>
+  <div class="reason-card">
+    <div class="reason-card-title">機敏資料不外流</div>
+    <div class="reason-card-body">LLM 跑在 GB10 內網、ERP 走 service account 內網、圖紙 .gitignore</div>
+  </div>
+  <div class="reason-card">
+    <div class="reason-card-title">客戶稽核友善</div>
+    <div class="reason-card-body">audit log 完整、Git 版控、可隨時印出說明文件給稽核員</div>
+  </div>
+  <div class="reason-card">
+    <div class="reason-card-title">可漸進導入</div>
+    <div class="reason-card-body">先用 mock data 試跑、再接 ERP、再加 profile、不爆改 IT 環境</div>
+  </div>
+</div>
+
+<div class="glossary">
+  <div class="glossary-title">名詞對照 · 給熟 IT 術語的讀者（對應到傳統企業 IT 概念）</div>
+  <div class="glossary-grid">
+    <div class="glossary-item"><strong>Agent</strong><span>AI persona ≈ 工廠 RPA（但會推理、能對話、不只執行固定腳本）</span></div>
+    <div class="glossary-item"><strong>MCP</strong><span>Model Context Protocol ≈ ESB 企業服務匯流排（標準介面接各種系統）</span></div>
+    <div class="glossary-item"><strong>Plugin</strong><span>可安裝模組 ≈ VS Code Extension（Claude Code 的擴充包）</span></div>
+    <div class="glossary-item"><strong>Profile</strong><span>應用模板 ≈ Application Template（CNC / PCB / 食品）</span></div>
+    <div class="glossary-item"><strong>Local LLM</strong><span>地端大語言模型 ≈ 自建 ERP server（資料不出公司）</span></div>
+    <div class="glossary-item"><strong>Ollama</strong><span>本地模型 runtime ≈ 自架 ChatGPT server</span></div>
+    <div class="glossary-item"><strong>GB10</strong><span>NVIDIA AI 桌機 ≈ 部門級 server（Mac mini 大小）</span></div>
+    <div class="glossary-item"><strong>Skill</strong><span>SOP markdown ≈ Wiki 條目（但 AI 會主動讀）</span></div>
+    <div class="glossary-item"><strong>Hook</strong><span>生命週期鉤子 ≈ DB Trigger / WebHook</span></div>
+    <div class="glossary-item"><strong>Slash Command</strong><span>斜線指令 ≈ Slack/Teams 的 /commands</span></div>
+    <div class="glossary-item"><strong>Frontmatter</strong><span>YAML 標頭 ≈ HTTP Header（描述 metadata）</span></div>
+    <div class="glossary-item"><strong>Fork</strong><span>Git 分支克隆 ≈ SVN branch + 客製化</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  manufacturing-plugin v0.1 · MIT License · GB10 / Ollama local · IT 稽核可隨附此圖 · jasonlin@simhope.com.tw
+</div>
+
+</body>
+</html>

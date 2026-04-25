@@ -1,0 +1,67 @@
+[
+  {
+    "id": "W2026042100123",
+    "so_id": "SO-2026-0421",
+    "customer": "客戶A",
+    "part_no": "BR-12345",
+    "part_name": "不鏽鋼支架",
+    "quantity": 100,
+    "completed_qty": 60,
+    "status": "in_production",
+    "current_phase": "04-生產",
+    "machine": "CNC#3",
+    "operator": "張三",
+    "scheduled_start": "2026-04-22T08:00:00Z",
+    "scheduled_end": "2026-04-28T17:00:00Z",
+    "estimated_completion": "2026-04-28T15:00:00Z",
+    "risk_flags": [
+      "tool_life_warning: D4 銑刀預計 80 件需換刀"
+    ]
+  },
+  {
+    "id": "W2026042500001",
+    "so_id": "SO-2026-0425",
+    "customer": "客戶B",
+    "part_no": "AL-67890",
+    "part_name": "鋁合金外殼",
+    "quantity": 500,
+    "completed_qty": 0,
+    "status": "scheduled",
+    "current_phase": "03-排程",
+    "machine": "CNC#5",
+    "scheduled_start": "2026-04-30T08:00:00Z",
+    "scheduled_end": "2026-05-08T17:00:00Z",
+    "risk_flags": []
+  },
+  {
+    "id": "W2026042500003",
+    "so_id": "SO-2026-0425",
+    "customer": "客戶B",
+    "part_no": "AL-67891",
+    "part_name": "鋁合金底座",
+    "quantity": 500,
+    "completed_qty": 0,
+    "status": "waiting",
+    "current_phase": "03-排程",
+    "machine": "CNC#5",
+    "scheduled_start": "2026-05-09T08:00:00Z",
+    "scheduled_end": "2026-05-15T17:00:00Z",
+    "risk_flags": [
+      "blocked_by: W2026042500001 must finish first (shared fixture)"
+    ]
+  },
+  {
+    "id": "W2026042500007",
+    "so_id": "SO-2026-0425",
+    "customer": "客戶C",
+    "part_no": "ST-54321",
+    "part_name": "結構件",
+    "quantity": 50,
+    "completed_qty": 0,
+    "status": "blocked",
+    "current_phase": "02-接單",
+    "risk_flags": [
+      "material_shortage: SUS304-φ20 缺 30 支，預計 4/28 到貨"
+    ]
+  }
+]

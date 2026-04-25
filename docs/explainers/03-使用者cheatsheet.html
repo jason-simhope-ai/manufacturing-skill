@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-plugin Cheatsheet — 業助 / 廠長 / 品管</title>
+<style>
+  @page { size: A3 landscape; margin: 1cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: #fafaf2; color: #2c2a26;
+    font-size: 12px; line-height: 1.5;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .title { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .subtitle { font-size: 13px; color: #6b6856; margin-top: 4px; }
+  .meta { font-family: "JetBrains Mono", "Consolas", monospace; font-size: 10px; color: #8a857c; }
+  .meta strong { color: #2c2a26; }
+
+  .container { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+
+  .sections { display: flex; flex-direction: column; gap: 8px; }
+  .section {
+    display: grid; grid-template-columns: 80px 1fr;
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    background: #fff;
+  }
+  .section-num {
+    background: var(--color); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-direction: column;
+    border-radius: 6px 0 0 6px; padding: 8px;
+  }
+  .section-num small { font-size: 9px; opacity: 0.85; font-weight: normal; margin-top: 2px; }
+  .section-content { padding: 8px 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .cmd-card {
+    border: 1px solid #d4cfb0; border-radius: 4px;
+    padding: 6px 8px; background: #fafaf2;
+  }
+  .cmd-name { font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; color: #2c2a26; }
+  .cmd-desc { font-size: 10px; color: #5a5648; margin-top: 2px; }
+  .cmd-example { font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: #6b6856; margin-top: 3px; }
+
+  .s1 { --color: #6b8a4c; }
+  .s2 { --color: #5a7892; }
+  .s3 { --color: #b07050; }
+  .s4 { --color: #8a6a8c; }
+  .s5 { --color: #7a8a4c; }
+  .s6 { --color: #a55050; }
+
+  .sidebar { display: flex; flex-direction: column; gap: 10px; }
+  .panel {
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 700; color: #6b6856;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .quick-row {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px; margin-bottom: 4px; line-height: 1.5;
+  }
+  .quick-row strong { color: #2c2a26; }
+  .panel-row { font-size: 11px; margin-bottom: 4px; }
+  .panel-row strong { display: inline-block; min-width: 65px; color: #6b6856; font-weight: 500; }
+
+  .rhythm {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px; margin-top: 12px;
+  }
+  .rhythm-card {
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    padding: 8px; background: #fff;
+  }
+  .rhythm-title { font-size: 11px; font-weight: 700; color: #6b8a4c; margin-bottom: 4px; }
+  .rhythm-body { font-size: 10px; color: #4a4640; line-height: 1.5; }
+
+  .keys {
+    margin-top: 12px;
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .keys-title { font-size: 11px; font-weight: 700; color: #6b6856; margin-bottom: 6px; }
+  .keys-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .key-item { font-size: 10px; }
+  .key-item strong {
+    display: block; color: #2c2a26; font-size: 11px; margin-bottom: 2px;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .key-item span { color: #5a5648; line-height: 1.4; }
+
+  .footer { text-align: center; margin-top: 14px; font-size: 9px; color: #8a857c; }
+
+  @media print {
+    body { background: white; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">manufacturing-plugin Cheatsheet</div>
+  <div class="subtitle">業助 / 廠長 / 品管 自用快查表 · 印出來掛牆</div>
+  <div class="meta">
+    Profile: <strong>cnc-machining</strong> ·
+    Vault: <strong>~/.claude/plugins/manufacturing-plugin</strong> ·
+    Shell: <strong>Git Bash / WSL</strong> ·
+    v0.1 · 2026-04-26
+  </div>
+</div>
+
+<div class="container">
+  <div class="sections">
+
+    <div class="section s1">
+      <div class="section-num">1.<small>QUOTE 報價</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/quote &lt;圖紙&gt;</div>
+          <div class="cmd-desc">啟動報價，自動分析圖紙並產出報價單</div>
+          <div class="cmd-example">/quote @客戶A-RFQ.pdf</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/quote &lt;描述&gt;</div>
+          <div class="cmd-desc">口頭描述也能報，AI 會問釐清問題</div>
+          <div class="cmd-example">/quote 「SUS304 支架 100 個，公差±0.05」</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section s2">
+      <div class="section-num">2.<small>ORDER 訂單</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/order-status &lt;ID&gt;</div>
+          <div class="cmd-desc">查單目前在哪段流程、進度、預計交期</div>
+          <div class="cmd-example">/order-status SO-2026-0421</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/order-status &lt;客戶&gt;</div>
+          <div class="cmd-desc">某客戶所有未交訂單一次列出</div>
+          <div class="cmd-example">/order-status 客戶A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section s3">
+      <div class="section-num">3.<small>PRODUCTION 生產</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/manufacturing</div>
+          <div class="cmd-desc">看 plugin 目前載入哪些 agent / skill</div>
+          <div class="cmd-example">/manufacturing agents</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">問生管 agent</div>
+          <div class="cmd-desc">「W2026042100123 預計幾號完工」</div>
+          <div class="cmd-example">「CNC#3 接下來 7 天還能塞單嗎」</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section s4">
+      <div class="section-num">4.<small>QC 檢驗</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/inspect IQC &lt;PO&gt;</div>
+          <div class="cmd-desc">進料檢驗（Incoming QC）</div>
+          <div class="cmd-example">/inspect IQC PO-2026-0421</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/inspect IPQC &lt;WO&gt;</div>
+          <div class="cmd-desc">製程中抽檢（In-Process QC）</div>
+          <div class="cmd-example">/inspect IPQC W2026042100123</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/inspect FQC &lt;WO&gt;</div>
+          <div class="cmd-desc">完工後最終檢驗（Final QC）</div>
+          <div class="cmd-example">/inspect FQC W2026042100123</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/inspect OQC &lt;SO&gt;</div>
+          <div class="cmd-desc">出貨前抽檢（Outgoing QC）</div>
+          <div class="cmd-example">/inspect OQC SO-2026-0421</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section s5">
+      <div class="section-num">5.<small>INVENTORY 倉庫</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/bom-check &lt;檔&gt;</div>
+          <div class="cmd-desc">BOM 健檢：缺料、規格不明、未建檔</div>
+          <div class="cmd-example">/bom-check @工單W123/BOM.xlsx</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">問倉管 agent</div>
+          <div class="cmd-desc">「SUS304-φ20 還有多少」「呆滯料盤點」</div>
+          <div class="cmd-example">「6 個月沒動的料列一下」</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section s6">
+      <div class="section-num">6.<small>DEBUG 除錯</small></div>
+      <div class="section-content">
+        <div class="cmd-card">
+          <div class="cmd-name">/manufacturing doctor</div>
+          <div class="cmd-desc">健檢：plugin 裝對了嗎、MCP 連得到嗎</div>
+          <div class="cmd-example">先跑 doctor 再回報問題</div>
+        </div>
+        <div class="cmd-card">
+          <div class="cmd-name">/install-profile &lt;name&gt;</div>
+          <div class="cmd-desc">切換 profile（CNC / PCB / 食品 ...）</div>
+          <div class="cmd-example">/install-profile cnc-machining</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">快速片段</div>
+      <div class="quick-row"><strong>裝 plugin</strong><br>bash adapters/claude-code/install.sh</div>
+      <div class="quick-row"><strong>升級</strong><br>git pull && bash install.sh</div>
+      <div class="quick-row"><strong>切 profile</strong><br>bash install.sh injection-molding</div>
+      <div class="quick-row"><strong>看狀態</strong><br>/manufacturing</div>
+      <div class="quick-row"><strong>健檢</strong><br>/manufacturing doctor</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">常用 URL</div>
+      <div class="panel-row"><strong>Repo</strong> github.com/jason-simhope-ai/manufacturing-skill</div>
+      <div class="panel-row"><strong>Docs</strong> docs/architecture.md</div>
+      <div class="panel-row"><strong>架構圖</strong> docs/explainers/01-架構總覽.html</div>
+      <div class="panel-row"><strong>IT 說明</strong> docs/explainers/02-IT部門系統說明.html</div>
+      <div class="panel-row"><strong>客服</strong> jasonlin@simhope.com.tw</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">固定排程（建議）</div>
+      <div class="panel-row"><strong>每日 08:00</strong> 看昨晚生產報告</div>
+      <div class="panel-row"><strong>每日 12:00</strong> /order-status 過所有未交</div>
+      <div class="panel-row"><strong>每週一</strong> /bom-check 本週工單</div>
+      <div class="panel-row"><strong>每週五</strong> 跑一次 doctor</div>
+      <div class="panel-row"><strong>每月底</strong> 呆滯料盤點</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">求救順序</div>
+      <div class="panel-row"><strong>1.</strong> 跑 /manufacturing doctor</div>
+      <div class="panel-row"><strong>2.</strong> 看 docs/architecture.md</div>
+      <div class="panel-row"><strong>3.</strong> 問 IT</div>
+      <div class="panel-row"><strong>4.</strong> 找 Jason</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="rhythm">
+  <div class="rhythm-card">
+    <div class="rhythm-title">業助 · 每天</div>
+    <div class="rhythm-body">
+      早上看 /order-status 跟客戶溝通預計交期 ·
+      RFQ 進來先 /quote 看初估 ·
+      回信用 AI 草稿但自己最後 review
+    </div>
+  </div>
+  <div class="rhythm-card">
+    <div class="rhythm-title">廠長 · 每天</div>
+    <div class="rhythm-body">
+      早會前 /manufacturing 看排程瓶頸 ·
+      /order-status 看延誤風險 ·
+      下班前確認明日材料 /bom-check
+    </div>
+  </div>
+  <div class="rhythm-card">
+    <div class="rhythm-title">品管 · 每天</div>
+    <div class="rhythm-body">
+      進料 /inspect IQC 即時填 ·
+      製程巡檢 /inspect IPQC ·
+      完工 /inspect FQC ·
+      出貨前 /inspect OQC
+    </div>
+  </div>
+</div>
+
+<div class="keys">
+  <div class="keys-title">指令快查 · 按字母</div>
+  <div class="keys-grid">
+    <div class="key-item"><strong>/bom-check</strong><span>BOM 健檢、缺料預警</span></div>
+    <div class="key-item"><strong>/inspect IQC</strong><span>進料檢驗</span></div>
+    <div class="key-item"><strong>/inspect IPQC</strong><span>製程中抽檢</span></div>
+    <div class="key-item"><strong>/inspect FQC</strong><span>完工最終檢驗</span></div>
+    <div class="key-item"><strong>/inspect OQC</strong><span>出貨前抽檢</span></div>
+    <div class="key-item"><strong>/install-profile</strong><span>切換 vertical（CNC / PCB / ...）</span></div>
+    <div class="key-item"><strong>/manufacturing</strong><span>看 plugin 載入內容</span></div>
+    <div class="key-item"><strong>/manufacturing doctor</strong><span>健檢：MCP 連線、模型可用</span></div>
+    <div class="key-item"><strong>/order-status</strong><span>單張或客戶所有訂單狀態</span></div>
+    <div class="key-item"><strong>/quote</strong><span>啟動報價（圖紙 / 描述 / RFQ 都可）</span></div>
+    <div class="key-item"><strong>@檔案</strong><span>夾帶圖紙 / BOM / RFQ 給 AI 看</span></div>
+    <div class="key-item"><strong>「自由提問」</strong><span>不會的就直接問，AI 會 dispatch agent</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  manufacturing-plugin v0.1 · 業助 / 廠長 / 品管 自用快查表 · 印 A3 掛牆 · 有問題找 IT 或 Jason
+</div>
+
+</body>
+</html>

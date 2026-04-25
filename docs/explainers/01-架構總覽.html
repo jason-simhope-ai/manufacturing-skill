@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-plugin 架構總覽</title>
+<style>
+  @page { size: A3 landscape; margin: 1cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: #fafaf7; color: #2c2a26;
+    font-size: 12px; line-height: 1.5;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .title { font-size: 28px; font-weight: 700; letter-spacing: 2px; }
+  .subtitle { font-size: 13px; color: #6b665e; margin-top: 4px; }
+  .meta { font-family: "JetBrains Mono", "Consolas", monospace; font-size: 10px; color: #8a857c; }
+  .meta strong { color: #2c2a26; }
+
+  .container { display: grid; grid-template-columns: 1fr 220px; gap: 16px; }
+
+  .layers { display: flex; flex-direction: column; gap: 8px; }
+  .layer {
+    display: grid; grid-template-columns: 80px 1fr;
+    border: 1px solid #d4ceb8; border-radius: 6px;
+    background: #fff;
+  }
+  .layer-num {
+    background: var(--color); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-direction: column;
+    border-radius: 6px 0 0 6px; padding: 8px;
+  }
+  .layer-num small { font-size: 9px; opacity: 0.85; font-weight: normal; margin-top: 2px; }
+  .layer-content { padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .item {
+    border: 1px solid #d4ceb8; border-radius: 4px;
+    padding: 4px 8px; background: #fafaf7;
+    font-size: 11px; min-width: 110px;
+  }
+  .item-name { font-weight: 600; color: #2c2a26; }
+  .item-desc { font-size: 9.5px; color: #6b665e; margin-top: 2px; }
+  .item.profile { border-color: #c9956b; background: #fef8f0; }
+  .item.profile .item-name::before { content: "★ "; color: #c9956b; }
+
+  .l1 { --color: #5a7892; }
+  .l2 { --color: #6b8a4c; }
+  .l3 { --color: #a78050; }
+  .l4 { --color: #8a6a8c; }
+  .l5 { --color: #7a8c5e; }
+  .l6 { --color: #b07050; }
+
+  .sidebar { display: flex; flex-direction: column; gap: 10px; }
+  .panel {
+    border: 1px solid #d4ceb8; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 700; color: #6b665e;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .stat { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .stat-num { font-size: 20px; font-weight: 700; color: #2c2a26; }
+  .stat-label { font-size: 10px; color: #6b665e; }
+  .panel-row { font-size: 11px; margin-bottom: 4px; }
+  .panel-row strong { display: inline-block; min-width: 70px; color: #6b665e; font-weight: 500; }
+
+  .values {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; margin-top: 12px;
+  }
+  .value-card {
+    border: 1px solid #d4ceb8; border-radius: 6px;
+    padding: 8px; background: #fff;
+  }
+  .value-card-title { font-size: 11px; font-weight: 700; color: #5a7892; margin-bottom: 3px; }
+  .value-card-body { font-size: 10px; color: #4a4640; line-height: 1.4; }
+
+  .glossary {
+    margin-top: 12px;
+    border: 1px solid #d4ceb8; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .glossary-title { font-size: 11px; font-weight: 700; color: #6b665e; margin-bottom: 6px; }
+  .glossary-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .glossary-item { font-size: 10px; }
+  .glossary-item strong { display: block; color: #2c2a26; font-size: 11px; margin-bottom: 2px; }
+  .glossary-item span { color: #6b665e; line-height: 1.4; }
+
+  .footer { text-align: center; margin-top: 14px; font-size: 9px; color: #8a857c; }
+
+  @media print {
+    body { background: white; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">manufacturing-plugin 架構總覽</div>
+  <div class="subtitle">製造業 AI 導入起手包 · The AI starter kit for manufacturers</div>
+  <div class="meta">
+    GitHub: <strong>jason-simhope-ai/manufacturing-skill</strong> ·
+    本圖：給機械業二代協進會會員 / 老闆 ·
+    v0.1 · 2026-04-26
+  </div>
+</div>
+
+<div class="container">
+  <div class="layers">
+
+    <div class="layer l1">
+      <div class="layer-num">1.<small>USE</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">/quote</div><div class="item-desc">啟動報價</div></div>
+        <div class="item"><div class="item-name">/order-status</div><div class="item-desc">查訂單到哪</div></div>
+        <div class="item"><div class="item-name">/bom-check</div><div class="item-desc">BOM 健檢</div></div>
+        <div class="item"><div class="item-name">/inspect</div><div class="item-desc">IQC/IPQC/FQC/OQC</div></div>
+        <div class="item"><div class="item-name">/install-profile</div><div class="item-desc">切換 vertical</div></div>
+        <div class="item"><div class="item-name">/manufacturing</div><div class="item-desc">plugin 狀態</div></div>
+      </div>
+    </div>
+
+    <div class="layer l2">
+      <div class="layer-num">2.<small>FLOW</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">01 報價</div></div>
+        <div class="item"><div class="item-name">02 接單</div></div>
+        <div class="item"><div class="item-name">03 排程</div></div>
+        <div class="item"><div class="item-name">04 生產</div></div>
+        <div class="item"><div class="item-name">05 檢驗</div></div>
+        <div class="item"><div class="item-name">06 出貨</div></div>
+      </div>
+    </div>
+
+    <div class="layer l3">
+      <div class="layer-num">3.<small>ROLE</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">報價師</div><div class="item-desc">quote-specialist</div></div>
+        <div class="item"><div class="item-name">業助</div><div class="item-desc">sales-coordinator</div></div>
+        <div class="item"><div class="item-name">生管</div><div class="item-desc">production-planner</div></div>
+        <div class="item"><div class="item-name">品管</div><div class="item-desc">quality-inspector</div></div>
+        <div class="item"><div class="item-name">倉管</div><div class="item-desc">inventory-manager</div></div>
+        <div class="item profile"><div class="item-name">CNC 程式工程師</div></div>
+        <div class="item profile"><div class="item-name">刀具壽命工程師</div></div>
+        <div class="item profile"><div class="item-name">夾治具設計師</div></div>
+        <div class="item profile"><div class="item-name">試樣協調員</div></div>
+      </div>
+    </div>
+
+    <div class="layer l4">
+      <div class="layer-num">4.<small>INFRA</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">scheduler-mcp</div><div class="item-desc">生產排程接口</div></div>
+        <div class="item"><div class="item-name">erp-connector</div><div class="item-desc">SAP/鼎新/Oracle</div></div>
+        <div class="item"><div class="item-name">GB10 + Ollama</div><div class="item-desc">地端 LLM</div></div>
+        <div class="item"><div class="item-name">檔案規範</div><div class="item-desc">圖紙/BOM/NC</div></div>
+      </div>
+    </div>
+
+    <div class="layer l5">
+      <div class="layer-num">5.<small>REF</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">ISO 9001</div></div>
+        <div class="item"><div class="item-name">Lean / 5S</div></div>
+        <div class="item"><div class="item-name">OEE</div></div>
+        <div class="item"><div class="item-name">MRP 基礎</div></div>
+        <div class="item profile"><div class="item-name">IATF 16949</div></div>
+        <div class="item profile"><div class="item-name">刀具壽命管理</div></div>
+        <div class="item profile"><div class="item-name">切削參數查表</div></div>
+        <div class="item profile"><div class="item-name">開發 vs 量產</div></div>
+      </div>
+    </div>
+
+    <div class="layer l6">
+      <div class="layer-num">6.<small>HOOK</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">pre-quote</div><div class="item-desc">圖紙完整度</div></div>
+        <div class="item"><div class="item-name">post-order</div><div class="item-desc">接單通知</div></div>
+        <div class="item"><div class="item-name">pre-ship</div><div class="item-desc">出貨前檢查</div></div>
+        <div class="item"><div class="item-name">on-error</div><div class="item-desc">異常升級</div></div>
+        <div class="item profile"><div class="item-name">pre-cnc-checkin</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">當前規模</div>
+      <div class="stat"><div class="stat-num">9</div><div class="stat-label">Agents（5 core + 4 CNC）</div></div>
+      <div class="stat"><div class="stat-num">12</div><div class="stat-label">Skills（9 core + 3 CNC）</div></div>
+      <div class="stat"><div class="stat-num">8</div><div class="stat-label">Know-how（4 core + 4 CNC）</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Hooks</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Profile（1 完整 + 4 stub）</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">支援平台</div>
+      <div class="panel-row"><strong>v0.1</strong> Claude Code</div>
+      <div class="panel-row"><strong>v0.3</strong> Cursor / Gemini / Codex</div>
+      <div class="panel-row"><strong>v2.0</strong> 自建 CLI</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">部署</div>
+      <div class="panel-row"><strong>HOST</strong> 地端 GB10</div>
+      <div class="panel-row"><strong>LLM</strong> Ollama 本地</div>
+      <div class="panel-row"><strong>DATA</strong> 不出公司</div>
+      <div class="panel-row"><strong>COST</strong> ~ NT$3,000/月</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">License</div>
+      <div class="panel-row"><strong>授權</strong> MIT</div>
+      <div class="panel-row"><strong>商用</strong> 無限制</div>
+      <div class="panel-row"><strong>修改</strong> 自由 fork</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="values">
+  <div class="value-card">
+    <div class="value-card-title">為什麼是 plugin 不是 SaaS</div>
+    <div class="value-card-body">企業裝在自己機器、資料完全不出公司，過得了客戶 IATF 稽核</div>
+  </div>
+  <div class="value-card">
+    <div class="value-card-title">為什麼是 core + profile</div>
+    <div class="value-card-body">5 段流程所有製造業共通，profile 補各 vertical 差異，DRY</div>
+  </div>
+  <div class="value-card">
+    <div class="value-card-title">為什麼是 6 段流程</div>
+    <div class="value-card-body">對應 ISO 9001 / IATF 16949 體系：報價→接單→排程→生產→檢驗→出貨</div>
+  </div>
+  <div class="value-card">
+    <div class="value-card-title">為什麼是地端 LLM</div>
+    <div class="value-card-body">圖紙是公司命脈，雲端 SaaS 過不了客戶稽核；GB10 一次投資長期免費</div>
+  </div>
+  <div class="value-card">
+    <div class="value-card-title">為什麼開源</div>
+    <div class="value-card-body">機械業二代協進會共享共贏；商業價值在客製化顧問導入</div>
+  </div>
+</div>
+
+<div class="glossary">
+  <div class="glossary-title">名詞解釋 · 用比喻說清楚（給不熟 AI 的老闆）</div>
+  <div class="glossary-grid">
+    <div class="glossary-item"><strong>Claude Code</strong><span>工廠裡會聽你話、能查資料、能寫文件的萬能新人</span></div>
+    <div class="glossary-item"><strong>Plugin</strong><span>給這位新人的「製造業職前訓練包」</span></div>
+    <div class="glossary-item"><strong>Core</strong><span>所有製造業共通的基本功（不管做什麼都會用到）</span></div>
+    <div class="glossary-item"><strong>Profile</strong><span>你這個產業的專業知識（CNC / PCB / 食品...）</span></div>
+    <div class="glossary-item"><strong>Agent</strong><span>能扮演特定角色（報價師、業助）的 AI 分身</span></div>
+    <div class="glossary-item"><strong>Skill</strong><span>「該怎麼做某件事」的 SOP，AI 跟著做</span></div>
+    <div class="glossary-item"><strong>MCP</strong><span>讓 AI 能讀懂你的 ERP / MES 的「翻譯機」</span></div>
+    <div class="glossary-item"><strong>Hook</strong><span>在特定時機自動觸發的檢查/通知（像門禁卡）</span></div>
+    <div class="glossary-item"><strong>GB10</strong><span>NVIDIA 出的桌上型 AI 電腦，放工廠就能跑 LLM</span></div>
+    <div class="glossary-item"><strong>Ollama</strong><span>把 AI 模型搬回家自己跑的軟體（不需要連雲端）</span></div>
+    <div class="glossary-item"><strong>LLM</strong><span>大語言模型 — ChatGPT/Claude/Gemini 背後的 AI 大腦</span></div>
+    <div class="glossary-item"><strong>Fork</strong><span>把整個 repo 複製一份到你自己帳號，自由修改</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  manufacturing-plugin v0.1 · MIT License · Created at SIMHOPE · Maintained by Jason Lin · jasonlin@simhope.com.tw
+</div>
+
+</body>
+</html>

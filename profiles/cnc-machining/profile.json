@@ -1,0 +1,60 @@
+{
+  "name": "cnc-machining",
+  "displayName": "CNC 精密加工",
+  "displayNameEn": "CNC Precision Machining",
+  "version": "0.1.0",
+  "extends-core": true,
+  "description": "金屬切削加工：車、銑、鑽、磨、線切割、放電。涵蓋 job shop 開發件與低量產。",
+  "applicableTo": [
+    "job-shop",
+    "low-volume-mass",
+    "prototype",
+    "tooling"
+  ],
+  "tags": ["metal", "subtractive", "precision", "cnc"],
+  "agents": [
+    "cnc-programmer",
+    "tool-life-engineer",
+    "fixture-designer",
+    "prototype-coordinator"
+  ],
+  "skills": [
+    "g-code-review",
+    "cutting-parameter-calc",
+    "fixture-design-patterns"
+  ],
+  "knowHow": [
+    "iatf-16949",
+    "刀具壽命管理",
+    "切削參數查表",
+    "開發工廠-vs-量產"
+  ],
+  "hooks": [
+    "pre-cnc-program-checkin"
+  ],
+  "overrides": {
+    "agents": [],
+    "skills": [],
+    "knowHow": []
+  },
+  "mcp": {
+    "recommended": [
+      "scheduler-mcp",
+      "erp-connector"
+    ],
+    "optional": [
+      "cam-software-bridge",
+      "tool-database"
+    ]
+  },
+  "complianceFrameworks": [
+    "ISO 9001",
+    "IATF 16949",
+    "AS9100 (aerospace, optional)",
+    "GD&T (drawing standard)"
+  ],
+  "createdBy": {
+    "organization": "SIMHOPE",
+    "context": "Reference profile based on real Taiwan precision machining job shop"
+  }
+}

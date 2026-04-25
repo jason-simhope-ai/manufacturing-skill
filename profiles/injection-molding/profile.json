@@ -1,0 +1,30 @@
+{
+  "name": "injection-molding",
+  "displayName": "射出成型",
+  "displayNameEn": "Injection Molding",
+  "version": "0.0.1-stub",
+  "status": "stub",
+  "extends-core": true,
+  "description": "塑膠射出成型（含模具設計與量產）。歡迎 contribute。",
+  "applicableTo": ["plastic", "thermoplastic", "thermoset", "tooling"],
+  "tags": ["plastic", "injection", "molding"],
+  "agents": [],
+  "skills": [],
+  "knowHow": [],
+  "hooks": [],
+  "wantedContributions": [
+    "mold-designer agent",
+    "molding-process-engineer agent",
+    "shot-weight-calc skill",
+    "cooling-time-calc skill",
+    "moldflow-analysis-review skill",
+    "common-defects (short-shot, sink, warpage, flash) know-how",
+    "polymer-material-database know-how",
+    "DFM-for-injection know-how"
+  ],
+  "complianceFrameworks": [
+    "ISO 9001",
+    "ISO 13485 (medical, optional)",
+    "FDA 21 CFR (food contact, optional)"
+  ]
+}

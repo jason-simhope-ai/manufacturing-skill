@@ -1,0 +1,30 @@
+{
+  "name": "pcb-assembly",
+  "displayName": "PCB 組裝",
+  "displayNameEn": "PCB Assembly",
+  "version": "0.0.1-stub",
+  "status": "stub",
+  "extends-core": true,
+  "description": "電子產品 PCB 組裝（SMT + DIP + 測試）。歡迎 contribute。",
+  "applicableTo": ["smt", "dip", "box-build", "ems"],
+  "tags": ["electronics", "pcb", "smt", "ems"],
+  "agents": [],
+  "skills": [],
+  "knowHow": [],
+  "hooks": [],
+  "wantedContributions": [
+    "smt-process-engineer agent",
+    "solder-paste-inspection skill",
+    "ipc-a-610 know-how",
+    "j-std-001 know-how",
+    "rework-process know-how",
+    "msl-management (Moisture Sensitivity Level) know-how"
+  ],
+  "complianceFrameworks": [
+    "IPC-A-610 (acceptability)",
+    "IPC-A-600 (PCB)",
+    "J-STD-001 (soldering)",
+    "RoHS / REACH",
+    "MSL (Moisture Sensitivity Level)"
+  ]
+}

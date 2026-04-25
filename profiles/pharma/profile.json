@@ -1,0 +1,41 @@
+{
+  "name": "pharma",
+  "displayName": "製藥",
+  "displayNameEn": "Pharmaceutical",
+  "version": "0.0.1-stub",
+  "status": "stub",
+  "extends-core": true,
+  "description": "製藥製造（含 GMP / 製藥追溯 / 批號管理）。歡迎 contribute。**製藥業導入 AI 的合規門檻極高**，contribution 須來自有 GMP 背景的人士。",
+  "applicableTo": ["api", "tablet", "injection", "biologics", "ointment"],
+  "tags": ["pharma", "gmp", "fda", "validation"],
+  "agents": [],
+  "skills": [],
+  "knowHow": [],
+  "hooks": [],
+  "wantedContributions": [
+    "qa-pharmacist agent (品保藥師)",
+    "validation-engineer agent (清潔/製程/設備驗證)",
+    "deviation-handler agent (偏差處理)",
+    "batch-record-review skill",
+    "process-validation skill (PV)",
+    "computer-system-validation skill (CSV)",
+    "data-integrity skill (ALCOA+)",
+    "gmp know-how (PIC/S, EU GMP, US FDA)",
+    "ich-q-series know-how (Q7, Q8, Q9, Q10)",
+    "21-cfr-part-11 know-how (electronic records)",
+    "data-integrity-alcoa-plus know-how"
+  ],
+  "complianceFrameworks": [
+    "GMP (PIC/S, EU GMP, US FDA cGMP)",
+    "ICH Q7 / Q8 / Q9 / Q10 / Q11",
+    "21 CFR Part 11 (electronic records)",
+    "ICH E6 (R3) GCP (clinical, optional)",
+    "Annex 11 (computerized systems)"
+  ],
+  "warnings": [
+    "AI agent 在製藥環境須經 CSV (Computer System Validation)",
+    "所有 AI 產出均不可直接作為 batch record",
+    "資料完整性 (ALCOA+) 是硬要求",
+    "建議僅用於非 GxP 範圍：報價、排程、文件草稿"
+  ]
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "machine": "CNC#1",
+    "type": "3-axis VMC",
+    "available_hours_7d": 56,
+    "scheduled_hours_7d": 32,
+    "load_pct": 0.571,
+    "next_available": "2026-04-26T15:00:00Z",
+    "status": "ok"
+  },
+  {
+    "machine": "CNC#3",
+    "type": "3-axis VMC",
+    "available_hours_7d": 56,
+    "scheduled_hours_7d": 53,
+    "load_pct": 0.946,
+    "next_available": "2026-05-02T08:00:00Z",
+    "status": "bottleneck"
+  },
+  {
+    "machine": "CNC#5",
+    "type": "5-axis VMC",
+    "available_hours_7d": 56,
+    "scheduled_hours_7d": 41,
+    "load_pct": 0.732,
+    "next_available": "2026-04-29T13:00:00Z",
+    "status": "ok"
+  },
+  {
+    "machine": "Lathe#1",
+    "type": "CNC turning",
+    "available_hours_7d": 56,
+    "scheduled_hours_7d": 22,
+    "load_pct": 0.393,
+    "next_available": "2026-04-26T10:00:00Z",
+    "status": "ok"
+  },
+  {
+    "machine": "Grinder#1",
+    "type": "Surface grinder",
+    "available_hours_7d": 40,
+    "scheduled_hours_7d": 35,
+    "load_pct": 0.875,
+    "next_available": "2026-04-30T16:00:00Z",
+    "status": "bottleneck"
+  }
+]

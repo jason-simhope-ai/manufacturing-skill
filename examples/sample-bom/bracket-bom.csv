@@ -1,0 +1,8 @@
+level,part_no,part_name,spec,unit,qty_per,scrap_pct,supplier,lead_time_days,abc_class
+0,BR-12345,不鏽鋼支架,SUS304 50x30x10,PCS,1,0,SELF-MADE,0,A
+1,RAW-SUS304-P10,SUS304 板材,50x30x10mm,PCS,1,5,供應商X,7,A
+1,FINISH-ANO2-BLK,陽極氧化 II 級黑,>=10μm,PCS,1,0,外包Y,5,B
+1,CONS-CUTOIL-32,切削油,#32,L,0.05,0,供應商Z,3,C
+1,CONS-DEBURR-TOOL,去毛邊工具耗材,共耗,EA,0.01,0,供應商Z,3,C
+1,PKG-BOX-STD-50,標準紙箱 50 件入,330x230x120mm,EA,0.02,0,供應商P,3,C
+1,PKG-RUSTOIL,防銹油,小包,PCS,1,0,供應商Z,3,C
