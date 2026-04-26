@@ -148,7 +148,9 @@ if [[ ! -d "${CLAUDE_DIR}" ]]; then
   echo "⚠️ Claude Code config dir not found at ${CLAUDE_DIR}"
   echo "   Create it? [y/N]"
   read -r answer
-  if [[ "${answer,,}" != "y" ]]; then
+  # Lowercase in a bash-3.2-compatible way (macOS default bash is still 3.2)
+  answer_lower="$(printf '%s' "${answer}" | tr '[:upper:]' '[:lower:]')"
+  if [[ "${answer_lower}" != "y" ]]; then
     echo "Aborted."
     exit 1
   fi

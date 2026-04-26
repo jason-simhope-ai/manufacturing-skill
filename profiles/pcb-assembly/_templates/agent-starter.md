@@ -65,4 +65,4 @@ tools: [Read, Grep, Glob, Bash]
 4. 改 `profile.json` 的 `status` 從 `"stub"` 拿掉（變 complete）
 5. 提 PR
 
-範本見 [`profiles/cnc-machining/`](../cnc-machining/) — 那是 v1 唯一完整 profile。
+範本見 [`profiles/cnc-machining/`](../../cnc-machining/) — 那是 v1 唯一完整 profile。

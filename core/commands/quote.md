@@ -18,7 +18,7 @@ argument-hint: "[圖紙路徑或 RFQ 檔案] [選用：客戶名稱]"
 ## 使用範例
 
 ```
-/quote @examples/sample-drawing/bracket.png
+/quote @examples/sample-drawing/bracket.md
 /quote @customer-rfq/客戶A-2026Q2.pdf 客戶A
 /quote 「我們需要一批不鏽鋼304的支架，數量100個，公差±0.05mm」
 ```

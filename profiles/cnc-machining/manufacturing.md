@@ -89,4 +89,4 @@ v0.1 暫無 override，CNC profile 只「加」不「改」。
 
 - 看完 [profiles/cnc-machining/agents/cnc-programmer.md](agents/cnc-programmer.md) 了解主要角色
 - 看 [docs/explainers/03-使用者cheatsheet.html](../../docs/explainers/03-使用者cheatsheet.html) CNC 區塊
-- 跑 `/quote @../../examples/sample-drawing/bracket.png` 體驗完整 demo
+- 跑 `/quote @../../examples/sample-drawing/bracket.md` 體驗完整 demo

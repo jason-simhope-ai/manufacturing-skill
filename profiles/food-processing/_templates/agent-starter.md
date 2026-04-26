@@ -47,4 +47,4 @@ tools: [Read, Grep, Glob, Bash]
 
 合規重點：HACCP, ISO 22000, GMP food, FSSC 22000, FDA 21 CFR (出口美國), Halal/Kosher (依市場)
 
-範本見 [`profiles/cnc-machining/`](../cnc-machining/)。
+範本見 [`profiles/cnc-machining/`](../../cnc-machining/)。

@@ -50,4 +50,4 @@ tools: [Read, Grep, Glob, Bash]
 2. `molding-process-engineer` — 射出參數、不良排除（短射、縮水、翹曲）
 3. `mold-maintenance-coordinator` — 模具保養、壽命追蹤
 
-範本見 [`profiles/cnc-machining/`](../cnc-machining/)。
+範本見 [`profiles/cnc-machining/`](../../cnc-machining/)。
