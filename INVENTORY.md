@@ -238,7 +238,7 @@ INVENTORY.md              ← 這份
 core/  agents           : 6
 core/  commands         : 9
 core/  skills           : 11
-core/  know-how         : 7
+core/  know-how         : 8
 core/  hooks            : 4
 CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest

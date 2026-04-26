@@ -196,10 +196,16 @@ fi
 # Stage 4: write install marker
 ACTIVE_PROFILE_VAL="${PROFILE}"
 if [[ "${CORE_ONLY}" == "true" ]]; then ACTIVE_PROFILE_VAL="(core-only)"; fi
+# Extract just the version VALUE (the bit between quotes after "version":)
+# Avoids the v0.1.2 bug where the whole `"version": "0.1.2"` string was
+# substituted into a JSON string field, producing nested quotes.
+PLUGIN_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "${PLUGIN_ROOT}/plugin.json" \
+  | head -1 \
+  | sed -E 's/.*"([^"]*)"$/\1/')
 cat > "${TARGET_DIR}/.installed" <<EOF
 {
   "installedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "pluginVersion": "$(grep -oE '"version"[^,]*' "${PLUGIN_ROOT}/plugin.json" | head -1)",
+  "pluginVersion": "${PLUGIN_VERSION}",
   "activeProfile": "${ACTIVE_PROFILE_VAL}",
   "source": "${PLUGIN_ROOT}"
 }
