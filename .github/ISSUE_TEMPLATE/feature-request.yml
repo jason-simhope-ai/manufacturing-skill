@@ -1,0 +1,58 @@
+name: 💡 Feature request
+description: Suggest a new capability, improvement, or workflow.
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want to propose a new vertical profile (PCB / injection / food / pharma / etc.) instead?
+        Use the **Profile contribution** template — it asks the right questions for that flow.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user / scenario / pain point. "I'd like X" is fine; "Y is hard to do because Z" is better.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Your proposed solution
+      description: What would you like the plugin to do? Concrete behaviour > vague vision.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Did you think about other ways to solve this? Why is the proposal above better than them?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Where does this belong?
+      multiple: true
+      options:
+        - core agent / skill (applies to all manufacturing)
+        - existing profile (CNC)
+        - new profile (one of the stubs)
+        - install.sh / adapters
+        - infra (MCP server / on-prem guide)
+        - docs / explainers
+        - tooling / CI
+        - unsure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be willing to send a PR for this if the design is agreed.
+        - label: I have domain expertise in this area (please describe in extra context).

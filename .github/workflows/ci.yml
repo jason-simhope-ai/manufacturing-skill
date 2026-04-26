@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel duplicate runs on the same branch (push then PR open) to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate repo well-formedness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # Step 1: All JSON files must parse
+      # ---------------------------------------------------------------
+      - name: JSON syntax validation
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! python3 -m json.tool "$f" > /dev/null; then
+              echo "::error file=$f::Invalid JSON"
+              fail=1
+            else
+              echo "ok  $f"
+            fi
+          done < <(find . \
+              -path ./node_modules -prune -o \
+              -path ./.git -prune -o \
+              -name '*.json' -print0)
+          exit $fail
+
+      # ---------------------------------------------------------------
+      # Step 2: plugin.json must declare its required top-level fields
+      # ---------------------------------------------------------------
+      - name: plugin.json schema sanity
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          required = {"name", "displayName", "version", "license", "profiles"}
+          p = json.load(open("plugin.json", encoding="utf-8"))
+          missing = required - p.keys()
+          if missing:
+              print(f"::error file=plugin.json::Missing required fields: {missing}")
+              sys.exit(1)
+          if not p["name"]:
+              print("::error file=plugin.json::name is empty")
+              sys.exit(1)
+          if "available" not in p["profiles"]:
+              print("::error file=plugin.json::profiles.available list missing")
+              sys.exit(1)
+          print(f"plugin.json OK — {p['name']} v{p['version']}, {len(p['profiles']['available'])} profiles available")
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 3: Each profile.json declared in plugin.json must exist
+      #          and reference files that exist
+      # ---------------------------------------------------------------
+      - name: Profile manifests vs filesystem
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          p = json.load(open("plugin.json", encoding="utf-8"))
+          fail = False
+          for name in p["profiles"]["available"]:
+              pj = f"profiles/{name}/profile.json"
+              if not os.path.isfile(pj):
+                  print(f"::error file=plugin.json::profile {name!r} listed but {pj} missing")
+                  fail = True
+                  continue
+              prof = json.load(open(pj, encoding="utf-8"))
+              for kind, dirname in [("agents","agents"),("skills","skills"),("knowHow","know-how"),("hooks","hooks")]:
+                  for item in prof.get(kind, []):
+                      path = f"profiles/{name}/{dirname}/{item}.md"
+                      if not os.path.isfile(path):
+                          print(f"::error file={pj}::{kind} entry {item!r} but {path} not found")
+                          fail = True
+              print(f"ok  profiles/{name}")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 4: Markdown frontmatter sanity for agents and commands
+      # ---------------------------------------------------------------
+      - name: Agent / command markdown frontmatter
+        run: |
+          python3 - <<'PY'
+          import os, sys, glob
+          fail = False
+          rules = {
+              "core/agents/*.md":            ["name", "description", "model"],
+              "profiles/*/agents/*.md":      ["name", "description", "model"],
+              "core/commands/*.md":          ["name", "description", "allowed-tools"],
+              "core/skills/*.md":            ["name", "description"],
+              "profiles/*/skills/*.md":      ["name", "description"],
+          }
+          for pattern, required in rules.items():
+              for f in glob.glob(pattern):
+                  if os.path.basename(f).startswith("_"):
+                      continue
+                  with open(f, encoding="utf-8") as fp:
+                      head = "".join(fp.readlines()[:25])
+                  if not head.startswith("---"):
+                      print(f"::error file={f}::missing YAML frontmatter")
+                      fail = True
+                      continue
+                  for key in required:
+                      if f"\n{key}:" not in head and not head.startswith(f"{key}:"):
+                          print(f"::error file={f}::frontmatter missing required field {key!r}")
+                          fail = True
+                  print(f"ok  {f}")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 5: install.sh syntax must be POSIX-bash compatible
+      # ---------------------------------------------------------------
+      - name: install.sh syntax (bash -n)
+        run: bash -n adapters/claude-code/install.sh
+
+      # ---------------------------------------------------------------
+      # Step 6: Confirm no bash 4+ feature regressed in
+      # ---------------------------------------------------------------
+      - name: install.sh — no bash 4+ syntax
+        run: |
+          if grep -nE '\$\{[a-zA-Z_]+,,\}|\$\{[a-zA-Z_]+\^\^\}|declare -A|mapfile' adapters/claude-code/install.sh; then
+            echo "::error file=adapters/claude-code/install.sh::bash 4+ feature found — must stay POSIX bash 3.2 compatible (macOS default)"
+            exit 1
+          fi
+          echo "ok  install.sh stays bash 3.2-compatible"

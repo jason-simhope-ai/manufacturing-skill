@@ -1,0 +1,88 @@
+name: 🐞 Bug report
+description: Something in the plugin behaved differently from what the docs say.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include the information below — it dramatically reduces the back-and-forth.
+        For security issues, do **not** open a public issue — see [SECURITY.md](../SECURITY.md).
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: From `plugin.json` or `~/.claude/plugins/manufacturing-skill/plugin.json`.
+      placeholder: "0.1.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Active profile
+      options:
+        - core-only
+        - cnc-machining
+        - pcb-assembly
+        - injection-molding
+        - food-processing
+        - pharma
+        - custom (describe in the body)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: claude-mode
+    attributes:
+      label: Where you ran into it
+      options:
+        - Claude Code CLI (terminal)
+        - Claude Code desktop app
+        - Claude Code web (claude.ai/code)
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / shell
+      placeholder: "Windows 11 / Git Bash, or macOS 14 / zsh, or Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the actual behaviour. Paste exact error output if any.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: What you expected
+      description: What did the docs / `/manufacturing` output / common sense lead you to expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `bash adapters/claude-code/install.sh ...`
+        2. In Claude Code, type `/quote ...`
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Logs, screenshots, gut feelings about what might be wrong, related issues you found.
+    validations:
+      required: false

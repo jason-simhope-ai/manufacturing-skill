@@ -1,0 +1,99 @@
+name: 🏭 Profile contribution
+description: Propose to build, complete, or upgrade a vertical profile (PCB / injection / food / pharma / new vertical).
+labels: ["profile-contribution", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for considering a profile contribution. Vertical profiles are how this plugin grows beyond CNC.
+        See [docs/profile-development.md](../docs/profile-development.md) for the structure you'd be filling in.
+
+  - type: dropdown
+    id: vertical
+    attributes:
+      label: Which vertical?
+      options:
+        - pcb-assembly (currently stub)
+        - injection-molding (currently alpha)
+        - food-processing (currently stub)
+        - pharma (currently stub)
+        - sheet-metal (new)
+        - mold-making (new)
+        - textile (new)
+        - chemicals (new)
+        - other (describe in body)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target-status
+    attributes:
+      label: Target status after your contribution
+      description: Be honest — alpha is a great place to land if you're not in the trade full-time.
+      options:
+        - "alpha — minimal viable (1 agent + 1 skill + 1-2 know-how, labelled needs-validation)"
+        - "beta — half-complete (2-3 agents + 2-3 skills + 3-4 know-how, useful but not authoritative)"
+        - "complete — production-grade (full set, validated by an active practitioner)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: experience
+    attributes:
+      label: Your domain experience
+      description: |
+        Be honest. "I worked 5 years in injection molding QC" carries different weight from "I read three textbooks."
+        We accept either, but we label them differently.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Planned scope
+      description: |
+        List the agents / skills / know-how / hooks you intend to add. The CNC profile is the reference shape.
+      placeholder: |
+        Agents:
+        - mold-designer
+        - molding-process-engineer
+
+        Skills:
+        - shot-weight-calc
+        - cooling-time-calc
+
+        Know-how:
+        - common-defects
+        - polymer-material-database
+    validations:
+      required: true
+
+  - type: textarea
+    id: compliance
+    attributes:
+      label: Compliance frameworks this profile should know about
+      description: e.g. for food → HACCP / ISO 22000 / FDA 21 CFR / Halal / Kosher
+    validations:
+      required: false
+
+  - type: dropdown
+    id: timeline
+    attributes:
+      label: Rough timeline
+      options:
+        - "I'll send a PR within 2 weeks"
+        - "1–2 months"
+        - "Eventually — let's discuss"
+        - "I want someone else to do this and I'm offering to fund / sponsor it"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledge
+      options:
+        - label: I have read [docs/profile-development.md](../docs/profile-development.md) and understand the file structure expected.
+          required: true
+        - label: I understand all content I contribute will be MIT-licensed.
+          required: true
