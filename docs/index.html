@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>manufacturing-skill — 製造業 AI 導入起手包</title>
+<meta name="description" content="開源 Claude Code plugin。讓任何製造業 30 分鐘建好對應自己 vertical 的 AI 助理 — 不用買硬體，雲端就能跑。MIT 授權。">
+<meta property="og:title" content="manufacturing-skill — 製造業 AI 導入起手包">
+<meta property="og:description" content="開源 Claude Code plugin。30 分鐘建好對應自己 vertical 的 AI 助理。">
+<meta property="og:image" content="https://raw.githubusercontent.com/jason-simhope-ai/manufacturing-skill/main/docs/demo/screenshots/real-quote-demo.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #fafaf7;
+    --bg-card: #ffffff;
+    --border: #d4ceb8;
+    --text: #2c2a26;
+    --text-soft: #6b665e;
+    --text-mute: #8a857c;
+    --c-blue: #5a7892;
+    --c-green: #6b8a4c;
+    --c-orange: #c9956b;
+    --c-purple: #8a6a8c;
+    --c-red: #b07050;
+    --c-amber: #a78050;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", -apple-system, "Inter", sans-serif;
+    background: var(--bg); color: var(--text);
+    font-size: 15px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Top nav */
+  .nav {
+    display: flex; align-items: center; gap: 18px;
+    padding: 18px 24px; max-width: 1100px; margin: 0 auto;
+    font-size: 13.5px;
+  }
+  .nav .brand { font-weight: 700; color: var(--text); font-size: 15px; }
+  .nav .brand-tag { color: var(--text-mute); font-size: 11px; font-family: "JetBrains Mono", monospace; margin-left: 6px; }
+  .nav .links { margin-left: auto; display: flex; gap: 18px; }
+  .nav .links a { color: var(--text-soft); text-decoration: none; }
+  .nav .links a:hover { color: var(--c-orange); }
+  .nav .cta {
+    background: var(--text); color: var(--bg-card);
+    padding: 7px 14px; border-radius: 6px; text-decoration: none;
+    font-weight: 600;
+  }
+  .nav .cta:hover { background: var(--c-orange); color: white; }
+
+  /* Hero */
+  .hero {
+    padding: 50px 0 30px;
+    text-align: center;
+  }
+  .hero .eyebrow {
+    color: var(--c-orange); font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-size: 44px; line-height: 1.2; font-weight: 800;
+    margin-bottom: 18px;
+    letter-spacing: -0.5px;
+  }
+  .hero h1 em {
+    font-style: normal; color: var(--c-orange);
+  }
+  .hero .sub {
+    font-size: 17px; color: var(--text-soft); max-width: 720px;
+    margin: 0 auto 28px; line-height: 1.7;
+  }
+  .hero .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 11px 22px; border-radius: 7px;
+    font-weight: 600; font-size: 14.5px; text-decoration: none;
+    border: 1px solid transparent;
+    transition: transform 0.1s, background 0.2s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary {
+    background: var(--text); color: var(--bg-card);
+  }
+  .btn-primary:hover { background: var(--c-orange); }
+  .btn-secondary {
+    background: transparent; color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg-card); border-color: var(--c-orange); color: var(--c-orange); }
+  .pill-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; }
+  .pill {
+    padding: 4px 11px; border-radius: 14px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    color: var(--text-soft);
+  }
+
+  /* Demo banner image */
+  .demo-section {
+    padding: 0 0 50px;
+  }
+  .demo-figure {
+    max-width: 880px; margin: 0 auto;
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  }
+  .demo-figure img { width: 100%; display: block; }
+  .demo-caption {
+    text-align: center; max-width: 720px; margin: 16px auto 0;
+    font-size: 13px; color: var(--text-mute); line-height: 1.7;
+  }
+  .demo-caption strong { color: var(--c-orange); }
+
+  /* Section heading */
+  .section { padding: 50px 0; }
+  .section-head { text-align: center; margin-bottom: 36px; }
+  .section-eyebrow {
+    color: var(--c-orange); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.3px;
+    margin-bottom: 10px;
+  }
+  .section-sub { color: var(--text-soft); font-size: 15px; }
+
+  /* Audience cards */
+  .audience-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  @media (max-width: 800px) { .audience-grid { grid-template-columns: 1fr; } }
+  .audience-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 24px; text-decoration: none; color: var(--text);
+    display: flex; flex-direction: column;
+    transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .audience-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(0,0,0,0.08); border-color: var(--c-orange); }
+  .audience-icon { font-size: 28px; margin-bottom: 12px; }
+  .audience-role { font-size: 11px; font-weight: 700; color: var(--c-orange); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+  .audience-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .audience-desc { font-size: 13.5px; color: var(--text-soft); line-height: 1.6; flex: 1; }
+  .audience-link { font-size: 12px; color: var(--c-orange); margin-top: 14px; font-weight: 600; }
+
+  /* Lazy pack hero card */
+  .lazy-card {
+    background: linear-gradient(135deg, var(--c-orange) 0%, var(--c-amber) 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 30px auto 0;
+    max-width: 880px;
+    display: flex; gap: 24px; align-items: center;
+    text-decoration: none;
+    transition: transform 0.15s;
+  }
+  .lazy-card:hover { transform: translateY(-2px); }
+  .lazy-card .icon { font-size: 56px; flex-shrink: 0; }
+  .lazy-card h3 { font-size: 22px; margin-bottom: 6px; color: white; }
+  .lazy-card p { color: rgba(255,255,255,0.92); font-size: 14px; }
+  .lazy-card .arrow { font-size: 28px; margin-left: auto; opacity: 0.7; }
+  @media (max-width: 600px) { .lazy-card { flex-direction: column; text-align: center; } .lazy-card .arrow { margin-left: 0; margin-top: 12px; } }
+
+  /* Quick start */
+  .quickstart {
+    background: #2c2a26; color: #e8e4d8;
+    padding: 50px 0;
+  }
+  .quickstart .section-title { color: white; }
+  .quickstart .section-sub { color: rgba(255,255,255,0.65); }
+  .quickstart .section-eyebrow { color: var(--c-orange); }
+  .terminal {
+    background: #1c1b18; border-radius: 10px;
+    padding: 22px 26px;
+    max-width: 760px; margin: 0 auto;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 13.5px; line-height: 1.85;
+    border: 1px solid #3a3936;
+  }
+  .terminal .prompt { color: #6fc28f; }
+  .terminal .cmd { color: #d8d4c8; }
+  .terminal .hint { color: #888; font-style: italic; }
+  .terminal .ok { color: #6fc28f; }
+  .qs-cta { text-align: center; margin-top: 22px; }
+  .qs-cta a { color: var(--c-orange); text-decoration: none; font-weight: 600; }
+  .qs-cta a:hover { text-decoration: underline; }
+
+  /* Architecture summary */
+  .arch-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    max-width: 980px; margin: 0 auto;
+  }
+  @media (max-width: 800px) { .arch-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .arch-grid { grid-template-columns: 1fr; } }
+  .arch-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 18px;
+  }
+  .arch-num {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    color: white; font-size: 11px; font-weight: 700; font-family: "JetBrains Mono", monospace;
+    margin-bottom: 6px;
+  }
+  .arch-num.l1 { background: var(--c-blue); }
+  .arch-num.l2 { background: var(--c-green); }
+  .arch-num.l3 { background: var(--c-amber); }
+  .arch-num.l4 { background: var(--c-purple); }
+  .arch-num.l5 { background: #7a8c5e; }
+  .arch-num.l6 { background: var(--c-red); }
+  .arch-card h4 { font-size: 14.5px; margin-bottom: 4px; }
+  .arch-card p { font-size: 12.5px; color: var(--text-soft); }
+
+  /* Why section */
+  .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 980px; margin: 0 auto; }
+  @media (max-width: 800px) { .why-grid { grid-template-columns: 1fr; } }
+  .why-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .why-card .pain { color: var(--c-red); font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .why-card .answer { font-size: 13.5px; color: var(--text-soft); }
+
+  /* CTA stripe */
+  .cta-stripe {
+    background: var(--text); color: var(--bg-card);
+    padding: 48px 0; text-align: center;
+  }
+  .cta-stripe h2 { font-size: 26px; margin-bottom: 8px; }
+  .cta-stripe p { color: rgba(255,255,255,0.75); font-size: 14.5px; margin-bottom: 22px; }
+
+  /* Footer */
+  footer { padding: 30px 0 50px; text-align: center; font-size: 12.5px; color: var(--text-mute); }
+  footer a { color: var(--text-soft); text-decoration: none; margin: 0 8px; }
+  footer a:hover { color: var(--c-orange); }
+  footer .credit { margin-top: 8px; font-size: 11.5px; }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 32px; }
+    .hero .sub { font-size: 15px; }
+    .nav .links { display: none; }
+    .nav .cta { padding: 6px 11px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="brand">manufacturing-skill <span class="brand-tag">v0.1</span></span>
+  <div class="links">
+    <a href="#demo">Demo</a>
+    <a href="#audience">三種人各看一張</a>
+    <a href="#quickstart">30 秒安裝</a>
+    <a href="#why">為什麼</a>
+    <a href="explainers/04-懶人包-5分鐘上手.html">懶人包</a>
+  </div>
+  <a class="cta" href="https://github.com/jason-simhope-ai/manufacturing-skill" target="_blank">GitHub →</a>
+</nav>
+
+<header class="hero container">
+  <div class="eyebrow">⭐ 製造業 AI 導入起手包 · MIT 開源</div>
+  <h1>30 分鐘讓 AI 變成<br>你工廠的<em>「新員工」</em></h1>
+  <p class="sub">
+    一個 Claude Code plugin。內建報價師、業助、生管、品管、倉管 5 隻 AI agent，懂 ISO 9001、Lean、OEE、IATF 16949。
+    雲端能跑、不用買硬體；客戶會稽核也能切到地端。
+  </p>
+  <div class="cta-row">
+    <a class="btn btn-primary" href="https://github.com/jason-simhope-ai/manufacturing-skill" target="_blank">看 GitHub Repo</a>
+    <a class="btn btn-secondary" href="#demo">看真實 demo</a>
+    <a class="btn btn-secondary" href="explainers/04-懶人包-5分鐘上手.html">5 分鐘懶人包 ⭐</a>
+  </div>
+  <div class="pill-row">
+    <span class="pill">9 隻 AI agent</span>
+    <span class="pill">12 個 skill</span>
+    <span class="pill">8 份 know-how</span>
+    <span class="pill">5 個 vertical profile</span>
+    <span class="pill">4 張可印 A3 explainer</span>
+  </div>
+</header>
+
+<!-- Demo banner -->
+<section id="demo" class="demo-section container">
+  <div class="demo-figure">
+    <img src="demo/screenshots/real-quote-demo.png" alt="Real Claude Opus 4.7 response acting as quote-specialist">
+  </div>
+  <p class="demo-caption">
+    ↑ <strong>真實 Claude Opus 4.7</strong> 對 manufacturing-skill <code>quote-specialist</code> prompt 的實際回應。
+    AI 抓到客戶 RFQ 中真實工程矛盾：<strong>SUS304 不鏽鋼不能陽極處理</strong>，提出 3 個替代方案要客戶書面確認。
+    這就是 plugin 把這層判斷力預載進 Claude 的目的。
+  </p>
+</section>
+
+<!-- 3 audiences -->
+<section id="audience" class="container section">
+  <div class="section-head">
+    <div class="section-eyebrow">PRINT-READY EXPLAINERS</div>
+    <h2 class="section-title">三種人各看一張就懂</h2>
+    <p class="section-sub">不需要工程師翻譯。可印 A3 掛牆。</p>
+  </div>
+
+  <div class="audience-grid">
+    <a class="audience-card" href="explainers/01-架構總覽.html">
+      <div class="audience-icon">📊</div>
+      <div class="audience-role">給老闆 / 二代</div>
+      <div class="audience-title">架構總覽</div>
+      <div class="audience-desc">5 分鐘看懂能解決什麼。內建名詞解釋（用比喻說清楚），給不熟 AI 的決策者。</div>
+      <div class="audience-link">打開 →</div>
+    </a>
+
+    <a class="audience-card" href="explainers/02-IT部門系統說明.html">
+      <div class="audience-icon">🛡️</div>
+      <div class="audience-role">給 IT 部門</div>
+      <div class="audience-title">系統說明</div>
+      <div class="audience-desc">Infra / Security / Ops 視角。把 AI 術語對照成傳統 IT（Agent ≈ RPA、MCP ≈ ESB、Local LLM ≈ 自建 server）。</div>
+      <div class="audience-link">打開 →</div>
+    </a>
+
+    <a class="audience-card" href="explainers/03-使用者cheatsheet.html">
+      <div class="audience-icon">📋</div>
+      <div class="audience-role">給業助 / 廠長 / 品管</div>
+      <div class="audience-title">每日 Cheatsheet</div>
+      <div class="audience-desc">每天會用到的指令、按字母快查、求救順序。印一張掛牆面就好。</div>
+      <div class="audience-link">打開 →</div>
+    </a>
+  </div>
+
+  <a class="lazy-card" href="explainers/04-懶人包-5分鐘上手.html">
+    <div class="icon">⭐</div>
+    <div>
+      <h3>不想看字？看這張就好。</h3>
+      <p>6 步驟視覺化操作流程：clone → 互動選 profile → 第一個 /quote → 查訂單 → 品檢 → 客製。</p>
+    </div>
+    <div class="arrow">→</div>
+  </a>
+</section>
+
+<!-- Quickstart -->
+<section id="quickstart" class="quickstart">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-eyebrow">QUICK START</div>
+      <h2 class="section-title">30 秒安裝、60 秒第一個報價</h2>
+      <p class="section-sub">不用買硬體。一般電腦的 Claude Code 就能跑。</p>
+    </div>
+
+    <div class="terminal">
+<span class="hint"># 1. Clone</span>
+<span class="prompt">$</span> <span class="cmd">git clone https://github.com/jason-simhope-ai/manufacturing-skill.git</span>
+<span class="prompt">$</span> <span class="cmd">cd manufacturing-skill</span>
+
+<span class="hint"># 2. 互動選 profile（CNC / PCB / 射出 / 食品 / 製藥 / core-only）</span>
+<span class="prompt">$</span> <span class="cmd">bash adapters/claude-code/install.sh</span>
+<span class="ok">✅ Installation complete.</span>
+
+<span class="hint"># 3. 在 Claude Code 內試</span>
+<span class="cmd">/manufacturing init     # 第一次用打這個，AI 引導 4 個問題</span>
+<span class="cmd">/quote @examples/sample-drawing/bracket.md</span>
+    </div>
+
+    <div class="qs-cta">
+      不會 git clone？<a href="https://github.com/jason-simhope-ai/manufacturing-skill" target="_blank">在 GitHub 點 Code → Download ZIP →</a>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section container">
+  <div class="section-head">
+    <div class="section-eyebrow">ARCHITECTURE</div>
+    <h2 class="section-title">六層架構 · 兩階 overlay</h2>
+    <p class="section-sub">所有製造業共通的 core，加上你那個 vertical 的 profile。</p>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-card">
+      <span class="arch-num l1">1 USE</span>
+      <h4>使用者入口</h4>
+      <p>每天打的 slash commands：/quote /order-status /bom-check /inspect</p>
+    </div>
+    <div class="arch-card">
+      <span class="arch-num l2">2 FLOW</span>
+      <h4>6 段流程</h4>
+      <p>報價 → 接單 → 排程 → 生產 → 檢驗 → 出貨</p>
+    </div>
+    <div class="arch-card">
+      <span class="arch-num l3">3 ROLE</span>
+      <h4>角色 persona</h4>
+      <p>5 隻 core agent + CNC profile 加碼 4 隻專精</p>
+    </div>
+    <div class="arch-card">
+      <span class="arch-num l4">4 INFRA</span>
+      <h4>基礎設施</h4>
+      <p>MCP 接 ERP/MES、地端 LLM、檔案規範</p>
+    </div>
+    <div class="arch-card">
+      <span class="arch-num l5">5 REF</span>
+      <h4>參考知識</h4>
+      <p>ISO 9001 / IATF 16949 / Lean / OEE / SPC / MRP</p>
+    </div>
+    <div class="arch-card">
+      <span class="arch-num l6">6 HOOK</span>
+      <h4>生命週期</h4>
+      <p>pre-quote / post-order / pre-ship / on-error</p>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 24px;">
+    <a class="btn btn-secondary" href="explainers/01-架構總覽.html">看完整架構圖 →</a>
+  </div>
+</section>
+
+<!-- Why -->
+<section id="why" class="section container" style="background: #f3efe3; padding-left: 24px; padding-right: 24px; border-radius: 14px; margin: 40px auto;">
+  <div class="section-head">
+    <div class="section-eyebrow">WHY</div>
+    <h2 class="section-title">製造業導入 AI 死在哪 · 我們解什麼</h2>
+  </div>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="pain">❌ AI 不懂製造業術語</div>
+      <p class="answer">傳統作法：自己訓 LLM、自己寫 prompt — 卡在沒人會。<br>本 plugin：5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE。</p>
+    </div>
+    <div class="why-card">
+      <div class="pain">❌ 各家流程都不一樣</div>
+      <p class="answer">傳統作法：找 SI 客製、超貴超慢。<br>本 plugin：core + profile overlay 架構，企業 fork 後改 profile 就好。</p>
+    </div>
+    <div class="why-card">
+      <div class="pain">❌ IT 擋資安、客戶要稽核</div>
+      <p class="answer">傳統作法：雲端 SaaS 過不了 IATF 客戶稽核（圖紙不能外流）。<br>本 plugin：可切地端 GB10/Ollama 完全 air-gap。</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA stripe -->
+<section class="cta-stripe">
+  <h2>想試試看你的工廠導得起來嗎？</h2>
+  <p>聊聊不收錢。MIT 授權自由 fork、自由商用。</p>
+  <a class="btn btn-secondary" style="background: white; color: var(--text); border: none;" href="mailto:jasonlin@simhope.com.tw">jasonlin@simhope.com.tw →</a>
+</section>
+
+<footer class="container">
+  <div>
+    <a href="https://github.com/jason-simhope-ai/manufacturing-skill" target="_blank">GitHub</a> ·
+    <a href="https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/README.zh-TW.md" target="_blank">README 繁中</a> ·
+    <a href="https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/README.md" target="_blank">README EN</a> ·
+    <a href="https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/INVENTORY.md" target="_blank">INVENTORY</a> ·
+    <a href="https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/docs/adoption-guide.md" target="_blank">導入 playbook</a>
+  </div>
+  <div class="credit">
+    manufacturing-skill v0.1 · MIT License · Created at SIMHOPE · Maintained by
+    <a href="mailto:jasonlin@simhope.com.tw">Jason Lin</a>
+  </div>
+</footer>
+
+</body>
+</html>
