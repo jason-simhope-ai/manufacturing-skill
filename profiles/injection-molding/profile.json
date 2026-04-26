@@ -2,29 +2,36 @@
   "name": "injection-molding",
   "displayName": "射出成型",
   "displayNameEn": "Injection Molding",
-  "version": "0.0.1-stub",
-  "status": "stub",
+  "version": "0.1.0-alpha",
+  "status": "alpha",
   "extends-core": true,
-  "description": "塑膠射出成型（含模具設計與量產）。歡迎 contribute。",
+  "description": "塑膠射出成型（含模具設計與量產）。Alpha — 內容基於公開資料，需要射出廠工程師驗證。",
   "applicableTo": ["plastic", "thermoplastic", "thermoset", "tooling"],
   "tags": ["plastic", "injection", "molding"],
-  "agents": [],
-  "skills": [],
-  "knowHow": [],
+  "agents": ["mold-designer"],
+  "skills": ["shot-weight-calc"],
+  "knowHow": ["common-defects", "polymer-material-database"],
   "hooks": [],
   "wantedContributions": [
-    "mold-designer agent",
-    "molding-process-engineer agent",
-    "shot-weight-calc skill",
-    "cooling-time-calc skill",
-    "moldflow-analysis-review skill",
-    "common-defects (short-shot, sink, warpage, flash) know-how",
-    "polymer-material-database know-how",
-    "DFM-for-injection know-how"
+    "molding-process-engineer agent (cycle 參數調整、不良排除實戰)",
+    "mold-maintenance-coordinator agent (模具保養 / 壽命追蹤)",
+    "cooling-time-calc skill (冷卻時間 + cycle time 估算)",
+    "moldflow-analysis-review skill (模流分析判讀)",
+    "defect-troubleshooting skill (對策樹自動引導，目前是純 know-how)",
+    "DFM-for-injection know-how (deep-dive DFM rules)",
+    "mold-life-management know-how (鋼料、表處、壽命公式)",
+    "Validation by an active injection-molding engineer of all alpha content"
   ],
   "complianceFrameworks": [
     "ISO 9001",
     "ISO 13485 (medical, optional)",
-    "FDA 21 CFR (food contact, optional)"
+    "FDA 21 CFR (food contact, optional)",
+    "RoHS / REACH (EU sales)",
+    "UL 94 (flame rating)"
+  ],
+  "warnings": [
+    "Alpha 內容基於公開 supplier datasheet 與業界教科書，未經實戰驗證",
+    "polymer-material-database 的所有數值為泛用範圍，量產務必依採購 grade 的實際 datasheet 為準",
+    "common-defects 對策樹為通識，特定機台/材料的細節差異須對照該設備 manual"
   ]
 }

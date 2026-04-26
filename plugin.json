@@ -1,7 +1,7 @@
 {
   "name": "manufacturing-skill",
   "displayName": "Manufacturing Skill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI starter kit for manufacturers — fork it, profile it, ship it.",
   "author": {
     "name": "Jason Lin",
@@ -39,7 +39,8 @@
       "pharma"
     ],
     "complete": ["cnc-machining"],
-    "stub": ["pcb-assembly", "injection-molding", "food-processing", "pharma"],
+    "alpha": ["injection-molding"],
+    "stub": ["pcb-assembly", "food-processing", "pharma"],
     "default": "cnc-machining"
   },
   "languages": {

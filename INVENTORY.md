@@ -125,14 +125,24 @@ INVENTORY.md              ← 這份
 | Know-how (4) | [iatf-16949](profiles/cnc-machining/know-how/iatf-16949.md) · [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
 | Hooks (1)    | [pre-cnc-program-checkin](profiles/cnc-machining/hooks/pre-cnc-program-checkin.md)                                                                                                                                                                                                                      |
 
-#### Stub profiles（4 個 — 歡迎 contribute）
+#### `profiles/injection-molding/` — 🧪 v0.1.1 alpha profile
 
-| Profile                                          | manifest                                                                                                    | 預留範本                                                                               |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [pcb-assembly](profiles/pcb-assembly/)           | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)           | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)      |
-| [injection-molding](profiles/injection-molding/) | [profile.json](profiles/injection-molding/profile.json) · [README.md](profiles/injection-molding/README.md) | [\_templates/agent-starter.md](profiles/injection-molding/_templates/agent-starter.md) |
-| [food-processing](profiles/food-processing/)     | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md)     | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md)   |
-| [pharma](profiles/pharma/)                       | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                       | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)            |
+| 類別         | 內容                                                                                                                                                                    |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/injection-molding/profile.json) · [README.md](profiles/injection-molding/README.md)                                                             |
+| Agents (1)   | [mold-designer](profiles/injection-molding/agents/mold-designer.md)                                                                                                     |
+| Skills (1)   | [shot-weight-calc](profiles/injection-molding/skills/shot-weight-calc.md)                                                                                               |
+| Know-how (2) | [common-defects](profiles/injection-molding/know-how/common-defects.md) · [polymer-material-database](profiles/injection-molding/know-how/polymer-material-database.md) |
+
+> **Alpha 警告**：內容基於公開資料，未經實際射出廠工程師驗證。歡迎射出廠師傅 PR 修正。
+
+#### Stub profiles（3 個 — 歡迎 contribute）
+
+| Profile                                      | manifest                                                                                                | 預留範本                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
+| [food-processing](profiles/food-processing/) | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md) | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md) |
+| [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
 
@@ -211,22 +221,26 @@ INVENTORY.md              ← 這份
 
 ---
 
-## Repo metrics
+## Repo metrics（v0.1.1）
 
 ```
-頂層檔            : 6
-core/  agents     : 5
-core/  commands   : 7
-core/  skills     : 9
-core/  know-how   : 4
-core/  hooks      : 4
-CNC profile entries: 13 (4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest)
-Stub profiles     : 4 (manifest + README + _templates/agent-starter)
-Explainers (HTML) : 4 + 4 PNG snapshots
-Docs              : 4 (architecture / adoption-guide / profile-development / ROADMAP)
-Infra             : 2 MCP servers + 1 on-prem guide
-Examples          : 4 files
-Total tracked     : 91
+頂層檔                  : 9 (README × 2, LICENSE, plugin.json, manufacturing.md,
+                              INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY)
+core/  agents           : 5
+core/  commands         : 7
+core/  skills           : 9
+core/  know-how         : 4
+core/  hooks            : 4
+CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
+Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
+Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+Explainers (HTML)       : 4 + 4 PNG snapshots
+Demo                    : 2 styled HTML (繁中/EN) + 1 mock animation + 2 PNG
+Landing page            : docs/index.html (GitHub Pages from /docs)
+Docs                    : 4 (architecture / adoption-guide / profile-dev / ROADMAP)
+Infra                   : 2 MCP servers + 1 on-prem guide
+Examples                : 4 files
+.github/                : CI workflow + 3 issue templates + PR template
 ```
 
 ---
