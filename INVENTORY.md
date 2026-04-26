@@ -59,48 +59,57 @@ INVENTORY.md              ← 這份
 
 #### `core/commands/` — 7 個 slash commands
 
-| 指令                                                   | 用途                        |
-| ------------------------------------------------------ | --------------------------- |
-| [`/quote`](core/commands/quote.md)                     | 啟動報價（圖紙 / 描述都可） |
-| [`/order-status`](core/commands/order-status.md)       | 查訂單目前在哪段流程        |
-| [`/bom-check`](core/commands/bom-check.md)             | BOM 健檢 + 缺料預警         |
-| [`/inspect`](core/commands/inspect.md)                 | IQC / IPQC / FQC / OQC 檢驗 |
-| [`/install-profile`](core/commands/install-profile.md) | 切換 vertical profile       |
-| [`/manufacturing`](core/commands/manufacturing.md)     | 看 plugin 狀態              |
-| [`/manufacturing init`](core/commands/init.md)         | 第一次用的 4 問題引導       |
+| 指令                                                     | 用途                        |
+| -------------------------------------------------------- | --------------------------- |
+| [`/quote`](core/commands/quote.md)                       | 啟動報價（圖紙 / 描述都可） |
+| [`/order-status`](core/commands/order-status.md)         | 查訂單目前在哪段流程        |
+| [`/bom-check`](core/commands/bom-check.md)               | BOM 健檢 + 缺料預警         |
+| [`/inspect`](core/commands/inspect.md)                   | IQC / IPQC / FQC / OQC 檢驗 |
+| [`/install-profile`](core/commands/install-profile.md)   | 切換 vertical profile       |
+| [`/manufacturing`](core/commands/manufacturing.md)       | 看 plugin 狀態              |
+| [`/manufacturing init`](core/commands/init.md)           | 第一次用的 4 問題引導       |
+| [`/morning-briefing`](core/commands/morning-briefing.md) | 廠長每日 8 AM 早會懶人包    |
+| [`/8d`](core/commands/8d.md)                             | 啟動 8D 客訴 / 重大不良處理 |
 
-#### `core/agents/` — 5 隻 universal persona
+#### `core/agents/` — 6 隻 universal persona
 
-| Agent                                                     | 角色   |
-| --------------------------------------------------------- | ------ |
-| [`quote-specialist`](core/agents/quote-specialist.md)     | 報價師 |
-| [`sales-coordinator`](core/agents/sales-coordinator.md)   | 業助   |
-| [`production-planner`](core/agents/production-planner.md) | 生管   |
-| [`quality-inspector`](core/agents/quality-inspector.md)   | 品管   |
-| [`inventory-manager`](core/agents/inventory-manager.md)   | 倉管   |
+| Agent                                                                     | 角色               |
+| ------------------------------------------------------------------------- | ------------------ |
+| [`quote-specialist`](core/agents/quote-specialist.md)                     | 報價師             |
+| [`sales-coordinator`](core/agents/sales-coordinator.md)                   | 業助               |
+| [`production-planner`](core/agents/production-planner.md)                 | 生管               |
+| [`quality-inspector`](core/agents/quality-inspector.md)                   | 品管               |
+| [`inventory-manager`](core/agents/inventory-manager.md)                   | 倉管               |
+| [`engineering-change-manager`](core/agents/engineering-change-manager.md) | 工程變更經理 (ECM) |
 
-#### `core/skills/` — 9 個 skill（6 段流程 + 3 通用）
+#### `core/skills/` — 11 個 skill（6 段流程 + 5 通用）
 
-| Skill                                                 | 內容                    |
-| ----------------------------------------------------- | ----------------------- |
-| [01-報價](core/skills/01-報價.md)                     | RFQ → 結構化報價 6 步驟 |
-| [02-接單](core/skills/02-接單.md)                     | PO → SO → WO 對帳       |
-| [03-排程](core/skills/03-排程.md)                     | 派工 + 瓶頸識別         |
-| [04-生產](core/skills/04-生產.md)                     | 開工 + IPQC + 異常升級  |
-| [05-檢驗](core/skills/05-檢驗.md)                     | 4 階段檢驗 + NCR / 8D   |
-| [06-出貨](core/skills/06-出貨.md)                     | 包裝 + 文件 + 通知      |
-| [bom-management](core/skills/bom-management.md)       | EBOM↔MBOM、cost rollup  |
-| [capacity-planning](core/skills/capacity-planning.md) | 產能評估 + 瓶頸前瞻     |
-| [spc-basics](core/skills/spc-basics.md)               | 管制圖 + Cpk + 失控規則 |
+| Skill                                                                   | 內容                                          |
+| ----------------------------------------------------------------------- | --------------------------------------------- |
+| [01-報價](core/skills/01-報價.md)                                       | RFQ → 結構化報價 6 步驟                       |
+| [02-接單](core/skills/02-接單.md)                                       | PO → SO → WO 對帳                             |
+| [03-排程](core/skills/03-排程.md)                                       | 派工 + 瓶頸識別                               |
+| [04-生產](core/skills/04-生產.md)                                       | 開工 + IPQC + 異常升級                        |
+| [05-檢驗](core/skills/05-檢驗.md)                                       | 4 階段檢驗 + NCR / 8D                         |
+| [06-出貨](core/skills/06-出貨.md)                                       | 包裝 + 文件 + 通知                            |
+| [bom-management](core/skills/bom-management.md)                         | EBOM↔MBOM、cost rollup                        |
+| [capacity-planning](core/skills/capacity-planning.md)                   | 產能評估 + 瓶頸前瞻                           |
+| [spc-basics](core/skills/spc-basics.md)                                 | 管制圖 + Cpk + 失控規則                       |
+| [8d-report-writing](core/skills/8d-report-writing.md)                   | 8D 八步驟 + customer-deliverable template     |
+| [engineering-change-process](core/skills/engineering-change-process.md) | ECN/ECO 5 步驟 SOP + 13-item impact checklist |
 
-#### `core/know-how/` — 4 份普世知識
+#### `core/know-how/` — 7 份普世知識
 
-| 檔                                        | 內容                       |
-| ----------------------------------------- | -------------------------- |
-| [iso-9001](core/know-how/iso-9001.md)     | 品質管理體系 7 原則 + PDCA |
-| [lean-5s](core/know-how/lean-5s.md)       | 5S + 7 大浪費 + JIT        |
-| [oee](core/know-how/oee.md)               | 設備總效率公式 + 改善方向  |
-| [mrp-basics](core/know-how/mrp-basics.md) | MRP / Lead time / ABC 分類 |
+| 檔                                        | 內容                                            |
+| ----------------------------------------- | ----------------------------------------------- |
+| [iso-9001](core/know-how/iso-9001.md)     | 品質管理體系 7 原則 + PDCA                      |
+| [lean-5s](core/know-how/lean-5s.md)       | 5S + 7 大浪費 + JIT                             |
+| [oee](core/know-how/oee.md)               | 設備總效率公式 + 改善方向                       |
+| [mrp-basics](core/know-how/mrp-basics.md) | MRP / Lead time / ABC 分類                      |
+| [gd-and-t](core/know-how/gd-and-t.md)     | GD&T 14 符號 + datum 3-2-1 + MMC/LMC/RFS        |
+| [fmea-pfmea](core/know-how/fmea-pfmea.md) | AIAG-VDA 7 步法 + S/O/D + AP table              |
+| [incoterms](core/know-how/incoterms.md)   | INCOTERMS 2020 11 條款 + risk vs cost           |
+| [eco-ecn](core/know-how/eco-ecn.md)       | ECN/ECO 制度 + ISO 9001 §8.5.6 + Class I/II/III |
 
 #### `core/hooks/` — 4 個生命週期 hook
 
@@ -221,15 +230,15 @@ INVENTORY.md              ← 這份
 
 ---
 
-## Repo metrics（v0.1.1）
+## Repo metrics（v0.1.2）
 
 ```
 頂層檔                  : 9 (README × 2, LICENSE, plugin.json, manufacturing.md,
                               INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY)
-core/  agents           : 5
-core/  commands         : 7
-core/  skills           : 9
-core/  know-how         : 4
+core/  agents           : 6
+core/  commands         : 9
+core/  skills           : 11
+core/  know-how         : 7
 core/  hooks            : 4
 CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest

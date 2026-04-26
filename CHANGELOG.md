@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 — Nothing yet.
 
+## [0.1.2] — 2026-04-26
+
+### Added
+
+- **3 reference know-how docs** in `core/know-how/` that core agents repeatedly need:
+  - `gd-and-t.md` — 14 GD&T symbols (ASME Y14.5-2018), feature control frame parsing, MMC/LMC/RFS modifiers, datum 3-2-1 system, anti-patterns. Notes ISO 1101 differences and the 2018-removed Concentricity / Symmetry.
+  - `fmea-pfmea.md` — AIAG-VDA harmonized 7-step method (post-2019), S/O/D scoring with AP (Action Priority) replacing legacy RPN, worked PFMEA template row.
+  - `incoterms.md` — INCOTERMS 2020 covering all 11 terms, risk-vs-cost transfer diagram, FOB-vs-FCA on containers gotcha, 5 most-used patterns for Taiwan manufacturers.
+- **2 daily-use slash commands** in `core/commands/`:
+  - `/morning-briefing` — plant-manager 8 AM standup briefing aggregating yesterday's results, today's deliveries, this week's risks, pending decisions, equipment items. Dispatches to 4 core agents in parallel. Documents graceful degradation when scheduler-mcp / erp-connector aren't connected.
+  - `/8d` — triggers the 8D customer-complaint flow with worked example output for all eight disciplines.
+- **`8d-report-writing` skill** in `core/skills/`: full SOP for D1-D8 with completion signals, customer-deliverable template, corrective-action strength hierarchy (training weakest, source-elimination strongest), Why-5 worked example escalating from "operator carelessness" to a real systemic root cause, 9-item self-checklist.
+- **Engineering Change Management bundle** — fills one of the largest baseline gaps:
+  - `core/agents/engineering-change-manager.md` — cross-functional ECM lead persona owning ECN/ECO from request to closure. Worked impact-analysis example covering all 13 axes plus Class II classification reasoning.
+  - `core/skills/engineering-change-process.md` — 5-step SOP (ECR → Impact → CCB → Implementation → Verification & Closure) with 13-item impact-analysis checklist, 9-item sync-update list, hard-cutover-vs-soft-transition decision.
+  - `core/know-how/eco-ecn.md` — conceptual basis: ISO 9001 §8.5.6 + IATF 16949 §8.5.6.1 mapping, document hierarchy showing how a single drawing rev cascades to BOM/SOP/PFMEA/Control Plan/Work Instruction, recommended tooling by factory size.
+
+### Changed
+
+- **CI frontmatter check** now uses real PyYAML parsing instead of string-grep — eliminates false negatives when YAML key names appear inside markdown body examples.
+- **`.github/ISSUE_TEMPLATE/config.yml`** added: disables blank issues, routes 4 non-bug intents (questions, security, commercial, "where do I find X") to the right destination instead of bug-report by default.
+- **CI status badge** added to README.md and README.zh-TW.md.
+- **`plugin.json` version**: 0.1.1 → 0.1.2.
+- **`INVENTORY.md` counts** updated: agents 5→6, commands 7→9, skills 9→11 (with 8d-report-writing), know-how 4→7. Added new entries to relevant sections.
+- **`docs/explainers/01-架構總覽.html`** sidebar metrics updated to match the new counts (10 agents shown including profile additions, 14 skills, 11 know-how, plus the new commands listed).
+
+### Notes
+
+- v0.1.2 was scoped from a v0.1.1 review pass; see [the v0.1.2 design spec](docs/superpowers/specs/2026-04-26-v0.1.2-polish-and-three-bundles-design.md) for the full reasoning.
+- All new content shipped with the same honesty constraints as v0.1.1 — references the canonical industry source (ASME Y14.5, AIAG-VDA, INCOTERMS, Ford 8D, ISO 9001 §8.5.6) for each topic, and flags areas where convention differs (US vs EU drawings, legacy AIAG vs harmonized).
+
 ## [0.1.1] — 2026-04-26
 
 ### Added
@@ -70,6 +101,7 @@ Initial public release. Built from the [v0.1 design spec](docs/superpowers/specs
 - Authoring credit: created at SIMHOPE (Taiwan precision machining); maintained by Jason Lin (<jasonlin@simhope.com.tw>).
 - Architectural inspiration credited in README to [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) and Anthropic's [superpowers](https://github.com/anthropics/superpowers) skill conventions.
 
-[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jason-simhope-ai/manufacturing-skill/releases/tag/v0.1.0
