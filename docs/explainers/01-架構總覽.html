@@ -43,6 +43,10 @@
   .item-desc { font-size: 9.5px; color: #6b665e; margin-top: 2px; }
   .item.profile { border-color: #c9956b; background: #fef8f0; }
   .item.profile .item-name::before { content: "★ "; color: #c9956b; }
+  .item.alpha { border-color: #b8a57a; background: #fbf6e8; }
+  .item.alpha .item-name::before { content: "▲ "; color: #a68850; }
+  .item.new { border-color: #6b8a4c; background: #f3f7eb; }
+  .item.new .item-name::after { content: " ✦"; color: #6b8a4c; font-size: 10px; }
 
   .l1 { --color: #5a7892; }
   .l2 { --color: #6b8a4c; }
@@ -122,6 +126,9 @@
         <div class="item"><div class="item-name">/inspect</div><div class="item-desc">IQC/IPQC/FQC/OQC</div></div>
         <div class="item"><div class="item-name">/install-profile</div><div class="item-desc">切換 vertical</div></div>
         <div class="item"><div class="item-name">/manufacturing</div><div class="item-desc">plugin 狀態</div></div>
+        <div class="item new"><div class="item-name">/morning-briefing</div><div class="item-desc">廠長早會懶人包</div></div>
+        <div class="item new"><div class="item-name">/8d</div><div class="item-desc">8D 客訴流程</div></div>
+        <div class="item"><div class="item-name">/init</div><div class="item-desc">第一次引導</div></div>
       </div>
     </div>
 
@@ -145,10 +152,12 @@
         <div class="item"><div class="item-name">生管</div><div class="item-desc">production-planner</div></div>
         <div class="item"><div class="item-name">品管</div><div class="item-desc">quality-inspector</div></div>
         <div class="item"><div class="item-name">倉管</div><div class="item-desc">inventory-manager</div></div>
+        <div class="item new"><div class="item-name">工程變更經理</div><div class="item-desc">engineering-change-manager</div></div>
         <div class="item profile"><div class="item-name">CNC 程式工程師</div></div>
         <div class="item profile"><div class="item-name">刀具壽命工程師</div></div>
         <div class="item profile"><div class="item-name">夾治具設計師</div></div>
         <div class="item profile"><div class="item-name">試樣協調員</div></div>
+        <div class="item alpha"><div class="item-name">模具設計師</div><div class="item-desc">mold-designer (injection α)</div></div>
       </div>
     </div>
 
@@ -169,10 +178,16 @@
         <div class="item"><div class="item-name">Lean / 5S</div></div>
         <div class="item"><div class="item-name">OEE</div></div>
         <div class="item"><div class="item-name">MRP 基礎</div></div>
+        <div class="item new"><div class="item-name">GD&amp;T</div><div class="item-desc">圖紙公差語言</div></div>
+        <div class="item new"><div class="item-name">FMEA / PFMEA</div><div class="item-desc">失效模式分析</div></div>
+        <div class="item new"><div class="item-name">INCOTERMS</div><div class="item-desc">2020 貿易條款</div></div>
+        <div class="item new"><div class="item-name">ECN / ECO</div><div class="item-desc">工程變更體系</div></div>
         <div class="item profile"><div class="item-name">IATF 16949</div></div>
         <div class="item profile"><div class="item-name">刀具壽命管理</div></div>
         <div class="item profile"><div class="item-name">切削參數查表</div></div>
         <div class="item profile"><div class="item-name">開發 vs 量產</div></div>
+        <div class="item alpha"><div class="item-name">射出常見不良</div><div class="item-desc">injection α</div></div>
+        <div class="item alpha"><div class="item-name">塑料特性表</div><div class="item-desc">injection α</div></div>
       </div>
     </div>
 
@@ -195,9 +210,17 @@
       <div class="panel-title">當前規模</div>
       <div class="stat"><div class="stat-num">11</div><div class="stat-label">Agents（6 core + 4 CNC + 1 injection α）</div></div>
       <div class="stat"><div class="stat-num">15</div><div class="stat-label">Skills（11 core + 3 CNC + 1 injection α）</div></div>
-      <div class="stat"><div class="stat-num">13</div><div class="stat-label">Know-how（7 core + 4 CNC + 2 injection α）</div></div>
+      <div class="stat"><div class="stat-num">14</div><div class="stat-label">Know-how（8 core + 4 CNC + 2 injection α）</div></div>
       <div class="stat"><div class="stat-num">5</div><div class="stat-label">Hooks</div></div>
       <div class="stat"><div class="stat-num">5</div><div class="stat-label">Profile（1 完整 + 1 alpha + 3 stub）</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">圖例</div>
+      <div class="panel-row"><span style="color:#6b8a4c;font-weight:700">✦</span> v0.1.2 新增（OSS 補強）</div>
+      <div class="panel-row"><span style="color:#c9956b;font-weight:700">★</span> CNC profile 完整</div>
+      <div class="panel-row"><span style="color:#a68850;font-weight:700">▲</span> Injection profile alpha</div>
+      <div class="panel-row" style="font-size:10px;color:#8a857c;margin-top:4px">未標 = core layer 通用</div>
     </div>
 
     <div class="panel">
