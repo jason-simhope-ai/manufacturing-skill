@@ -20,34 +20,68 @@
 
   .container { display: grid; grid-template-columns: 1fr 220px; gap: 16px; }
 
+  /* ── Layer rows: 6 stacked horizontal bands ──────────── */
   .layers { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Each layer is a 3-column grid: [num | core | profile-overlay] */
   .layer {
-    display: grid; grid-template-columns: 80px 1fr;
-    border: 1px solid #d4ceb8; border-radius: 6px;
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr) minmax(0, 0.7fr);
+    border: 1px solid #d4ceb8;
+    border-radius: 6px;
     background: #fff;
+    overflow: hidden;
+    min-height: 70px;
   }
+
   .layer-num {
     background: var(--color); color: white;
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700; flex-direction: column;
-    border-radius: 6px 0 0 6px; padding: 8px;
+    padding: 8px;
   }
   .layer-num small { font-size: 9px; opacity: 0.85; font-weight: normal; margin-top: 2px; }
-  .layer-content { padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .layer-core, .layer-overlay {
+    padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .layer-overlay {
+    background: linear-gradient(to right, transparent 0%, #fcf8ee 8%);
+    border-left: 1px dashed #c5bea0;
+  }
+
+  .col-label {
+    font-size: 9px; color: #8a857c;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .col-label.profile { color: #b08550; }
+
+  .row-items { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
+  .row-items.empty {
+    color: #b8b3a8; font-style: italic; font-size: 10.5px;
+    align-items: center; padding: 4px 0;
+  }
+
   .item {
     border: 1px solid #d4ceb8; border-radius: 4px;
     padding: 4px 8px; background: #fafaf7;
-    font-size: 11px; min-width: 110px;
+    font-size: 11px; min-width: 96px;
   }
   .item-name { font-weight: 600; color: #2c2a26; }
   .item-desc { font-size: 9.5px; color: #6b665e; margin-top: 2px; }
-  .item.profile { border-color: #c9956b; background: #fef8f0; }
-  .item.profile .item-name::before { content: "★ "; color: #c9956b; }
+
+  /* Variants */
+  .item.cnc { border-color: #c9956b; background: #fef8f0; }
+  .item.cnc .item-name::before { content: "★ "; color: #c9956b; }
   .item.alpha { border-color: #b8a57a; background: #fbf6e8; }
   .item.alpha .item-name::before { content: "▲ "; color: #a68850; }
   .item.new { border-color: #6b8a4c; background: #f3f7eb; }
   .item.new .item-name::after { content: " ✦"; color: #6b8a4c; font-size: 10px; }
 
+  /* Layer accent colors */
   .l1 { --color: #5a7892; }
   .l2 { --color: #6b8a4c; }
   .l3 { --color: #a78050; }
@@ -55,6 +89,12 @@
   .l5 { --color: #7a8c5e; }
   .l6 { --color: #b07050; }
 
+  /* ── FLOW layer special: arrow chain ─────────────────── */
+  .flow-chain { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .flow-chain .item { min-width: 80px; text-align: center; }
+  .flow-chain .arrow { color: #6b8a4c; font-weight: 700; padding: 0 2px; }
+
+  /* ── Sidebar ─────────────────────────────────────────── */
   .sidebar { display: flex; flex-direction: column; gap: 10px; }
   .panel {
     border: 1px solid #d4ceb8; border-radius: 6px;
@@ -70,6 +110,7 @@
   .panel-row { font-size: 11px; margin-bottom: 4px; }
   .panel-row strong { display: inline-block; min-width: 70px; color: #6b665e; font-weight: 500; }
 
+  /* ── Bottom rows: values + glossary ──────────────────── */
   .values {
     display: grid; grid-template-columns: repeat(5, 1fr);
     gap: 8px; margin-top: 12px;
@@ -110,117 +151,176 @@
   <div class="meta">
     GitHub: <strong>jason-simhope-ai/manufacturing-skill</strong> ·
     本圖：給機械業二代協進會會員 / 老闆 ·
-    v0.1 · 2026-04-26
+    v0.1.2 · 2026-04-26
   </div>
 </div>
 
 <div class="container">
   <div class="layers">
 
+    <!-- LAYER 1 USE -->
     <div class="layer l1">
       <div class="layer-num">1.<small>USE</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">/quote</div><div class="item-desc">啟動報價</div></div>
-        <div class="item"><div class="item-name">/order-status</div><div class="item-desc">查訂單到哪</div></div>
-        <div class="item"><div class="item-name">/bom-check</div><div class="item-desc">BOM 健檢</div></div>
-        <div class="item"><div class="item-name">/inspect</div><div class="item-desc">IQC/IPQC/FQC/OQC</div></div>
-        <div class="item"><div class="item-name">/install-profile</div><div class="item-desc">切換 vertical</div></div>
-        <div class="item"><div class="item-name">/manufacturing</div><div class="item-desc">plugin 狀態</div></div>
-        <div class="item new"><div class="item-name">/morning-briefing</div><div class="item-desc">廠長早會懶人包</div></div>
-        <div class="item new"><div class="item-name">/8d</div><div class="item-desc">8D 客訴流程</div></div>
-        <div class="item"><div class="item-name">/init</div><div class="item-desc">第一次引導</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 普世指令</div>
+        <div class="row-items">
+          <div class="item"><div class="item-name">/quote</div><div class="item-desc">啟動報價</div></div>
+          <div class="item"><div class="item-name">/order-status</div><div class="item-desc">查訂單到哪</div></div>
+          <div class="item"><div class="item-name">/bom-check</div><div class="item-desc">BOM 健檢</div></div>
+          <div class="item"><div class="item-name">/inspect</div><div class="item-desc">IQC/IPQC/FQC/OQC</div></div>
+          <div class="item"><div class="item-name">/install-profile</div></div>
+          <div class="item"><div class="item-name">/manufacturing</div></div>
+          <div class="item"><div class="item-name">/init</div><div class="item-desc">第一次引導</div></div>
+          <div class="item new"><div class="item-name">/morning-briefing</div><div class="item-desc">廠長早會</div></div>
+          <div class="item new"><div class="item-name">/8d</div><div class="item-desc">8D 客訴</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE OVERLAY</div>
+        <div class="row-items empty">— core layer 通用，profile 無加碼 —</div>
       </div>
     </div>
 
+    <!-- LAYER 2 FLOW -->
     <div class="layer l2">
       <div class="layer-num">2.<small>FLOW</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">01 報價</div></div>
-        <div class="item"><div class="item-name">02 接單</div></div>
-        <div class="item"><div class="item-name">03 排程</div></div>
-        <div class="item"><div class="item-name">04 生產</div></div>
-        <div class="item"><div class="item-name">05 檢驗</div></div>
-        <div class="item"><div class="item-name">06 出貨</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 6 段普世流程</div>
+        <div class="flow-chain">
+          <div class="item"><div class="item-name">01 報價</div></div>
+          <span class="arrow">→</span>
+          <div class="item"><div class="item-name">02 接單</div></div>
+          <span class="arrow">→</span>
+          <div class="item"><div class="item-name">03 排程</div></div>
+          <span class="arrow">→</span>
+          <div class="item"><div class="item-name">04 生產</div></div>
+          <span class="arrow">→</span>
+          <div class="item"><div class="item-name">05 檢驗</div></div>
+          <span class="arrow">→</span>
+          <div class="item"><div class="item-name">06 出貨</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE OVERLAY</div>
+        <div class="row-items empty">— 流程 6 段所有製造業共通 —</div>
       </div>
     </div>
 
+    <!-- LAYER 3 ROLE -->
     <div class="layer l3">
       <div class="layer-num">3.<small>ROLE</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">報價師</div><div class="item-desc">quote-specialist</div></div>
-        <div class="item"><div class="item-name">業助</div><div class="item-desc">sales-coordinator</div></div>
-        <div class="item"><div class="item-name">生管</div><div class="item-desc">production-planner</div></div>
-        <div class="item"><div class="item-name">品管</div><div class="item-desc">quality-inspector</div></div>
-        <div class="item"><div class="item-name">倉管</div><div class="item-desc">inventory-manager</div></div>
-        <div class="item new"><div class="item-name">工程變更經理</div><div class="item-desc">engineering-change-manager</div></div>
-        <div class="item profile"><div class="item-name">CNC 程式工程師</div></div>
-        <div class="item profile"><div class="item-name">刀具壽命工程師</div></div>
-        <div class="item profile"><div class="item-name">夾治具設計師</div></div>
-        <div class="item profile"><div class="item-name">試樣協調員</div></div>
-        <div class="item alpha"><div class="item-name">模具設計師</div><div class="item-desc">mold-designer (injection α)</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 6 隻 universal agent</div>
+        <div class="row-items">
+          <div class="item"><div class="item-name">報價師</div><div class="item-desc">quote-specialist</div></div>
+          <div class="item"><div class="item-name">業助</div><div class="item-desc">sales-coordinator</div></div>
+          <div class="item"><div class="item-name">生管</div><div class="item-desc">production-planner</div></div>
+          <div class="item"><div class="item-name">品管</div><div class="item-desc">quality-inspector</div></div>
+          <div class="item"><div class="item-name">倉管</div><div class="item-desc">inventory-manager</div></div>
+          <div class="item new"><div class="item-name">工程變更經理</div><div class="item-desc">engineering-change-mgr</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE · CNC 4 + injection α 1</div>
+        <div class="row-items">
+          <div class="item cnc"><div class="item-name">CNC 程式工程師</div></div>
+          <div class="item cnc"><div class="item-name">刀具壽命工程師</div></div>
+          <div class="item cnc"><div class="item-name">夾治具設計師</div></div>
+          <div class="item cnc"><div class="item-name">試樣協調員</div></div>
+          <div class="item alpha"><div class="item-name">模具設計師</div><div class="item-desc">injection α</div></div>
+        </div>
       </div>
     </div>
 
+    <!-- LAYER 4 INFRA -->
     <div class="layer l4">
       <div class="layer-num">4.<small>INFRA</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">scheduler-mcp</div><div class="item-desc">生產排程接口</div></div>
-        <div class="item"><div class="item-name">erp-connector</div><div class="item-desc">SAP/鼎新/Oracle</div></div>
-        <div class="item"><div class="item-name">GB10 + Ollama</div><div class="item-desc">地端 LLM</div></div>
-        <div class="item"><div class="item-name">檔案規範</div><div class="item-desc">圖紙/BOM/NC</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 跨層底座</div>
+        <div class="row-items">
+          <div class="item"><div class="item-name">scheduler-mcp</div><div class="item-desc">生產排程接口</div></div>
+          <div class="item"><div class="item-name">erp-connector</div><div class="item-desc">SAP/鼎新/Oracle</div></div>
+          <div class="item"><div class="item-name">GB10 + Ollama</div><div class="item-desc">地端 LLM</div></div>
+          <div class="item"><div class="item-name">檔案規範</div><div class="item-desc">圖紙/BOM/NC</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE OVERLAY</div>
+        <div class="row-items empty">— infra 跨 vertical 共用 —</div>
       </div>
     </div>
 
+    <!-- LAYER 5 REF -->
     <div class="layer l5">
       <div class="layer-num">5.<small>REF</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">ISO 9001</div></div>
-        <div class="item"><div class="item-name">Lean / 5S</div></div>
-        <div class="item"><div class="item-name">OEE</div></div>
-        <div class="item"><div class="item-name">MRP 基礎</div></div>
-        <div class="item new"><div class="item-name">GD&amp;T</div><div class="item-desc">圖紙公差語言</div></div>
-        <div class="item new"><div class="item-name">FMEA / PFMEA</div><div class="item-desc">失效模式分析</div></div>
-        <div class="item new"><div class="item-name">INCOTERMS</div><div class="item-desc">2020 貿易條款</div></div>
-        <div class="item new"><div class="item-name">ECN / ECO</div><div class="item-desc">工程變更體系</div></div>
-        <div class="item profile"><div class="item-name">IATF 16949</div></div>
-        <div class="item profile"><div class="item-name">刀具壽命管理</div></div>
-        <div class="item profile"><div class="item-name">切削參數查表</div></div>
-        <div class="item profile"><div class="item-name">開發 vs 量產</div></div>
-        <div class="item alpha"><div class="item-name">射出常見不良</div><div class="item-desc">injection α</div></div>
-        <div class="item alpha"><div class="item-name">塑料特性表</div><div class="item-desc">injection α</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 8 份普世 know-how</div>
+        <div class="row-items">
+          <div class="item"><div class="item-name">ISO 9001</div></div>
+          <div class="item"><div class="item-name">Lean / 5S</div></div>
+          <div class="item"><div class="item-name">OEE</div></div>
+          <div class="item"><div class="item-name">MRP 基礎</div></div>
+          <div class="item new"><div class="item-name">GD&amp;T</div><div class="item-desc">圖紙公差</div></div>
+          <div class="item new"><div class="item-name">FMEA / PFMEA</div><div class="item-desc">失效分析</div></div>
+          <div class="item new"><div class="item-name">INCOTERMS</div><div class="item-desc">2020 條款</div></div>
+          <div class="item new"><div class="item-name">ECN / ECO</div><div class="item-desc">變更管控</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE · CNC 4 + injection α 2</div>
+        <div class="row-items">
+          <div class="item cnc"><div class="item-name">IATF 16949</div></div>
+          <div class="item cnc"><div class="item-name">刀具壽命</div></div>
+          <div class="item cnc"><div class="item-name">切削參數</div></div>
+          <div class="item cnc"><div class="item-name">開發 vs 量產</div></div>
+          <div class="item alpha"><div class="item-name">射出常見不良</div></div>
+          <div class="item alpha"><div class="item-name">塑料特性表</div></div>
+        </div>
       </div>
     </div>
 
+    <!-- LAYER 6 HOOK -->
     <div class="layer l6">
       <div class="layer-num">6.<small>HOOK</small></div>
-      <div class="layer-content">
-        <div class="item"><div class="item-name">pre-quote</div><div class="item-desc">圖紙完整度</div></div>
-        <div class="item"><div class="item-name">post-order</div><div class="item-desc">接單通知</div></div>
-        <div class="item"><div class="item-name">pre-ship</div><div class="item-desc">出貨前檢查</div></div>
-        <div class="item"><div class="item-name">on-error</div><div class="item-desc">異常升級</div></div>
-        <div class="item profile"><div class="item-name">pre-cnc-checkin</div></div>
+      <div class="layer-core">
+        <div class="col-label">CORE · 4 個生命週期 hook</div>
+        <div class="row-items">
+          <div class="item"><div class="item-name">pre-quote</div><div class="item-desc">圖紙完整度</div></div>
+          <div class="item"><div class="item-name">post-order</div><div class="item-desc">接單通知</div></div>
+          <div class="item"><div class="item-name">pre-ship</div><div class="item-desc">出貨前檢查</div></div>
+          <div class="item"><div class="item-name">on-error</div><div class="item-desc">異常升級</div></div>
+        </div>
+      </div>
+      <div class="layer-overlay">
+        <div class="col-label profile">PROFILE · CNC 1</div>
+        <div class="row-items">
+          <div class="item cnc"><div class="item-name">pre-cnc-checkin</div><div class="item-desc">G-code 進版控前</div></div>
+        </div>
       </div>
     </div>
 
   </div>
 
+  <!-- ── Sidebar ────────────────────────────────────── -->
   <div class="sidebar">
 
     <div class="panel">
-      <div class="panel-title">當前規模</div>
-      <div class="stat"><div class="stat-num">11</div><div class="stat-label">Agents（6 core + 4 CNC + 1 injection α）</div></div>
-      <div class="stat"><div class="stat-num">15</div><div class="stat-label">Skills（11 core + 3 CNC + 1 injection α）</div></div>
-      <div class="stat"><div class="stat-num">14</div><div class="stat-label">Know-how（8 core + 4 CNC + 2 injection α）</div></div>
-      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Hooks</div></div>
-      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Profile（1 完整 + 1 alpha + 3 stub）</div></div>
+      <div class="panel-title">當前規模 v0.1.2</div>
+      <div class="stat"><div class="stat-num">11</div><div class="stat-label">Agents（6 + 4 + 1α）</div></div>
+      <div class="stat"><div class="stat-num">15</div><div class="stat-label">Skills（11 + 3 + 1α）</div></div>
+      <div class="stat"><div class="stat-num">14</div><div class="stat-label">Know-how（8 + 4 + 2α）</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Hooks（4 + 1）</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Profile（1 完整 + 1α + 3 stub）</div></div>
     </div>
 
     <div class="panel">
       <div class="panel-title">圖例</div>
       <div class="panel-row"><span style="color:#6b8a4c;font-weight:700">✦</span> v0.1.2 新增（OSS 補強）</div>
-      <div class="panel-row"><span style="color:#c9956b;font-weight:700">★</span> CNC profile 完整</div>
-      <div class="panel-row"><span style="color:#a68850;font-weight:700">▲</span> Injection profile alpha</div>
-      <div class="panel-row" style="font-size:10px;color:#8a857c;margin-top:4px">未標 = core layer 通用</div>
+      <div class="panel-row"><span style="color:#c9956b;font-weight:700">★</span> CNC profile（complete）</div>
+      <div class="panel-row"><span style="color:#a68850;font-weight:700">▲</span> Injection profile（alpha）</div>
+      <div class="panel-row" style="font-size:10px;color:#8a857c;margin-top:6px;border-top:1px dashed #d4ceb8;padding-top:6px">
+        每層左欄 = core 普世<br>右欄 = profile overlay
+      </div>
     </div>
 
     <div class="panel">
@@ -255,7 +355,7 @@
   </div>
   <div class="value-card">
     <div class="value-card-title">為什麼是 core + profile</div>
-    <div class="value-card-body">5 段流程所有製造業共通，profile 補各 vertical 差異，DRY</div>
+    <div class="value-card-body">流程 6 段所有製造業共通，profile 補各 vertical 差異，DRY</div>
   </div>
   <div class="value-card">
     <div class="value-card-title">為什麼是 6 段流程</div>
@@ -290,7 +390,7 @@
 </div>
 
 <div class="footer">
-  manufacturing-skill v0.1 · MIT License · Created at SIMHOPE · Maintained by Jason Lin · jasonlin@simhope.com.tw
+  manufacturing-skill v0.1.2 · MIT License · Created at SIMHOPE · Maintained by Jason Lin · jasonlin@simhope.com.tw
 </div>
 
 </body>
