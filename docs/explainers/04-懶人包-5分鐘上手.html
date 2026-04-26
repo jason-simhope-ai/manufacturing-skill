@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-skill 懶人包 — 5 分鐘上手</title>
+<style>
+  @page { size: A3 landscape; margin: 1cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: #f7f4f0; color: #2c2a26;
+    font-size: 12px; line-height: 1.5;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .title { font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .subtitle { font-size: 13px; color: #6b6856; margin-top: 4px; }
+  .meta { font-family: "JetBrains Mono", "Consolas", monospace; font-size: 10px; color: #8a857c; }
+  .meta strong { color: #2c2a26; }
+
+  .container { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: grid; grid-template-columns: 60px 1fr;
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .step-num {
+    background: var(--color); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; flex-direction: column;
+    padding: 8px;
+  }
+  .step-num small { font-size: 8px; opacity: 0.85; font-weight: normal; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+  .step-content { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .step-title { font-size: 14px; font-weight: 700; color: #2c2a26; }
+  .step-caption { font-size: 11px; color: #5a5648; }
+
+  /* mocked terminal/screen */
+  .mock {
+    border-radius: 5px; overflow: hidden;
+    border: 1px solid #c5c0a8;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 10.5px;
+    margin-top: 4px;
+  }
+  .mock-bar {
+    background: #2a2926; padding: 4px 10px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: #b8b4a8;
+  }
+  .mock-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5f56; }
+  .mock-dot.y { background: #ffbd2e; }
+  .mock-dot.g { background: #27c93f; }
+  .mock-title { margin-left: 8px; font-size: 9.5px; color: #888; }
+  .mock-body {
+    background: #1c1b18; color: #d8d4c8;
+    padding: 10px 12px;
+    line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .mock-body .prompt { color: #6fc28f; }
+  .mock-body .cmd { color: #8eb5e0; }
+  .mock-body .out { color: #d8d4c8; }
+  .mock-body .ok { color: #6fc28f; }
+  .mock-body .warn { color: #e0c478; }
+  .mock-body .err { color: #e08878; }
+  .mock-body .hint { color: #888; font-style: italic; }
+
+  /* Claude-like chat mock */
+  .chat-body {
+    background: #faf8f3; color: #2c2a26;
+    padding: 10px 12px;
+    font-family: "Noto Sans TC", sans-serif;
+    font-size: 11px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .chat-body .you { color: #5a7892; font-weight: 600; }
+  .chat-body .ai  { color: #6b8a4c; font-weight: 600; }
+  .chat-body .agent-tag { display: inline-block; background: #fef8f0; color: #8a6a4c; padding: 1px 5px; border-radius: 3px; font-size: 9.5px; border: 1px solid #d4ceb8; margin-right: 4px; }
+
+  .s1 { --color: #5a7892; }
+  .s2 { --color: #6b8a4c; }
+  .s3 { --color: #b07050; }
+  .s4 { --color: #8a6a8c; }
+  .s5 { --color: #7a8a4c; }
+  .s6 { --color: #a55050; }
+
+  .sidebar { display: flex; flex-direction: column; gap: 10px; }
+  .panel {
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    padding: 10px; background: #fff;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 700; color: #6b6856;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .faq-q { font-size: 11px; font-weight: 600; color: #2c2a26; margin-top: 6px; }
+  .faq-a { font-size: 10.5px; color: #5a5648; margin-top: 1px; line-height: 1.5; }
+  .panel-row { font-size: 11px; margin-bottom: 4px; }
+  .panel-row strong { display: inline-block; min-width: 18px; color: #6b6856; font-weight: 700; }
+
+  .footer { text-align: center; margin-top: 14px; font-size: 9px; color: #8a857c; }
+
+  @media print {
+    body { background: white; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">manufacturing-skill 懶人包 · 5 分鐘上手</div>
+  <div class="subtitle">不想看一堆字？跟著這 6 張截圖照做就會用 · For "just show me, don't make me read" people</div>
+  <div class="meta">
+    GitHub: <strong>jason-simhope-ai/manufacturing-skill</strong> ·
+    完整文件 → <strong>README.zh-TW.md</strong> ·
+    v0.1 · 2026-04-26
+  </div>
+</div>
+
+<div class="container">
+  <div class="steps">
+
+    <!-- STEP 1 -->
+    <div class="step s1">
+      <div class="step-num">1<small>install</small></div>
+      <div class="step-content">
+        <div class="step-title">Clone + 互動式選 profile</div>
+        <div class="step-caption">把 repo 拉下來，跑 install.sh，會出現選單讓你挑哪個產業 — 不選硬湊，先試 core-only 也可以。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Terminal — bash</span></div>
+          <div class="mock-body"><span class="prompt">$</span> <span class="cmd">git clone https://github.com/jason-simhope-ai/manufacturing-skill.git</span>
+<span class="prompt">$</span> <span class="cmd">cd manufacturing-skill && bash adapters/claude-code/install.sh</span>
+
+════════════════════════════════════════════════
+ manufacturing-skill installer · choose a profile
+════════════════════════════════════════════════
+
+  1) ✅       cnc-machining
+  2) 🚧 stub  pcb-assembly
+  3) 🚧 stub  injection-molding
+  4) 🚧 stub  food-processing
+  5) 🚧 stub  pharma
+  0) 🧪       (core-only, no profile) — try the framework first
+
+  Default: cnc-machining  (press Enter to accept)
+
+Select [0-5]: <span class="warn">0</span>
+
+→ Installing core layer...
+→ Skipping profile overlay (core-only mode)
+<span class="ok">✅ Installation complete.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step s2">
+      <div class="step-num">2<small>init</small></div>
+      <div class="step-content">
+        <div class="step-title">不知道下一步？打 /manufacturing init</div>
+        <div class="step-caption">第一次用打這個，AI 會問你 4 個問題（你做什麼、有沒有 ERP、資安要求、想看什麼），然後給你客製化下一步建議。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
+          <div class="chat-body"><span class="you">You ▸</span> /manufacturing init
+
+<span class="ai">Claude ▸</span> 歡迎使用 manufacturing-skill！我問你 4 個問題搞定設定。
+
+<strong>Q1.</strong> 你的工廠主要做什麼？
+  A) CNC 精密加工      B) PCB 組裝         C) 塑膠射出
+  D) 食品加工          E) 製藥             F) 多元化 / 想試框架
+  G) 其他（板金 / 紡織...）
+
+<span class="you">You ▸</span> F
+
+<span class="ai">Claude ▸</span> <strong>Q2.</strong> 你有 ERP / MES 嗎？
+  A) 有 SAP / Oracle / 鼎新   B) 有但不在清單   C) 沒有 / Excel</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step s3">
+      <div class="step-num">3<small>quote</small></div>
+      <div class="step-content">
+        <div class="step-title">第一個 /quote — 純文字描述也能報</div>
+        <div class="step-caption">不一定要圖紙。口頭描述 → AI 會問釐清問題，缺資料時不硬報，你補完它就算給結構化報價。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
+          <div class="chat-body"><span class="you">You ▸</span> /quote 「不鏽鋼 304 支架 50×30×10mm，4 個 φ6 通孔，量 100，要黑陽極」
+
+<span class="ai">Claude ▸</span> <span class="agent-tag">quote-specialist</span> 接手報價。
+
+<strong>觸發 pre-quote hook 檢查：</strong>
+  ✅ 材料牌號明確（SUS304）
+  ✅ 主要尺寸 + 公差有
+  ⚠️ <strong>需澄清</strong>：「黑陽極」具體色號？（pantone / RAL / 自由色）
+  ⚠️ <strong>需澄清</strong>：交期需求？
+
+請補完上述兩項我就給結構化報價。<span class="hint">[預估含稅 NT$40,000 ± 10%，視交期可能加 5% 急件費]</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step s4">
+      <div class="step-num">4<small>order</small></div>
+      <div class="step-content">
+        <div class="step-title">查訂單狀態 — 一句話跨 6 段流程</div>
+        <div class="step-caption">不用打開 ERP 點 5 層選單。問「SO-XXX 在哪」AI 自動跨報價、接單、排程、生產、檢驗、出貨整合。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
+          <div class="chat-body"><span class="you">You ▸</span> /order-status SO-2026-0421
+
+<span class="ai">Claude ▸</span> <span class="agent-tag">sales-coordinator</span>
+
+訂單 SO-2026-0421（客戶A · 不鏽鋼支架 × 100）
+[3. 排程完成 → <strong>4. 生產中</strong>] 進度 60% (60/100)
+預計檢驗：2026-04-28
+預計出貨：2026-04-30
+
+<span class="warn">⚠️ 風險</span>：刀具壽命將於第 80 件達上限
+   → 已通知刀具部，預計 4/26 14:30 換刀，不影響交期
+
+📤 <strong>給客戶的回覆草稿：</strong>
+「客戶您好，貴司訂單 SO-2026-0421 目前已生產 60 件，
+ 預計 4/28 完成全部 100 件並進入品管檢驗，4/30 出貨。」</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step s5">
+      <div class="step-num">5<small>inspect</small></div>
+      <div class="step-content">
+        <div class="step-title">品質檢驗 — IPQC 抽檢自動帶入 SPC</div>
+        <div class="step-caption">填量測值、AI 自動算 Cpk、對照 SPC 規則、發現失控立刻提醒，不用人工查表。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
+          <div class="chat-body"><span class="you">You ▸</span> /inspect IPQC W2026042100123
+
+<span class="ai">Claude ▸</span> <span class="agent-tag">quality-inspector</span>
+
+W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
+
+請填關鍵尺寸 φ20H7（規範 19.987~20.000）：
+<span class="you">You ▸</span> 19.992, 19.995, 19.991, 19.989, 19.987
+
+<span class="ai">Claude ▸</span> 量測值已記錄。
+  平均 X̄ = 19.991  R = 0.008
+  Cpk = 1.42（合格，> 1.33 標準）
+
+<span class="ok">✅ 全 5 件 OK，製程穩定</span>
+<span class="hint">趨勢分析：X̄ 漸下移，距離 LCL 還有 4.2σ 安全</span>
+記錄已寫入 inspection record IPQC-20260426-007</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step s6">
+      <div class="step-num">6<small>customize</small></div>
+      <div class="step-content">
+        <div class="step-title">客製給你的工廠 — fork CNC profile 改</div>
+        <div class="step-caption">CNC profile 是最完整範本。複製一份改成你的 vertical（食品 / PCB / ...）就能用。詳見 docs/profile-development.md。</div>
+        <div class="mock">
+          <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Terminal — bash</span></div>
+          <div class="mock-body"><span class="prompt">$</span> <span class="cmd">cp -r profiles/cnc-machining profiles/my-injection-shop</span>
+<span class="prompt">$</span> <span class="cmd">cd profiles/my-injection-shop</span>
+
+<span class="hint"># 改 3 個地方：</span>
+<span class="prompt">$</span> <span class="cmd">vim profile.json</span>          <span class="hint"># 改 name + agents 列表</span>
+<span class="prompt">$</span> <span class="cmd">vim agents/*.md</span>            <span class="hint"># 改 prompt 對應你的工藝</span>
+<span class="prompt">$</span> <span class="cmd">vim know-how/*.md</span>          <span class="hint"># 改 know-how 對應你的標準</span>
+
+<span class="prompt">$</span> <span class="cmd">cd ../.. && bash adapters/claude-code/install.sh my-injection-shop</span>
+<span class="ok">✅ Installation complete.</span>
+<span class="hint"># 4 個 stub profile（PCB/射出/食品/製藥）內附 _starter-template.md，照著填更快</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">⏱️ 預期時間</div>
+      <div class="panel-row"><strong>30s</strong> Step 1 安裝</div>
+      <div class="panel-row"><strong>2m</strong> Step 2 init 引導</div>
+      <div class="panel-row"><strong>1m</strong> Step 3 第一個 quote</div>
+      <div class="panel-row"><strong>30s</strong> Step 4 查狀態</div>
+      <div class="panel-row"><strong>1m</strong> Step 5 試 inspect</div>
+      <div class="panel-row"><strong>5m</strong> Step 6 客製（看深度）</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">💰 預期花費</div>
+      <div class="faq-q">硬體？</div>
+      <div class="faq-a">不用買。先用雲端 Claude Code 跑（一台你現在的電腦就行）</div>
+      <div class="faq-q">月費？</div>
+      <div class="faq-a">Claude Code 訂閱（個人 ~ NT$600/月起）</div>
+      <div class="faq-q">什麼時候要地端硬體？</div>
+      <div class="faq-a">客戶會稽核 / 圖紙不可外流 → 才考慮買 GB10</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">❓ 常見問題</div>
+      <div class="faq-q">不是 CNC 廠也能用？</div>
+      <div class="faq-a">能。跑 install.sh --core-only 純試框架</div>
+      <div class="faq-q">資料會外流嗎？</div>
+      <div class="faq-a">.gitignore 排除真實圖紙；雲端用 Claude API（Anthropic 不訓練客戶資料）；地端 Ollama 完全不出網</div>
+      <div class="faq-q">壞了怎麼辦？</div>
+      <div class="faq-a">/manufacturing doctor 健檢，或 git pull 重裝</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">📍 下一步</div>
+      <div class="panel-row"><strong>1.</strong> 看 README.zh-TW.md</div>
+      <div class="panel-row"><strong>2.</strong> 看其他 explainer 圖卡</div>
+      <div class="panel-row"><strong>3.</strong> 試 examples/ 範例</div>
+      <div class="panel-row"><strong>4.</strong> 找 Jason 聊導入</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  manufacturing-skill v0.1 · 懶人包 · 不想看字版本 · 印 A3 / 直接傳 LINE 都行 · jasonlin@simhope.com.tw
+</div>
+
+</body>
+</html>

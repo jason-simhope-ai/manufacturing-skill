@@ -37,20 +37,49 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-skill
+git clone https://github.com/jason-simhope-ai/manufacturing-skill.git
 cd manufacturing-skill
 
-# 2. 裝進 Claude Code
+# 2. 裝進 Claude Code（互動選 profile）
 bash adapters/claude-code/install.sh
+# 會出現選單，列出 5 個 vertical profile + "core-only 純試框架" 選項
 
-# 3. 試試看
-# 在 Claude Code 打：
-/quote @examples/sample-drawing/bracket.png
+# 3. 試試看（在 Claude Code 內）
+/manufacturing init     # ← 第一次用打這個，AI 會引導 4 個問題
 ```
 
-60 秒內你會拿到一張結構化報價單。
+或者直接 skip 引導：
+```bash
+/quote @examples/sample-drawing/bracket.md   # CNC profile demo
+/quote 「我做不鏽鋼五金件，幫我寫一份報價流程」  # 純文字描述也可以
+```
 
-要做地端、不連網、IT 友善的部署，看 [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md)。
+---
+
+### 我不是 CNC 廠也能用嗎？
+
+**可以**，三種選法：
+
+1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有 vertical profile，只裝 5 隻通用 agent（報價師 / 業助 / 生管 / 品管 / 倉管）。可以直接用通用問答試「AI 懂不懂我的工廠」。
+2. **Stub 加碼客製** — 若你是 PCB / 射出 / 食品 / 製藥，那個 profile 是 stub 但有 starter template，照著填內容就能用
+3. **Fork CNC profile 改成你的** — CNC profile 是最完整的範本，fork 一份改成你的 vertical 是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）
+
+---
+
+### Cloud first, on-prem later
+
+預設**不需要任何特殊硬體** — 用一般電腦的 Claude Code 直接跑就行（雲端 Anthropic API）。
+
+什麼時候才考慮地端 LLM（GB10 / Ollama）？
+
+| 你的情境 | 建議 |
+|---|---|
+| 想先試試看、確認價值 | ☁️ **雲端 Claude Code，不用買硬體** |
+| 跑了 1-2 週覺得有用 | ☁️ 繼續雲端，確認團隊接受度 |
+| 客戶會稽核（IATF / ISO 醫材 / 圖紙不可外流） | 🏠 才考慮地端 — 詳見 [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
+| 公司本來就買了 AI 硬體想物盡其用 | 🏠 直接接上就好 |
+
+**先別被「AI 要花一筆設備錢」嚇跑** — v0.1 純雲端就能跑完整流程。
 
 ---
 
@@ -89,9 +118,10 @@ manufacturing-skill/
 
 本 plugin 預設有三張可印 A3 的繁中說明卡（呼應「印出來掛牆」精神）：
 
-- **`docs/explainers/01-架構總覽.html`** — 給老闆 / 機械業二代協進會。5 分鐘看懂這能解決什麼。
-- **`docs/explainers/02-IT部門系統說明.html`** — 給 IT。Infra / Security / Ops 角度，把 AI 術語對照成傳統 IT（Agent ≈ RPA、MCP ≈ ESB、Local LLM ≈ 自建 server）。
-- **`docs/explainers/03-使用者cheatsheet.html`** — 給業助 / 廠長 / 品管。每天會用到的指令、按字母快查。
+- **`docs/explainers/01-架構總覽.html`** — 給老闆。5 分鐘看懂這能解決什麼。
+- **`docs/explainers/02-IT部門系統說明.html`** — 給 IT。把 AI 術語對照成傳統 IT（Agent ≈ RPA、MCP ≈ ESB）。
+- **`docs/explainers/03-使用者cheatsheet.html`** — 給業助 / 廠長 / 品管。每天會用到的指令快查。
+- **`docs/explainers/04-懶人包-5分鐘上手.html`** — ⭐ **給「不想看文字直接看截圖」的人**。一頁式視覺操作流程。
 
 直接用瀏覽器打開 HTML 檔即可，無 build step、無外部依賴、印 A3 看得清楚。
 

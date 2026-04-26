@@ -39,20 +39,49 @@ Manufacturing AI adoption usually fails on three things:
 
 ```bash
 # 1. Clone
-git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-skill
+git clone https://github.com/jason-simhope-ai/manufacturing-skill.git
 cd manufacturing-skill
 
-# 2. Install into Claude Code
+# 2. Install into Claude Code (interactive profile picker)
 bash adapters/claude-code/install.sh
 
-# 3. Try it
-# In Claude Code, type:
-/quote @examples/sample-drawing/bracket.png
+# 3. In Claude Code, run:
+/manufacturing init     # 4-question wizard for first-time users
 ```
 
-You should get a structured quote within 60 seconds.
+Or skip the wizard:
 
-For on-prem (no internet, IT-friendly) setup, see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md).
+```bash
+/quote @examples/sample-drawing/bracket.md          # CNC profile demo
+/quote "Stainless brackets, 100 pcs, ±0.05mm"      # plain text works too
+```
+
+---
+
+### Not a CNC shop?
+
+Three paths:
+
+1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 5 universal agents (quote / sales / production / quality / inventory). Useful to evaluate "does this AI understand my factory at all" before committing.
+2. **Use a stub + customize** — PCB / injection / food / pharma stubs ship with starter templates ready to fill in.
+3. **Fork the CNC profile** — CNC is the most complete reference; fork and adapt is the fastest path. See [docs/profile-development.md](docs/profile-development.md).
+
+---
+
+### Cloud first, on-prem later
+
+By default this needs **no special hardware** — runs on regular Claude Code with Anthropic's cloud API.
+
+When should you consider on-prem LLM (GB10 / Ollama)?
+
+| Your situation                                                   | Recommendation                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Just want to try / evaluate value                                | ☁️ **Cloud Claude Code — no hardware needed**                               |
+| 1-2 weeks in, value confirmed                                    | ☁️ Stay on cloud, validate team adoption                                    |
+| Customer audits (IATF / medical / drawings can't leave premises) | 🏠 On-prem — see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
+| Already have AI hardware, want to use it                         | 🏠 Just plug in                                                             |
+
+**Don't let "AI needs expensive hardware" scare you off** — v0.1 runs the entire flow on cloud.
 
 ---
 
@@ -87,15 +116,18 @@ manufacturing-skill/
 
 ---
 
-## For three audiences
+## Four explainer cards (Traditional Chinese, A3 print-friendly)
 
-This plugin ships with three printable Traditional-Chinese explainer cards, designed in the spirit of "印出來掛牆" (print and pin to the wall):
+This plugin ships with four printable explainer cards, designed in the spirit of "印出來掛牆" (print and pin to the wall):
 
-- **`docs/explainers/01-架構總覽.html`** — for owners and second-generation manufacturers (機械業二代協進會). 5-minute "what is this and what does it solve."
-- **`docs/explainers/02-IT部門系統說明.html`** — for IT departments. Architecture, security, ops perspective. Maps AI/agent terminology to traditional IT terms (Agent ≈ RPA, MCP ≈ ESB, Local LLM ≈ self-hosted server).
+- **`docs/explainers/01-架構總覽.html`** — for owners. 5-minute "what is this and what does it solve."
+- **`docs/explainers/02-IT部門系統說明.html`** — for IT departments. Maps AI/agent terminology to traditional IT (Agent ≈ RPA, MCP ≈ ESB).
 - **`docs/explainers/03-使用者cheatsheet.html`** — for daily users (sales assistants, plant managers, QC). Every command, every keystroke they need.
+- **`docs/explainers/04-懶人包-5分鐘上手.html`** — ⭐ **for "just show me, don't make me read"** users. Visual-first quick start with annotated mocked screens.
 
 Open the HTML files directly in any browser — no build step, no external dependencies, prints cleanly to A3.
+
+PNG snapshots also live in `docs/explainers/screenshots/` for direct linking from external posts.
 
 ---
 
