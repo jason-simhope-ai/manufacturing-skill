@@ -12,6 +12,19 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ---
 
+## ⭐ Live demo (real Claude Opus 4.7 acting as the `quote-specialist` persona)
+
+![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo.png)
+
+**The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
+
+> Want the full transcript or an interactive playable mock?
+>
+> - Plain-text capture: [docs/demo/real-claude-response.md](docs/demo/real-claude-response.md)
+> - Auto-playing browser animation: serve `docs/demo/` (`python -m http.server 8080`) and open [quote-demo.html](docs/demo/quote-demo.html)
+
+---
+
 ## What this is
 
 `manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.

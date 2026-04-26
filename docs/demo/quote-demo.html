@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-skill /quote demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #1a1818; color: #e8e4d8;
+    height: 100vh; width: 100vw;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .window {
+    width: 1100px; height: 700px;
+    background: #1c1b18; border-radius: 10px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+    border: 1px solid #2a2926;
+    overflow: hidden;
+  }
+  .window-bar {
+    background: #2a2926; padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #3a3936;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff5f56; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #27c93f; }
+  .window-title {
+    margin-left: 14px; font-size: 12.5px; color: #888; font-family: "JetBrains Mono", "Consolas", monospace;
+  }
+  .badge {
+    margin-left: auto; padding: 3px 10px; border-radius: 12px;
+    background: #3a3936; color: #d8d4c8; font-size: 11px;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .conversation {
+    flex: 1; padding: 26px 32px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .msg {
+    display: flex; gap: 12px; align-items: flex-start;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .msg.show { opacity: 1; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    flex-shrink: 0; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .msg.user .avatar { background: #5a7892; color: white; }
+  .msg.ai   .avatar { background: #c9956b; color: white; }
+
+  .bubble { font-size: 14.5px; line-height: 1.65; max-width: 920px; }
+  .bubble strong { color: #f0e8d8; font-weight: 700; }
+  .bubble .agent-tag {
+    display: inline-block; background: #2a3a2a; color: #6fc28f;
+    padding: 1px 7px; border-radius: 3px; font-size: 12px;
+    border: 1px solid #3a4a3a; margin-right: 6px;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .bubble .ok    { color: #6fc28f; }
+  .bubble .warn  { color: #e0c478; }
+  .bubble .info  { color: #8eb5e0; }
+  .bubble .file  { color: #c9956b; font-family: "JetBrains Mono", monospace; }
+  .bubble .hint  { color: #888; font-size: 13px; }
+
+  .quote-card {
+    margin-top: 8px;
+    background: #232220; border: 1px solid #3a3936;
+    border-radius: 6px; padding: 14px 18px;
+    font-size: 13.5px; line-height: 1.7;
+  }
+  .quote-card .row { display: flex; justify-content: space-between; }
+  .quote-card .row.total { margin-top: 8px; padding-top: 8px; border-top: 1px solid #3a3936; font-weight: 700; color: #f0e8d8; }
+  .quote-card .label { color: #888; }
+  .quote-card .val { color: #d8d4c8; font-family: "JetBrains Mono", monospace; }
+
+  .typing-indicator {
+    display: inline-flex; gap: 4px; align-items: center;
+    color: #888; font-size: 14px;
+  }
+  .typing-indicator span {
+    width: 6px; height: 6px; border-radius: 50%; background: #888;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-4px); }
+  }
+
+  .input-bar {
+    border-top: 1px solid #3a3936;
+    padding: 14px 24px;
+    display: flex; align-items: center; gap: 12px;
+    background: #232220;
+  }
+  .input-text {
+    flex: 1; font-family: "Noto Sans TC", sans-serif; font-size: 14px;
+    color: #d8d4c8;
+    min-height: 24px;
+  }
+  .input-text .typed { color: #d8d4c8; }
+  .input-text .placeholder { color: #555; }
+  .input-text .cursor {
+    display: inline-block; width: 8px; height: 16px;
+    background: #d8d4c8; vertical-align: middle;
+    margin-left: 1px;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+  .input-attach {
+    color: #888; font-size: 12px; font-family: "JetBrains Mono", monospace;
+    padding: 4px 8px; background: #2a2926; border-radius: 4px;
+  }
+  .send-btn {
+    background: #c9956b; color: white;
+    padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <div class="window-bar">
+    <span class="dot"></span>
+    <span class="dot y"></span>
+    <span class="dot g"></span>
+    <span class="window-title">Claude Code · manufacturing-skill v0.1</span>
+    <span class="badge">profile: cnc-machining</span>
+  </div>
+
+  <div class="conversation" id="conv">
+    <!-- Messages injected by JS -->
+  </div>
+
+  <div class="input-bar" id="input-bar">
+    <span class="input-attach" id="attach" style="display:none">📎 bracket.md</span>
+    <span class="input-text" id="input-text">
+      <span class="placeholder">/quote &lt;附件 or 描述&gt;</span><span class="cursor"></span>
+    </span>
+    <span class="send-btn" id="send-btn" style="opacity:0.3">Send</span>
+  </div>
+</div>
+
+<script>
+const conv = document.getElementById('conv');
+const inputText = document.getElementById('input-text');
+const attach = document.getElementById('attach');
+const sendBtn = document.getElementById('send-btn');
+
+const FRAMES = [];
+
+function recordFrame(label) {
+  FRAMES.push({ label, html: document.querySelector('.window').outerHTML });
+}
+
+function setInput(state) {
+  // state: 'empty' | 'typing-1' | 'typing-2' | 'typing-3' | 'sent'
+  if (state === 'empty') {
+    inputText.innerHTML = '<span class="placeholder">/quote &lt;附件 or 描述&gt;</span><span class="cursor"></span>';
+    attach.style.display = 'none';
+    sendBtn.style.opacity = '0.3';
+  } else if (state === 'typing-1') {
+    inputText.innerHTML = '<span class="typed">/quote </span><span class="cursor"></span>';
+    attach.style.display = 'none';
+  } else if (state === 'typing-2') {
+    attach.style.display = 'inline-block';
+    inputText.innerHTML = '<span class="typed">/quote @bracket.md</span><span class="cursor"></span>';
+    sendBtn.style.opacity = '1';
+  } else if (state === 'sent') {
+    attach.style.display = 'none';
+    inputText.innerHTML = '<span class="placeholder">繼續對話...</span><span class="cursor"></span>';
+    sendBtn.style.opacity = '0.3';
+  }
+}
+
+function addMsg(role, html) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const avatar = role === 'user' ? 'You' : 'C';
+  div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${html}</div>`;
+  conv.appendChild(div);
+  // Force reflow then add show class
+  void div.offsetWidth;
+  div.classList.add('show');
+  // Auto scroll
+  conv.scrollTop = conv.scrollHeight;
+  return div;
+}
+
+// === Define the demo timeline ===
+// Each step is a function that mutates DOM to a target state.
+// Capture mode jumps directly to a frame; playback mode runs sequentially with delays.
+const steps = [
+  // 0: initial — empty input
+  () => {
+    conv.innerHTML = '';
+    setInput('empty');
+  },
+  // 1: typing started
+  () => {
+    setInput('typing-1');
+  },
+  // 2: full input + attachment
+  () => {
+    setInput('typing-2');
+  },
+  // 3: user sent
+  () => {
+    setInput('sent');
+    addMsg('user', '<span class="file">📎 bracket.md</span><br>/quote @bracket.md');
+  },
+  // 4: AI thinking
+  () => {
+    addMsg('ai', '<span class="agent-tag">quote-specialist</span> 接手報價...<br><span class="typing-indicator"><span></span><span></span><span></span></span>');
+  },
+  // 5: AI delivers pre-quote check
+  () => {
+    // Replace last AI msg
+    const last = conv.lastElementChild;
+    last.querySelector('.bubble').innerHTML = `
+      <span class="agent-tag">quote-specialist</span> 接手報價。<br><br>
+      <strong>觸發 pre-quote hook 檢查：</strong><br>
+      <span class="ok">✅</span> 材料牌號明確（SUS304）<br>
+      <span class="ok">✅</span> 主要尺寸 50×30×10 + 公差 ±0.05<br>
+      <span class="ok">✅</span> 4 × φ6H7 通孔規格完整<br>
+      <span class="warn">⚠️</span> <strong>需澄清</strong>：「黑陽極」具體色號？<br>
+      <span class="warn">⚠️</span> <strong>需澄清</strong>：客戶交期？<br><br>
+      <span class="hint">補完上述兩項後我給結構化報價</span>
+    `;
+  },
+  // 6: user responds with clarifications
+  () => {
+    addMsg('user', 'RAL 9005 霧黑、交期 2026-05-15');
+  },
+  // 7: AI confirming + dispatching
+  () => {
+    addMsg('ai', '<span class="info">→ dispatching</span> <span class="agent-tag">cnc-programmer</span> 估工時 + 切削參數...<br><span class="typing-indicator"><span></span><span></span><span></span></span>');
+  },
+  // 8: AI delivers structured quote
+  () => {
+    const last = conv.lastElementChild;
+    last.querySelector('.bubble').innerHTML = `
+      <strong>報價單 Q-20260426-001</strong><br>
+      <div class="quote-card">
+        <div class="row"><span class="label">客戶</span><span class="val">客戶A</span></div>
+        <div class="row"><span class="label">件號</span><span class="val">BR-12345 不鏽鋼支架 × 100</span></div>
+        <div class="row"><span class="label">材料成本</span><span class="val">NT$ 5,875</span></div>
+        <div class="row"><span class="label">加工成本（CNC#3 × 11.1hr）</span><span class="val">NT$ 23,132</span></div>
+        <div class="row"><span class="label">外包 陽極氧化</span><span class="val">NT$ 525</span></div>
+        <div class="row"><span class="label">利潤 22% + 風險 10%</span><span class="val">NT$ 9,450</span></div>
+        <div class="row total"><span>含稅總價</span><span class="val">NT$ 40,931</span></div>
+        <div class="row total" style="border-top:none;padding-top:2px;font-weight:normal"><span class="label">單價</span><span class="val">NT$ 409 / 件</span></div>
+      </div>
+      <span class="hint">預計交貨 2026-05-11（提前 4 天） · 有效期 30 天</span>
+    `;
+  },
+  // 9: closing message
+  () => {
+    addMsg('ai', '<span class="ok">✅</span> 報價單已產出，<strong>耗時 28 秒</strong>。<br>要我寄給客戶 / 開單給生管，還是修數字？');
+  }
+];
+
+// === Capture mode (URL ?frame=N) ===
+const params = new URLSearchParams(location.search);
+const frameParam = params.get('frame');
+
+if (frameParam !== null) {
+  // Run steps 0..N synchronously
+  const target = parseInt(frameParam, 10);
+  for (let i = 0; i <= target && i < steps.length; i++) {
+    steps[i]();
+    // Force "show" on all messages for capture
+    document.querySelectorAll('.msg').forEach(m => m.classList.add('show'));
+  }
+  document.title = 'Frame ' + target + ' / ' + (steps.length - 1);
+} else {
+  // Auto-play mode
+  const delays = [800, 600, 800, 800, 1200, 1800, 800, 1200, 2000, 1500];
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length) {
+      // Loop after a pause
+      setTimeout(() => { i = 0; tick(); }, 2500);
+      return;
+    }
+    steps[i]();
+    setTimeout(() => { i++; tick(); }, delays[i] || 1000);
+  };
+  // Start after small delay
+  setTimeout(tick, 600);
+}
+
+// Expose total frames for capture script
+window.TOTAL_FRAMES = steps.length;
+</script>
+
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-skill /quote — real Claude Opus 4.7 response</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", -apple-system, sans-serif;
+    background: #1f1e1c; color: #e8e4d8;
+    padding: 40px;
+    min-height: 100vh;
+  }
+  .frame {
+    max-width: 880px; margin: 0 auto;
+    background: #2a2926; border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    overflow: hidden;
+    border: 1px solid #3a3936;
+  }
+  .titlebar {
+    background: #25241f; padding: 12px 18px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #3a3936;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff5f56; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #27c93f; }
+  .titlebar-title {
+    margin-left: 16px; font-size: 13px; color: #999; font-weight: 500;
+  }
+  .titlebar-meta {
+    margin-left: auto; display: flex; gap: 14px; align-items: center;
+    font-size: 11.5px; color: #777; font-family: "JetBrains Mono", "Consolas", monospace;
+  }
+  .titlebar-meta .badge {
+    background: #3a3936; color: #d8d4c8; padding: 3px 9px; border-radius: 12px;
+  }
+
+  .conversation { padding: 28px 36px 22px; }
+
+  .msg { display: flex; gap: 14px; margin-bottom: 22px; align-items: flex-start; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    flex-shrink: 0; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .msg.user .avatar { background: #5a7892; color: white; }
+  .msg.ai   .avatar {
+    background: linear-gradient(135deg, #d97757 0%, #c9956b 100%);
+    color: white;
+  }
+  .role-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 600; }
+  .bubble {
+    flex: 1; font-size: 14px; line-height: 1.7;
+    color: #e8e4d8;
+  }
+  .msg.user .bubble {
+    background: #2f2e2a; border: 1px solid #3a3936;
+    border-radius: 8px; padding: 12px 16px;
+  }
+
+  .bubble strong { color: #f5efdf; font-weight: 700; }
+  .bubble .warn { color: #f0c679; font-weight: 600; }
+  .bubble ul { margin: 6px 0 6px 22px; padding: 0; }
+  .bubble li { margin-bottom: 3px; }
+  .bubble .price { color: #6fc28f; font-weight: 700; }
+  .bubble .section-h {
+    color: #c9956b; font-weight: 700;
+    background: rgba(201, 149, 107, 0.08);
+    padding: 2px 6px; border-radius: 3px;
+    display: inline-block;
+  }
+  .bubble p { margin-bottom: 10px; }
+
+  .response-summary {
+    color: #888; font-style: italic; font-size: 13px;
+    margin-bottom: 12px;
+    border-left: 3px solid #3a3936; padding-left: 10px;
+  }
+
+  .footer-strip {
+    border-top: 1px solid #3a3936;
+    padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #777;
+    background: #25241f;
+  }
+  .footer-strip .left { display: flex; gap: 16px; align-items: center; }
+  .footer-strip .right { font-family: "JetBrains Mono", "Consolas", monospace; }
+  .ok-badge { color: #6fc28f; }
+
+  .caption {
+    max-width: 880px; margin: 24px auto 0;
+    text-align: center; font-size: 12.5px; color: #999;
+    line-height: 1.6;
+  }
+  .caption strong { color: #c9956b; }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <div class="titlebar">
+    <span class="dot"></span>
+    <span class="dot y"></span>
+    <span class="dot g"></span>
+    <span class="titlebar-title">SUS304支架報價單結構化分析 — Claude</span>
+    <div class="titlebar-meta">
+      <span class="badge">Opus 4.7 · 1M</span>
+    </div>
+  </div>
+
+  <div class="conversation">
+
+    <div class="msg user">
+      <div class="avatar">J</div>
+      <div>
+        <div class="role-label" style="color:#7a9bbe">YOU</div>
+        <div class="bubble">扮演製造業 quote-specialist。客戶 RFQ：SUS304 支架 50×30×10mm，4 個 D6H7 通孔，量 100，要 RAL9005 黑陽極，交期 2026-05-15。依 ISO 9001 規範給結構化報價：pre-quote 檢查 → 工藝路線 → 成本拆解 → 報價金額，繁中、200 字內。</div>
+      </div>
+    </div>
+
+    <div class="msg ai">
+      <div class="avatar">✱</div>
+      <div style="flex:1">
+        <div class="role-label" style="color:#c9956b">CLAUDE</div>
+        <div class="response-summary">識別材料表處衝突並架構製造報價方案。</div>
+        <div class="bubble">
+
+          <p><span class="section-h">【Pre-Quote 檢查 ｜ ISO 9001 設計審查】</span> <span class="warn">⚠️ 規格衝突</span>：SUS304 為不鏽鋼，<strong>無法陽極處理</strong>（陽極為鋁/鈦製程）。建議改：<strong>① 黑色 PVD 鍍膜</strong>　<strong>② 發黑鈍化</strong>　<strong>③ 黑色粉體烤漆</strong>，達 RAL9005 視覺效果，需客戶書面確認後鎖價。</p>
+
+          <ul>
+            <li>D6H7 (+0.012/0) 需鉸孔，孔位公差、Ra 值待補</li>
+            <li>50×30×10 一般公差 ±0.1，特徵基準面待確認</li>
+          </ul>
+
+          <p><span class="section-h">【工藝路線】</span> 雷切下料 → CNC 銑外形/面 → 鑽孔 ø5.8 → 鉸 D6H7 → 去毛邊 → 外發表處 → FAI 首件 + AQL 2.5 抽檢 → 包裝</p>
+
+          <p><span class="section-h">【成本拆解 NT$/件】</span> 材料 35 ｜ CNC 加工 60 ｜ 鉸孔 25 ｜ 表處外包 80 ｜ QC/包裝 15 ｜ 管銷+利潤 35</p>
+
+          <p><span class="section-h">【報價】</span></p>
+
+          <ul>
+            <li>單價 <span class="price">NT$ 250 / 件</span></li>
+            <li>總價 <span class="price">NT$ 25,000</span>（未稅）</li>
+            <li>交期 2026-05-15 可達（LT 18 工作天，表處確認後啟動）</li>
+            <li>報價有效期 30 天；MOQ 100；付款 月結 60 天</li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-strip">
+    <div class="left">
+      <span class="ok-badge">● 完成</span>
+      <span>Real response · captured 2026-04-26</span>
+    </div>
+    <div class="right">claude.ai · Opus 4.7</div>
+  </div>
+
+</div>
+
+<div class="caption">
+  ↑ <strong>真實 Claude Opus 4.7 對 manufacturing-skill quote-specialist prompt 的回應</strong>。
+  注意 AI 抓到了客戶 RFQ 中真實存在的工程矛盾：<strong>SUS304（不鏽鋼）不能陽極處理</strong>（陽極製程是給鋁、鈦），並提出 3 個替代方案要客戶書面確認。
+  這就是 plugin 把 quote-specialist 預載進 Claude 的目的：每次 <code style="color:#c9956b">/quote</code> 都自動具備這層判斷力。
+</div>
+
+</body>
+</html>

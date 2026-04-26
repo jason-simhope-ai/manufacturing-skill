@@ -10,6 +10,19 @@
 
 ---
 
+## ⭐ 真實 demo（Claude Opus 4.7 對 quote-specialist prompt 的實際回應）
+
+![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo.png)
+
+**真實場景**：客戶 RFQ 寫「SUS304 不鏽鋼支架要 RAL9005 黑陽極」 — 工程上根本做不到（陽極處理是給鋁/鈦的）。
+plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代方案、parking 在客戶書面確認上才鎖價。
+
+> 想看完整對話 + 互動體驗？
+> - 完整文字版：[docs/demo/real-claude-response.md](docs/demo/real-claude-response.md)
+> - 互動式動畫版（瀏覽器自動播放）：用 `python -m http.server 8080` 在 `docs/demo/` 跑起來看 [quote-demo.html](docs/demo/quote-demo.html)
+
+---
+
 ## 這是什麼
 
 `manufacturing-skill` 是一個 **Claude Code plugin**，採用「**core + profile overlay**」架構。
