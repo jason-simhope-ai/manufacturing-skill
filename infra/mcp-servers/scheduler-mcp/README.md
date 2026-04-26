@@ -59,7 +59,7 @@ python server.py
     "manufacturing-scheduler": {
       "command": "python",
       "args": [
-        "/path/to/manufacturing-plugin/infra/mcp-servers/scheduler-mcp/server.py"
+        "/path/to/manufacturing-skill/infra/mcp-servers/scheduler-mcp/server.py"
       ]
     }
   }

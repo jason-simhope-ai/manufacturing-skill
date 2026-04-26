@@ -83,8 +83,8 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 ## 30 秒安裝
 
 ```bash
-git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-plugin
-cd manufacturing-plugin
+git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-skill
+cd manufacturing-skill
 bash adapters/claude-code/install.sh
 ```
 

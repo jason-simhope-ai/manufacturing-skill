@@ -1,4 +1,4 @@
-# manufacturing-plugin
+# manufacturing-skill
 
 > 製造業 AI 導入起手包 — fork 它、profile 它、ship 它。
 
@@ -12,7 +12,7 @@
 
 ## 這是什麼
 
-`manufacturing-plugin` 是一個 **Claude Code plugin**，採用「**core + profile overlay**」架構。
+`manufacturing-skill` 是一個 **Claude Code plugin**，採用「**core + profile overlay**」架構。
 
 - **Core 層** — 所有製造業共通的基本功：6 段流程（報價→接單→排程→生產→檢驗→出貨）、5 隻 agent persona（報價師、業助、生管、品管、倉管）、普世 know-how（ISO 9001、Lean、OEE、MRP）。
 - **Profile 層** — 各垂直領域加碼。v1 完整支援 **CNC 精密加工**（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 vertical（PCB / 射出 / 食品 / 製藥）以 stub 形式存在，歡迎社群或客戶 contribute。
@@ -37,8 +37,8 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-plugin
-cd manufacturing-plugin
+git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-skill
+cd manufacturing-skill
 
 # 2. 裝進 Claude Code
 bash adapters/claude-code/install.sh
@@ -57,7 +57,7 @@ bash adapters/claude-code/install.sh
 ## Repo 結構
 
 ```
-manufacturing-plugin/
+manufacturing-skill/
 ├── manufacturing.md          # 靈魂入口文件 — 先讀這個
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # 普世製造業基本功

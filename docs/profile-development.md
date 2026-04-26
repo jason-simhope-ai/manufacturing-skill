@@ -6,7 +6,7 @@
 
 ## 為什麼會需要新 profile
 
-`manufacturing-plugin` v1 完整支援 CNC machining。但你可能是：
+`manufacturing-skill` v1 完整支援 CNC machining。但你可能是：
 
 - PCB 組裝廠
 - 射出成型廠
@@ -121,7 +121,7 @@ core/agents/quote-specialist.md           → 預設
 profiles/cnc-machining/agents/quote-specialist.md  → override
 ```
 
-`bash adapters/claude-code/install.sh cnc-machining` 後，`~/.claude/plugins/manufacturing-plugin/agents/quote-specialist.md` = profile 版。
+`bash adapters/claude-code/install.sh cnc-machining` 後，`~/.claude/plugins/manufacturing-skill/agents/quote-specialist.md` = profile 版。
 
 ### 加碼
 
@@ -201,7 +201,7 @@ v1 先靠完整檔案 override。
 ## 常見問題
 
 **Q: profile 和 plugin 有什麼差別？**
-A: plugin = 整個 manufacturing-plugin（core + 多個 profile）。profile = 一個 vertical（CNC / 食品 / ...）的 overlay 包。
+A: plugin = 整個 manufacturing-skill（core + 多個 profile）。profile = 一個 vertical（CNC / 食品 / ...）的 overlay 包。
 
 **Q: 一次能裝多個 profile 嗎？**
 A: v1 一次只能 active 一個 profile。如果你的工廠橫跨多個 vertical（如同時做 CNC + 板金），建議：

@@ -6,12 +6,12 @@ allowed-tools: [Read, Bash, Glob]
 
 # /manufacturing — Plugin 狀態
 
-顯示 manufacturing-plugin 目前載入的所有資源。
+顯示 manufacturing-skill 目前載入的所有資源。
 
 ## 顯示內容
 
 ```
-manufacturing-plugin v0.1.0
+manufacturing-skill v0.1.0
 ├── 啟用 profile：cnc-machining
 ├── Agents（5 + 4 = 9）
 │   Core: quote-specialist, sales-coordinator, production-planner,

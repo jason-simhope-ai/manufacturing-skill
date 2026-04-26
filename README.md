@@ -1,4 +1,4 @@
-# manufacturing-plugin
+# manufacturing-skill
 
 > AI starter kit for manufacturers — fork it, profile it, ship it.
 
@@ -14,7 +14,7 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ## What this is
 
-`manufacturing-plugin` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
+`manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
 
 - **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, Lean, OEE, MRP).
 - **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 4 know-how docs covering IATF 16949, tool life, cutting parameters, job-shop vs. mass production). Stub profiles for PCB assembly, injection molding, food processing, and pharma are scaffolded for community / customer contribution.
@@ -39,8 +39,8 @@ Manufacturing AI adoption usually fails on three things:
 
 ```bash
 # 1. Clone
-git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-plugin
-cd manufacturing-plugin
+git clone https://github.com/jason-simhope-ai/manufacturing-skill.git manufacturing-skill
+cd manufacturing-skill
 
 # 2. Install into Claude Code
 bash adapters/claude-code/install.sh
@@ -59,7 +59,7 @@ For on-prem (no internet, IT-friendly) setup, see [infra/on-prem/gb10-setup.md](
 ## Repo layout
 
 ```
-manufacturing-plugin/
+manufacturing-skill/
 ├── manufacturing.md          # The soul — read this first
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # Universal manufacturing primitives

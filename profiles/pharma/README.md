@@ -70,5 +70,5 @@
 ## 為什麼 v1 仍保留此 stub
 
 - 標示框架的擴展性（連製藥都能裝）
-- 給對「製藥廠也想用 manufacturing-plugin」的潛在客戶一個入口
+- 給對「製藥廠也想用 manufacturing-skill」的潛在客戶一個入口
 - 預留正式 profile 的成長空間

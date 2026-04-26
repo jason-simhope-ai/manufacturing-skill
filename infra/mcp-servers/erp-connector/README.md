@@ -10,7 +10,7 @@
 
 Every ERP is different (vendor, version, custom fields, schema). Hard-coding for one ERP would break for everyone else.
 
-Instead, this template defines the **interface contract** — the tools your ERP connector should expose to manufacturing-plugin agents. You implement the connector for your specific ERP.
+Instead, this template defines the **interface contract** — the tools your ERP connector should expose to manufacturing-skill agents. You implement the connector for your specific ERP.
 
 ---
 
@@ -48,7 +48,7 @@ Your connector must implement:
 2. Implement tools in `server.py` connecting to your ERP API / DB
 3. Map tool input/output to your ERP's schema
 4. Add auth (most ERPs require service account)
-5. Test against the manufacturing-plugin demo flow
+5. Test against the manufacturing-skill demo flow
 6. Deploy as on-prem MCP server (security: 不要把 ERP 直接暴露到外網)
 
 ---

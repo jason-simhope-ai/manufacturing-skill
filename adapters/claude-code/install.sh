@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# manufacturing-plugin — Claude Code installer
+# manufacturing-skill — Claude Code installer
 #
 # Usage:
 #   bash adapters/claude-code/install.sh [profile_name]
@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-PLUGIN_NAME="manufacturing-plugin"
+PLUGIN_NAME="manufacturing-skill"
 DEFAULT_PROFILE="cnc-machining"
 PROFILE="${1:-$DEFAULT_PROFILE}"
 
@@ -36,7 +36,7 @@ CLAUDE_DIR="$(detect_claude_dir)"
 TARGET_DIR="${CLAUDE_DIR}/plugins/${PLUGIN_NAME}"
 
 echo "════════════════════════════════════════════════"
-echo " manufacturing-plugin Claude Code installer"
+echo " manufacturing-skill Claude Code installer"
 echo "════════════════════════════════════════════════"
 echo ""
 echo "Plugin source : ${PLUGIN_ROOT}"

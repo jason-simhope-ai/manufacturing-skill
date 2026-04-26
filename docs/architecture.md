@@ -1,4 +1,4 @@
-# Architecture — manufacturing-plugin 六層架構詳解
+# Architecture — manufacturing-skill 六層架構詳解
 
 > 給開發者、SI、認真要 fork 的人看的內部架構文件。
 > 老闆 / IT / 終端使用者請看 `docs/explainers/` 內的圖卡。

@@ -2,7 +2,7 @@
 ERP Connector — Interface contract.
 
 This file defines the interface that any ERP connector implementation must
-fulfill so that manufacturing-plugin agents can call ERP-related tools
+fulfill so that manufacturing-skill agents can call ERP-related tools
 without knowing the specific ERP brand.
 
 Implementations live in sibling repos / dirs:

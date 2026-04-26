@@ -1,6 +1,6 @@
 # Roadmap
 
-> manufacturing-plugin 路線圖。版本與時程會依社群回饋與商業合作機會調整。
+> manufacturing-skill 路線圖。版本與時程會依社群回饋與商業合作機會調整。
 
 ---
 
@@ -100,8 +100,8 @@ manufacturing-cli (自建 orchestrator)
 
 ### 商業方向
 
-- 認證計畫：「manufacturing-plugin 認證顧問」
-- 認證計畫：「manufacturing-plugin 認證工程師」
+- 認證計畫：「manufacturing-skill 認證顧問」
+- 認證計畫：「manufacturing-skill 認證工程師」
 - 聯名計畫：與 ERP 廠商合作預先 connector
 - 教材：免費線上課（培養生態系）
 

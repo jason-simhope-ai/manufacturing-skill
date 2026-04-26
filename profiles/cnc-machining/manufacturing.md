@@ -12,7 +12,7 @@
 
 ## 這個 profile 解決什麼
 
-讓 manufacturing-plugin 從「通用製造業」升級為「**懂 CNC 切削加工**」：
+讓 manufacturing-skill 從「通用製造業」升級為「**懂 CNC 切削加工**」：
 
 - 知道 G-code 與切削參數
 - 知道 IATF 16949（汽車業客戶必備）

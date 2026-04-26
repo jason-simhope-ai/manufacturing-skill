@@ -1,6 +1,6 @@
 {
-  "name": "manufacturing-plugin",
-  "displayName": "Manufacturing Plugin",
+  "name": "manufacturing-skill",
+  "displayName": "Manufacturing Skill",
   "version": "0.1.0",
   "description": "AI starter kit for manufacturers — fork it, profile it, ship it.",
   "author": {

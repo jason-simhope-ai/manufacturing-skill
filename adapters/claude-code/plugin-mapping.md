@@ -1,13 +1,13 @@
 # Claude Code Adapter — Plugin Mapping
 
-How `manufacturing-plugin` 的 platform-neutral 內容映射到 Claude Code 的實際 plugin 結構。
+How `manufacturing-skill` 的 platform-neutral 內容映射到 Claude Code 的實際 plugin 結構。
 
 ---
 
 ## Source → Target
 
 ```
-Source (this repo)                      Target (~/.claude/plugins/manufacturing-plugin/)
+Source (this repo)                      Target (~/.claude/plugins/manufacturing-skill/)
 ────────────────────                    ─────────────────────────────────────────────────
 core/commands/*.md            ────►     commands/*.md
 core/agents/*.md              ────►     agents/*.md       ┐
@@ -54,7 +54,7 @@ Claude Code 預期 plugin 內：
 ## 安裝後的目錄樹
 
 ```
-~/.claude/plugins/manufacturing-plugin/
+~/.claude/plugins/manufacturing-skill/
 ├── plugin.json              # plugin 元資訊
 ├── active-profile.json      # 目前 active profile manifest
 ├── .installed               # 安裝紀錄（時間、版本、profile）
@@ -113,14 +113,14 @@ Claude Code 預期 plugin 內：
 bash adapters/claude-code/install.sh injection-molding
 ```
 
-會清掉舊的 `~/.claude/plugins/manufacturing-plugin/`（先備份），重裝 core + 指定 profile。
+會清掉舊的 `~/.claude/plugins/manufacturing-skill/`（先備份），重裝 core + 指定 profile。
 
 ---
 
 ## 解除安裝
 
 ```bash
-rm -rf ~/.claude/plugins/manufacturing-plugin/
+rm -rf ~/.claude/plugins/manufacturing-skill/
 ```
 
 ---
