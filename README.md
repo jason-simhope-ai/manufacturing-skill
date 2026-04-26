@@ -14,7 +14,7 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ## ⭐ Live demo (real Claude Opus 4.7 acting as the `quote-specialist` persona)
 
-![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo.png)
+![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo-en.png)
 
 **The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
 

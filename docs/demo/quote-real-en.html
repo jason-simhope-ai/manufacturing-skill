@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>manufacturing-skill /quote — real Claude Opus 4.7 response (EN)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
+    background: #1f1e1c; color: #e8e4d8;
+    padding: 40px;
+    min-height: 100vh;
+  }
+  .frame {
+    max-width: 880px; margin: 0 auto;
+    background: #2a2926; border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    overflow: hidden;
+    border: 1px solid #3a3936;
+  }
+  .titlebar {
+    background: #25241f; padding: 12px 18px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #3a3936;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff5f56; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #27c93f; }
+  .titlebar-title {
+    margin-left: 16px; font-size: 13px; color: #999; font-weight: 500;
+  }
+  .titlebar-meta {
+    margin-left: auto; display: flex; gap: 14px; align-items: center;
+    font-size: 11.5px; color: #777; font-family: "JetBrains Mono", "Consolas", monospace;
+  }
+  .titlebar-meta .badge {
+    background: #3a3936; color: #d8d4c8; padding: 3px 9px; border-radius: 12px;
+  }
+
+  .conversation { padding: 28px 36px 22px; }
+
+  .msg { display: flex; gap: 14px; margin-bottom: 22px; align-items: flex-start; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    flex-shrink: 0; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .msg.user .avatar { background: #5a7892; color: white; }
+  .msg.ai   .avatar {
+    background: linear-gradient(135deg, #d97757 0%, #c9956b 100%);
+    color: white;
+  }
+  .role-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 600; }
+  .bubble {
+    flex: 1; font-size: 14px; line-height: 1.7;
+    color: #e8e4d8;
+  }
+  .msg.user .bubble {
+    background: #2f2e2a; border: 1px solid #3a3936;
+    border-radius: 8px; padding: 12px 16px;
+  }
+
+  .bubble strong { color: #f5efdf; font-weight: 700; }
+  .bubble .warn { color: #f0c679; font-weight: 600; }
+  .bubble ul { margin: 6px 0 6px 22px; padding: 0; }
+  .bubble li { margin-bottom: 3px; }
+  .bubble .price { color: #6fc28f; font-weight: 700; }
+  .bubble .section-h {
+    color: #c9956b; font-weight: 700;
+    background: rgba(201, 149, 107, 0.08);
+    padding: 2px 6px; border-radius: 3px;
+    display: inline-block;
+  }
+  .bubble p { margin-bottom: 10px; }
+
+  .response-summary {
+    color: #888; font-style: italic; font-size: 13px;
+    margin-bottom: 12px;
+    border-left: 3px solid #3a3936; padding-left: 10px;
+  }
+
+  .footer-strip {
+    border-top: 1px solid #3a3936;
+    padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #777;
+    background: #25241f;
+  }
+  .footer-strip .left { display: flex; gap: 16px; align-items: center; }
+  .footer-strip .right { font-family: "JetBrains Mono", "Consolas", monospace; }
+  .ok-badge { color: #6fc28f; }
+
+  .caption {
+    max-width: 880px; margin: 24px auto 0;
+    text-align: center; font-size: 12.5px; color: #999;
+    line-height: 1.6;
+  }
+  .caption strong { color: #c9956b; }
+  .caption code { color: #c9956b; font-family: "JetBrains Mono", monospace; }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <div class="titlebar">
+    <span class="dot"></span>
+    <span class="dot y"></span>
+    <span class="dot g"></span>
+    <span class="titlebar-title">SUS304 Bracket Quote Analysis — Claude</span>
+    <div class="titlebar-meta">
+      <span class="badge">Opus 4.7 · 1M</span>
+    </div>
+  </div>
+
+  <div class="conversation">
+
+    <div class="msg user">
+      <div class="avatar">J</div>
+      <div>
+        <div class="role-label" style="color:#7a9bbe">YOU</div>
+        <div class="bubble">Act as a manufacturing <code style="color:#c9956b">quote-specialist</code>. Customer RFQ: SUS304 stainless bracket 50×30×10mm, 4× D6H7 through-holes, qty 100, RAL 9005 black anodize, due 2026-05-15. Per ISO 9001, give a structured quote: pre-quote checks → process routing → cost breakdown → quoted price. Under 200 words.</div>
+      </div>
+    </div>
+
+    <div class="msg ai">
+      <div class="avatar">✱</div>
+      <div style="flex:1">
+        <div class="role-label" style="color:#c9956b">CLAUDE</div>
+        <div class="response-summary">Identifies material/finish conflict and structures the manufacturing quote.</div>
+        <div class="bubble">
+
+          <p><span class="section-h">[Pre-Quote Check | ISO 9001 Design Review]</span> <span class="warn">⚠️ Spec conflict</span>: SUS304 is stainless steel and <strong>cannot be anodized</strong> (anodizing is an aluminum/titanium process). Recommend instead: <strong>① Black PVD coating</strong>　<strong>② Black oxide / blackening</strong>　<strong>③ Black powder coating</strong>, all reaching the RAL 9005 visual target. Customer written confirmation required before locking the price.</p>
+
+          <ul>
+            <li>D6H7 (+0.012/0) requires reaming; hole-position tolerance &amp; surface Ra still TBD</li>
+            <li>50×30×10 general tolerance ±0.1; datum face needs confirmation</li>
+          </ul>
+
+          <p><span class="section-h">[Process Routing]</span> Laser cut blank → CNC mill profile/face → drill ø5.8 → ream D6H7 → deburr → outsource surface treatment → FAI first-article + AQL 2.5 sampling → packaging</p>
+
+          <p><span class="section-h">[Cost Breakdown · NT$ / pc]</span> Material 35 ｜ CNC 60 ｜ Reaming 25 ｜ Outsourced finish 80 ｜ QC + packaging 15 ｜ SG&amp;A + margin 35</p>
+
+          <p><span class="section-h">[Quote]</span></p>
+
+          <ul>
+            <li>Unit price <span class="price">NT$ 250 / pc</span></li>
+            <li>Total <span class="price">NT$ 25,000</span> (pre-tax)</li>
+            <li>Lead time: 2026-05-15 achievable (LT 18 working days, clock starts after finish confirmation)</li>
+            <li>Quote valid 30 days; MOQ 100; payment Net 60</li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-strip">
+    <div class="left">
+      <span class="ok-badge">● Done</span>
+      <span>Real response · captured 2026-04-26</span>
+    </div>
+    <div class="right">claude.ai · Opus 4.7</div>
+  </div>
+
+</div>
+
+<div class="caption">
+  ↑ <strong>A real Claude Opus 4.7 response to the manufacturing-skill <code>quote-specialist</code> prompt</strong>.
+  Notice the model caught a real engineering contradiction in the customer RFQ:
+  <strong>SUS304 (stainless steel) cannot be anodized</strong> — anodizing is a process for aluminum/titanium.
+  It proposed 3 valid alternatives reaching the same RAL 9005 visual target and parked pricing on a written customer confirmation —
+  exactly what an experienced quote engineer does.
+  This is the judgment the plugin pre-loads into Claude every time you invoke <code>/quote</code>.
+</div>
+
+</body>
+</html>
