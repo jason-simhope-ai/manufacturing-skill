@@ -91,11 +91,16 @@ jobs:
 
       # ---------------------------------------------------------------
       # Step 4: Markdown frontmatter sanity for agents and commands
+      # Uses real YAML parsing (PyYAML) — not string grep — to avoid
+      # false negatives when key names appear inside markdown bodies.
       # ---------------------------------------------------------------
+      - name: Install PyYAML for frontmatter parsing
+        run: pip install --quiet pyyaml
+
       - name: Agent / command markdown frontmatter
         run: |
           python3 - <<'PY'
-          import os, sys, glob
+          import os, sys, glob, yaml
           fail = False
           rules = {
               "core/agents/*.md":            ["name", "description", "model"],
@@ -109,13 +114,29 @@ jobs:
                   if os.path.basename(f).startswith("_"):
                       continue
                   with open(f, encoding="utf-8") as fp:
-                      head = "".join(fp.readlines()[:25])
-                  if not head.startswith("---"):
+                      content = fp.read()
+                  if not content.startswith("---"):
                       print(f"::error file={f}::missing YAML frontmatter")
                       fail = True
                       continue
+                  # Extract the frontmatter block between the first two '---' lines
+                  parts = content.split("---", 2)
+                  if len(parts) < 3:
+                      print(f"::error file={f}::frontmatter not closed (no second '---')")
+                      fail = True
+                      continue
+                  try:
+                      fm = yaml.safe_load(parts[1]) or {}
+                  except yaml.YAMLError as e:
+                      print(f"::error file={f}::frontmatter is not valid YAML: {e}")
+                      fail = True
+                      continue
+                  if not isinstance(fm, dict):
+                      print(f"::error file={f}::frontmatter must be a YAML mapping (got {type(fm).__name__})")
+                      fail = True
+                      continue
                   for key in required:
-                      if f"\n{key}:" not in head and not head.startswith(f"{key}:"):
+                      if key not in fm:
                           print(f"::error file={f}::frontmatter missing required field {key!r}")
                           fail = True
                   print(f"ok  {f}")

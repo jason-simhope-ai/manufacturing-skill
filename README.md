@@ -2,6 +2,7 @@
 
 > AI starter kit for manufacturers — fork it, profile it, ship it.
 
+[![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](https://claude.com/claude-code)
 [![繁體中文](https://img.shields.io/badge/lang-%E7%B9%81%E4%B8%AD-red)](README.zh-TW.md)

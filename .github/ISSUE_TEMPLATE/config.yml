@@ -1,0 +1,20 @@
+# Routes anything that isn't a real bug / feature / profile-contribution
+# to the right place, instead of letting it land in the issues backlog.
+blank_issues_enabled: false
+
+contact_links:
+  - name: 💬 Question or general discussion
+    url: https://github.com/jason-simhope-ai/manufacturing-skill/discussions
+    about: Ask "how do I...", "is this the right way to...", or share a use case. Issues are for bug reports and concrete feature requests only.
+
+  - name: 🔐 Security vulnerability
+    url: https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/SECURITY.md
+    about: Do NOT open a public issue. Read SECURITY.md for the private disclosure process.
+
+  - name: 🤝 Commercial collaboration / paid profile development
+    url: mailto:jasonlin@simhope.com.tw
+    about: Want a custom profile validated against your factory, or consulting on AI adoption? Email Jason directly.
+
+  - name: 📖 Read the docs first
+    url: https://github.com/jason-simhope-ai/manufacturing-skill/blob/main/INVENTORY.md
+    about: INVENTORY.md is the one-page index of every entry point in the repo. Most "where do I find X" questions are answered there.

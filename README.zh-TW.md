@@ -2,6 +2,7 @@
 
 > 製造業 AI 導入起手包 — fork 它、profile 它、ship 它。
 
+[![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](https://claude.com/claude-code)
 [![English](https://img.shields.io/badge/lang-English-blue)](README.md)
