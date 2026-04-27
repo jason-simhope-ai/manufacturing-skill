@@ -15,6 +15,9 @@
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
+> 📺 **完全沒寫過程式、沒用過 Claude Code、沒用過 ChatGPT？**
+> 直接看 [**docs/quickstart-for-beginners.zh-TW.md**](docs/quickstart-for-beginners.zh-TW.md) — 假設你完全是新手，從下載 Claude Code 開始手把手教到第一個 AI 報價跑出來。看 README 卡住就翻這份。
+
 ---
 
 ## Demo 畫面
@@ -34,18 +37,40 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ## 這能做什麼
 
-`manufacturing-skill` 是一個 **Claude Code plugin**，採用「**core + profile overlay**」架構。
+簡單說：**裝起來後你會多 5 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
 
-- **Core 層** — 所有製造業共通的基本功：6 段流程（報價→接單→排程→生產→檢驗→出貨）、5 隻 agent persona（報價師、業助、生管、品管、倉管）、普世 know-how（ISO 9001、Lean、OEE、MRP）。
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 **CNC 精密加工**（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他產業包（PCB / 射出 / 食品 / 製藥）以 stub 形式存在，歡迎社群或客戶 contribute。
-- **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）。
-- **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後。
+| #   | 場景                  | AI 同事幫你做                                                                |
+| --- | --------------------- | ---------------------------------------------------------------------------- |
+| 1   | 📞 **接報價**         | 客戶 RFQ 一進來，AI 自動算成本、估交期、組報價單；發現工程矛盾會主動提替代方案 |
+| 2   | 📅 **排生產**         | 訂單接下來，AI 看當前產能能不能接、要不要加班、什麼時候交得出去             |
+| 3   | 🏭 **追工單**         | 工單跑到哪了？哪台機台卡住了？哪個訂單可能延誤？隨時問                       |
+| 4   | 🔍 **顧品管**         | 不良追蹤、客訴 8D 處理、IATF 稽核準備 — AI 引導你跑完合規流程                |
+| 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
+| 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥都有起點範本）  |
+
+**5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
+
+**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 5 隻 AI 同事，**你不用每次重講一遍**。
+
+---
+
+<details>
+<summary>給工程師看的架構細節（決策者跟導入者可以跳過）</summary>
+
+採用「**core + profile overlay**」架構：
+
+- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
+- **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
+- **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
+
+</details>
 
 ---
 
 ## Agent 之間怎麼協作
 
-特助看 demo 時最常問的就是這個：「5 隻 agent 是怎麼接力的？」一張圖說明。
+看完 demo 最常被問的問題：「5 隻 AI 同事是怎麼接力的？」一張圖說明。
 
 ### 流程：以 `/quote` 為例
 
@@ -107,6 +132,8 @@ sequenceDiagram
 ---
 
 ## 30 秒安裝
+
+> 💡 **不會 git / bash 也別擔心：** [新手指南](docs/quickstart-for-beginners.zh-TW.md) 把這幾行指令一行一行解釋給你看，含 Windows / Mac 安裝流程跟錯誤排除。
 
 ```bash
 # 1. Clone
