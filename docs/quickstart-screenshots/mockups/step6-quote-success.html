@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Step 6 mockup · /quote success output</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Source+Serif+Pro:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html, body {
+        font-family: "Inter", "Noto Sans TC", sans-serif;
+        background: #f0eee6;
+        min-height: 100vh;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 50px 40px;
+      }
+      .frame {
+        width: 1280px;
+        background: #1a1a1c;
+        border-radius: 14px;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.20), 0 4px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .titlebar {
+        background: #232326;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #2e2e32;
+      }
+      .traffic-light { width: 12px; height: 12px; border-radius: 50%; }
+      .red { background: #ff5f56; }
+      .yellow { background: #ffbd2e; }
+      .green { background: #27c93f; }
+      .titlebar-title {
+        flex: 1;
+        text-align: center;
+        font-size: 13px;
+        color: #888;
+        font-weight: 500;
+        margin-left: -68px;
+      }
+
+      .mockup-label {
+        position: absolute;
+        top: 14px;
+        right: 16px;
+        background: rgba(255,255,255,0.08);
+        color: #888;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        z-index: 20;
+      }
+
+      .conv {
+        padding: 36px 56px 40px;
+        background: #161618;
+      }
+
+      .msg {
+        margin-bottom: 30px;
+      }
+      .msg-role {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .role-icon {
+        width: 28px; height: 28px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .role-icon.user {
+        background: #36363a;
+        color: #f4f4f4;
+      }
+      .role-icon.claude {
+        background: #cc785c;
+        color: #fff;
+      }
+      .role-name {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #999;
+        font-weight: 700;
+      }
+      .msg-body {
+        margin-left: 38px;
+        color: #e0e0e0;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      .msg-body.user-cmd {
+        font-family: "JetBrains Mono", monospace;
+        background: #232327;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #f4d589;
+        border: 1px solid #36363a;
+      }
+      .msg-body code {
+        background: #2a2a2e;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13.5px;
+        color: #f4d589;
+      }
+      .msg-body strong {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      /* Block: pre-quote check */
+      .block {
+        margin-bottom: 18px;
+      }
+      .block-title {
+        font-weight: 700;
+        color: #ffffff;
+        font-size: 15.5px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .block-title.warn {
+        color: #f4b942;
+      }
+      .block-content {
+        color: #d0d0d0;
+        font-size: 14.5px;
+        line-height: 1.7;
+      }
+
+      .alert-box {
+        background: rgba(244, 185, 66, 0.10);
+        border-left: 3px solid #f4b942;
+        padding: 10px 14px;
+        border-radius: 4px;
+        margin: 6px 0 8px;
+      }
+      .alert-box .alert-title {
+        color: #f4b942;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .alt-list {
+        margin: 6px 0 6px 16px;
+        color: #c0c0c0;
+        font-size: 14px;
+      }
+      .alt-list li {
+        margin-bottom: 3px;
+      }
+
+      .quote-final {
+        margin-top: 18px;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, rgba(108,142,239,0.12) 0%, rgba(204,120,92,0.10) 100%);
+        border-radius: 10px;
+        border: 1px solid rgba(108,142,239,0.25);
+      }
+      .quote-final .ql {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 14.5px;
+      }
+      .quote-final .ql-label {
+        color: #b0b0b0;
+      }
+      .quote-final .ql-val {
+        color: #f4f4f4;
+        font-weight: 700;
+        font-family: "Inter", sans-serif;
+      }
+      .quote-final .ql-val.big {
+        color: #5dd4a3;
+        font-size: 17px;
+      }
+
+      .meta-row {
+        font-size: 12px;
+        color: #777;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid #2a2a2e;
+      }
+
+      .agent-tag {
+        display: inline-block;
+        background: rgba(108,142,239,0.15);
+        color: #6c8eef;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+      }
+
+      .highlight-strip {
+        background: linear-gradient(90deg, rgba(244,185,66,0.20) 0%, transparent 100%);
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin: 0 -8px;
+        display: inline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="titlebar">
+        <span class="traffic-light red"></span>
+        <span class="traffic-light yellow"></span>
+        <span class="traffic-light green"></span>
+        <span class="titlebar-title">Claude Code — /quote demo</span>
+      </div>
+      <div class="mockup-label">示意圖 / MOCKUP</div>
+
+      <div class="conv">
+        <!-- USER MESSAGE -->
+        <div class="msg">
+          <div class="msg-role">
+            <div class="role-icon user">J</div>
+            <div class="role-name">You</div>
+          </div>
+          <div class="msg-body user-cmd">/quote @examples/sample-drawing/bracket.md</div>
+        </div>
+
+        <!-- CLAUDE RESPONSE -->
+        <div class="msg">
+          <div class="msg-role">
+            <div class="role-icon claude">✱</div>
+            <div class="role-name">Claude<span class="agent-tag">🧮 quote-specialist</span></div>
+          </div>
+          <div class="msg-body">
+            <p style="margin-bottom: 18px"><strong>識別材料表處衝突並架構製造報價方案。</strong></p>
+
+            <div class="block">
+              <div class="block-title warn">⚠️ Pre-Quote 檢查｜ISO 9001 設計審查</div>
+              <div class="alert-box">
+                <div class="alert-title">⚠️ 規格衝突</div>
+                <div class="block-content">
+                  SUS304 為不鏽鋼，<strong>無法陽極處理</strong>（陽極為鋁/鈦製程）。建議改：
+                  <ul class="alt-list">
+                    <li>① 黑色 PVD 鍍膜</li>
+                    <li>② 發黑鈍化</li>
+                    <li>③ 黑色粉體烤漆</li>
+                  </ul>
+                  <span class="highlight-strip">需客戶書面確認後鎖價。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="block">
+              <div class="block-title">📐 工藝路線</div>
+              <div class="block-content">
+                雷切下料 → CNC 銑外形/面 → 鑽孔 ø5.8 → 鉸 D6H7 → 去毛邊 → 外發表處 → FAI 首件 + AQL 2.5 抽檢 → 包裝
+              </div>
+            </div>
+
+            <div class="block">
+              <div class="block-title">💰 成本拆解 NT$/件</div>
+              <div class="block-content">
+                材料 35 ｜ CNC 加工 60 ｜ 鉸孔 25 ｜ 表處外包 80 ｜ QC/包裝 15 ｜ 管銷+利潤 35
+              </div>
+            </div>
+
+            <div class="quote-final">
+              <div class="ql">
+                <span class="ql-label">單價</span>
+                <span class="ql-val big">NT$ 250 / 件</span>
+              </div>
+              <div class="ql">
+                <span class="ql-label">總價（未稅）</span>
+                <span class="ql-val big">NT$ 25,000</span>
+              </div>
+              <div class="ql">
+                <span class="ql-label">交期</span>
+                <span class="ql-val">2026-05-15 可達（LT 18 工作天）</span>
+              </div>
+              <div class="ql">
+                <span class="ql-label">報價有效</span>
+                <span class="ql-val">30 天 · MOQ 100 · 月結 60 天</span>
+              </div>
+            </div>
+
+            <div class="meta-row">
+              ✅ 同步通知 📅 生管確認交期 · 🔍 品管 AQL 設定已套用 · 等客戶確認表處後送出
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -47,7 +47,13 @@ https://claude.com/claude-code
 
 > 💡 **完全新手：選桌面 app。** 跟裝 LINE / Word 一樣，下載 → 雙擊 → 點下一步 → 完成。安裝完桌面會出現 Claude 的 icon，雙擊就打開。
 
-> 📸 _截圖待補：官方下載頁的「Download Claude for desktop」按鈕位置、Windows / Mac 各自的安裝過程畫面_
+**📸 官網開頭長這樣**（注意「Built for developers」字樣 + 下方那行 `irm ... | iex` PowerShell 指令 — 這就是「對新手不友善」的地方）：
+
+![Claude Code 官網 hero — Built for developers](quickstart-screenshots/step0-claude-code-hero.png)
+
+**📸 往下捲到 Download Claude 頁，會看到桌面 app 路徑**（macOS / Windows / Windows arm64 / iOS / Android）：
+
+![Download Claude 頁面 — 桌面 app 下載](quickstart-screenshots/step1-download-page.png "如果這張顯示不出來，代表 step1-download-page.png 還沒存到 quickstart-screenshots/ 資料夾")
 
 ### 1-3 確認裝起來了
 
@@ -73,7 +79,13 @@ https://claude.com/claude-code
 - 月繳不綁約，隨時可以取消
 - 確切收費以 [官網價目頁](https://claude.com/claude-code) 為準
 
-> 📸 _截圖待補：登入畫面、首次開啟主畫面、找到 terminal 區_
+**📸 第一次打開桌面 app 看到這個 splash 畫面，按「Get started」開始登入流程：**
+
+![Claude for Windows 首次開啟畫面](quickstart-screenshots/step2-first-launch-windows.png "如果這張顯示不出來，代表 step2-first-launch-windows.png 還沒存到 quickstart-screenshots/ 資料夾")
+
+**📸 接著看到登入畫面，最簡單的是按「Continue with Google」：**
+
+![Claude Code Sign In 登入畫面](quickstart-screenshots/step3-sign-in.png "如果這張顯示不出來，代表 step3-sign-in.png 還沒存到 quickstart-screenshots/ 資料夾")
 
 ---
 
@@ -83,6 +95,8 @@ Claude Code 主畫面有兩塊：
 
 - **上方對話框** — 跟 AI 聊天的地方（之後 Step 4 會用）
 - **下方 terminal** — 黑底白字、可以打指令的地方（Step 3 在這邊）
+
+![Claude Code 主畫面 — 上方對話框 + 下方 terminal（示意圖）](quickstart-screenshots/step4-main-window-mockup.png)
 
 > 💡 **找不到 terminal？** 在 Claude Code 裡按 `Ctrl + 反引號`（鍵盤左上角，數字 1 旁邊那顆 `` ` ``）切換顯示。Mac 也是一樣按法。
 
@@ -139,7 +153,7 @@ bash adapters/claude-code/install.sh
 
 按完 Enter，等個 5-10 秒，看到 `✅ Installation complete.` 就成功了。
 
-> 📸 _截圖待補：選單畫面、Installation complete 成功畫面_
+![install.sh 安裝選單實際畫面（示意圖）](quickstart-screenshots/step5-install-selector-mockup.png)
 
 ---
 
@@ -171,7 +185,7 @@ bash adapters/claude-code/install.sh
 
 ✅ **看到 AI 自己抓到「不鏽鋼不能陽極」這個矛盾 = plugin 在工作。**
 
-> 📸 _截圖待補：指令打完、AI 思考中、最終報價單輸出_
+![/quote 跑完的成功 output（示意圖，文字內容為真實 Opus 4.7 回應）](quickstart-screenshots/step6-quote-success-mockup.png)
 
 ---
 
@@ -245,6 +259,11 @@ sudo bash adapters/claude-code/install.sh
 
 ---
 
-> 📌 **這份文件還在補實際截圖。** 標 📸 的地方目前只有文字說明，後續會補上 Windows / Mac 桌面 app 的真實畫面。
+> 📌 **本文件截圖狀態：**
+>
+> - ✅ Step 1（Claude Code hero、Download Claude 頁）— **真實截圖**
+> - ✅ Step 2（Claude for Windows splash、Sign In）— **真實截圖**
+> - 🎨 Step 3（主畫面、安裝選單）— **示意圖（mockup）**，左上角有「示意圖 / MOCKUP」標記，原始 HTML 在 [`docs/quickstart-screenshots/mockups/`](quickstart-screenshots/mockups/)
+> - 🎨 Step 4（`/quote` 成功 output）— **示意圖**，文字內容 100% 來自真實 Claude Opus 4.7 回應（見 [docs/demo/real-claude-response.md](demo/real-claude-response.md)）
 >
 > 如果你照這份做卡在某一步，**請直接 [開 issue](https://github.com/jason-simhope-ai/manufacturing-skill/issues) 告訴我們你卡哪、看到什麼錯誤訊息**，我們會優先補那一段。你的回饋直接讓這份指南變更好。

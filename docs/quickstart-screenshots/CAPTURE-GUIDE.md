@@ -1,127 +1,63 @@
-# 截圖捕捉指南
+# 新手指南截圖庫狀態
 
-> 給 Jason 補新手指南截圖用的工作清單。明天 demo 完之後再補也行，但補上後新手指南完成度會大幅上升。
-
-每張截圖的目標、推薦尺寸、要框的範圍、要避開的東西，都列在下方。
-
-存檔規範：
-
-- **位置**：`docs/quickstart-screenshots/`（這個資料夾）
-- **檔名**：照下面的命名（已附建議檔名）
-- **格式**：PNG 優先（截 retina 也 OK）
-- **隱私**：截圖前**清除個人帳號資訊**（email、信用卡末四碼、電話）
+> 給 Jason 的工作清單。完成度：**4 真實截圖（待你存檔）+ 3 mockup（已生）+ 1 hero 警告圖**。
 
 ---
 
-## ✅ Step 1：官方下載頁（已抓 / 可重抓）
+## 截圖總覽
 
-| 屬性     | 內容                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------- |
-| 檔名     | `step1-download-page.png`（已抓 — 用 headless Chrome 截，dark theme）                                   |
-| 推薦尺寸 | 1440×900 或更大                                                                                         |
-| 要框     | 整個 hero 區塊：`Built for developers` 標題 + `irm ... \| iex` install 命令框 + 「Get Claude Code」按鈕 |
-| 要避開   | 個人帳號 avatar（如有登入請先登出）                                                                     |
-
-**重點**：要捕捉到 `irm https://claude.ai/install.ps1 | iex` 這行命令 — 這就是新手指南 Step 1-2 表格裡提到的「一行 install 指令」原始來源。
-
-> 💡 如果你想重抓彩色 light mode 版本：用一般瀏覽器到 https://claude.com/claude-code，截整個 viewport（按 F12 開 DevTools → Cmd/Ctrl+Shift+P → 輸入「screenshot」→ 選 Capture full size screenshot）。
-
----
-
-## 📸 Step 2：「Download Claude for desktop」按鈕位置
-
-| 屬性     | 內容                                                                                                                            |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 檔名     | `step1b-desktop-download-button.png`                                                                                            |
-| 推薦尺寸 | 1440×900                                                                                                                        |
-| 要框     | 同個官網頁面，**往下捲**到「Use Claude Code where you work」區塊，框 **Desktop** 那欄 + 「**Download Claude for desktop**」按鈕 |
-| 要避開   | 同上                                                                                                                            |
-
-**為什麼要這張**：新手指南開頭就警告讀者「不要被 Built for developers 嚇到，要往下捲找桌面 app」 — 這張截圖證明確實有桌面 app 路徑。
+| #   | 檔名                                | 狀態          | 來源                    |
+| --- | ----------------------------------- | ------------- | ----------------------- |
+| 0   | `step0-claude-code-hero.png`        | ✅ 已抓       | headless Chrome 自動抓  |
+| 1   | `step1-download-page.png`           | ⏳ **待你存** | 你貼在 chat 的 Image 3  |
+| 2   | `step2-first-launch-windows.png`    | ⏳ **待你存** | 你貼在 chat 的 Image 2  |
+| 3   | `step3-sign-in.png`                 | ⏳ **待你存** | 你貼在 chat 的 Image 1  |
+| 4   | `step4-main-window-mockup.png`      | ✅ Mockup     | playwright 從 HTML 渲染 |
+| 5   | `step5-install-selector-mockup.png` | ✅ Mockup     | 同上                    |
+| 6   | `step6-quote-success-mockup.png`    | ✅ Mockup     | 同上                    |
 
 ---
 
-## 📸 Step 3：Claude Code 桌面版首次開啟 / 登入畫面
+## ⏳ 你還需要做：把 3 張 chat 截圖存成檔案
 
-| 屬性     | 內容                                                                                            |
-| -------- | ----------------------------------------------------------------------------------------------- |
-| 檔名     | `step2-login-screen.png`                                                                        |
-| 推薦尺寸 | 桌面 app 視窗滿版（你的螢幕解析度）                                                             |
-| 要框     | Claude Code 桌面 app 的登入畫面 — 要看到「Continue with Google」、「Continue with email」等選項 |
-| 要避開   | **絕對不要框到你的 email、Google 帳號縮圖。** 截圖前先登出，截「未登入狀態」                    |
+你在 chat 貼了 3 張真實截圖（Sign In、Claude for Windows、Download Claude）。我這端只能看到，沒有檔案存取權限。請：
 
-**怎麼操作**：
+1. **從 chat 把 3 張圖另存到本地**
+2. **照下面命名搬到 `docs/quickstart-screenshots/` 資料夾**
 
-1. 如果你已經登入，先在 Claude Code 設定裡找「Sign out」
-2. 完全關掉 Claude Code
-3. 重新打開（會跳登入畫面）
-4. 截圖
+| 你貼的 chat image             | 對應檔名                         | 內容描述                                                |
+| ----------------------------- | -------------------------------- | ------------------------------------------------------- |
+| Image 1（Sign In）            | `step3-sign-in.png`              | 「Continue with Google」/ 「Continue with email」登入頁 |
+| Image 2（Claude for Windows） | `step2-first-launch-windows.png` | 桌面 app 第一次開啟的「Get started」splash 畫面         |
+| Image 3（Download Claude）    | `step1-download-page.png`        | 「Download Claude」頁，含 macOS/Windows 下載按鈕        |
 
 ---
 
-## 📸 Step 4：Claude Code 主畫面 + terminal 位置標示
+## ✅ 已生 mockup（Step 4 / 5 / 6）
 
-| 屬性     | 內容                                                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 檔名     | `step3-main-window-with-terminal.png`                                                                                  |
-| 推薦尺寸 | 桌面 app 視窗滿版                                                                                                      |
-| 要框     | 登入後的主畫面 — **上方對話框** + **下方 terminal 區**都要看到                                                         |
-| 後製     | 用任何畫圖軟體（Windows 小畫家 / Mac 預覽程式）在「對話框」跟「terminal」位置加紅框 + 文字標示「對話框」、「terminal」 |
-| 要避開   | 個人對話歷史（如有先清除）                                                                                             |
+我用 HTML + playwright 渲染了 3 張擬真 mockup（dark theme + 1080p retina），左上角有「示意圖 / MOCKUP」小標。原始 HTML 在 `docs/quickstart-screenshots/mockups/` 隨時可改。
 
-**目的**：新手指南 Step 3 開頭說「主畫面有兩塊：上方對話框 + 下方 terminal」 — 這張截圖直接視覺證明位置。
+### Step 4：Claude Code 主畫面 + terminal 標示
 
----
+- 檔案：`step4-main-window-mockup.png`（1440×980 retina）
+- 內容：左側 sidebar、上方 chat、下方 terminal、紅色註解標箭頭
+- 為什麼是 mockup：你還沒登入截到自己 app 主畫面 — 等你截到真實版可替換
 
-## 📸 Step 5：install.sh 安裝選單跑出來的瞬間
+### Step 5：install.sh 安裝選單
 
-| 屬性     | 內容                                                                                                |
-| -------- | --------------------------------------------------------------------------------------------------- |
-| 檔名     | `step3-install-selector.png`                                                                        |
-| 推薦尺寸 | terminal 那塊放大截，至少 800×600                                                                   |
-| 要框     | 跑完 `bash adapters/claude-code/install.sh` 之後跳出的選單（cnc-machining / stub / core-only 那段） |
-| 要避開   | 上面 `git clone` 的個人系統路徑（如有 `C:/Users/<你的名字>/...` 在輸出中，截圖時手動把名字打碼）    |
+- 檔案：`step5-install-selector-mockup.png`（1280×720 retina）
+- 內容：完整 macOS 風格 terminal，cursor 在 `Select [0-5]:` 後閃爍
+- 為什麼是 mockup：跟真實 terminal output 1:1，可信度足夠；想替換成真截圖也歡迎
 
-**怎麼操作**：
+### Step 6：`/quote` 跑成功的 output
 
-1. 在 terminal 跑 `bash adapters/claude-code/install.sh`
-2. 跑到「Select [0-5]:」那個 prompt 停下
-3. **不要**先按 Enter，先截圖
-4. 截完再選 1 按 Enter 繼續
+- 檔案：`step6-quote-success-mockup.png`（1280×1280 retina）
+- 內容：完整 Claude chat 對話，含「規格衝突」alert 框 + 3 個替代方案 + 報價結算表
+- 內容來源：`docs/demo/real-claude-response.md`（你之前 captured 的真實 Opus 4.7 回應）所以文字 100% 真實，只是 UI 是 mockup
 
 ---
 
-## 📸 Step 6：`/quote` 跑完的成功 output
-
-| 屬性     | 內容                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 檔名     | `step4-quote-success.png`                                                                                                 |
-| 推薦尺寸 | 對話框那塊滿版截，至少 1200×900                                                                                           |
-| 要框     | 完整 `/quote @examples/sample-drawing/bracket.md` 的成功 output — 至少要看到 AI 抓到「不鏽鋼陽極」矛盾 + 提替代方案的部分 |
-| 後製建議 | 太長的話分成 2 張：(a) AI 思考過程開頭 (b) 最終報價單。或者用一張長截圖（Chrome 的 full size screenshot 可以做到）        |
-
-**怎麼操作**：
-
-1. 在 Claude Code 對話框打 `/quote @examples/sample-drawing/bracket.md` 按 Enter
-2. 等 AI 跑完整段（約 30 秒到 2 分鐘）
-3. 看到完整 output 後截圖
-4. 如果太長，先截最有戲劇張力的一段（AI 抓到矛盾、提替代方案那段）
-
----
-
-## 截好後
-
-把 6 張 PNG 放到這個資料夾後，告訴 Jason（或自己）做兩件事：
-
-1. **編輯 `docs/quickstart-for-beginners.zh-TW.md`** — 把 6 處 `📸 _截圖待補：..._` 提示換成實際的 markdown 圖片連結：
-   ```markdown
-   ![截圖描述](../quickstart-screenshots/step1-download-page.png)
-   ```
-2. **commit + push** — 訊息建議 `docs(quickstart): add 6 screenshots for beginner guide`
-
----
-
-## 後製小工具推薦
+## 📷 後製小工具推薦
 
 | 需求                  | Windows                                           | Mac               |
 | --------------------- | ------------------------------------------------- | ----------------- |
@@ -129,3 +65,31 @@
 | 畫紅框 / 寫文字       | 小畫家 / [ShareX](https://getsharex.com/)（推薦） | 預覽程式 / Skitch |
 | 馬賽克 / 打碼帳號資訊 | ShareX                                            | Skitch / 預覽程式 |
 | 全頁截圖              | Chrome DevTools                                   | Chrome DevTools   |
+
+---
+
+## 想重新生 mockup？
+
+3 張 mockup 的原始 HTML 在 `docs/quickstart-screenshots/mockups/`。改完內容後重新渲染：
+
+```bash
+# 從 repo root
+py -c "
+from playwright.sync_api import sync_playwright
+slides = [
+    ('step5-install-selector', 1280, 720),
+    ('step4-main-window', 1440, 980),
+    ('step6-quote-success', 1280, 1280),
+]
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    for name, w, h in slides:
+        page = browser.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2).new_page()
+        page.goto(f'http://localhost:8765/quickstart-screenshots/mockups/{name}.html', wait_until='networkidle')
+        page.wait_for_timeout(1500)
+        page.screenshot(path=f'docs/quickstart-screenshots/{name}-mockup.png', full_page=True, type='png')
+    browser.close()
+"
+```
+
+需先啟動 dev server：`py -m http.server 8765 --directory docs`
