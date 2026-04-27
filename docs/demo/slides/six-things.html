@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>manufacturing-skill · 6 件事</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        font-family:
+          "Noto Sans TC", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #f4f6fa;
+        color: #0f1629;
+        overflow: hidden;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+
+      /* 1920×1080 canvas, scaled to fit if viewport smaller */
+      .slide {
+        width: 1920px;
+        height: 1080px;
+        background: linear-gradient(135deg, #fafbfc 0%, #eff2f7 100%);
+        position: relative;
+        overflow: hidden;
+        padding: 80px 100px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 56px;
+      }
+
+      /* Decorative grid lines (subtle) */
+      .slide::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(15, 22, 41, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 22, 41, 0.025) 1px, transparent 1px);
+        background-size: 80px 80px;
+        pointer-events: none;
+      }
+
+      /* Decorative accent bar (top-right) */
+      .slide::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 480px;
+        height: 8px;
+        background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 50%, #06b6d4 100%);
+      }
+
+      /* ─── HEADER ─── */
+      .header {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .eyebrow {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 18px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #2563eb;
+      }
+
+      .brand-name {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: 84px;
+        letter-spacing: -0.025em;
+        color: #0f1629;
+        line-height: 1;
+      }
+
+      .brand-name .accent {
+        color: #2563eb;
+      }
+
+      .tagline {
+        font-weight: 500;
+        font-size: 32px;
+        color: #475569;
+        letter-spacing: 0.02em;
+        margin-top: 8px;
+      }
+
+      .tagline strong {
+        color: #0f1629;
+        font-weight: 700;
+      }
+
+      .meta-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-align: right;
+        font-family: "Inter", sans-serif;
+      }
+
+      .meta-stack .badge {
+        align-self: flex-end;
+        background: #0f1629;
+        color: white;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 16px;
+        letter-spacing: 0.05em;
+      }
+
+      .meta-stack .ver {
+        font-weight: 600;
+        font-size: 18px;
+        color: #64748b;
+        margin-top: 8px;
+      }
+
+      /* ─── CARD GRID ─── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 36px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 24px;
+        padding: 42px 44px;
+        box-shadow:
+          0 1px 2px rgba(15, 22, 41, 0.04),
+          0 8px 24px rgba(15, 22, 41, 0.06);
+        border: 1px solid rgba(15, 22, 41, 0.06);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow: hidden;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 6px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--card-accent), transparent);
+      }
+
+      .card-num {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: 14px;
+        color: var(--card-accent);
+        letter-spacing: 0.15em;
+      }
+
+      .card-title-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .card-emoji {
+        font-size: 56px;
+        line-height: 1;
+      }
+
+      .card-title {
+        font-weight: 900;
+        font-size: 38px;
+        letter-spacing: -0.01em;
+        color: #0f1629;
+      }
+
+      .card-desc {
+        font-size: 19px;
+        line-height: 1.65;
+        color: #334155;
+        font-weight: 400;
+      }
+
+      .card-desc strong {
+        color: #0f1629;
+        font-weight: 700;
+      }
+
+      /* Card accents per item */
+      .card.c1 { --card-accent: #2563eb; }
+      .card.c2 { --card-accent: #0891b2; }
+      .card.c3 { --card-accent: #059669; }
+      .card.c4 { --card-accent: #d97706; }
+      .card.c5 { --card-accent: #dc2626; }
+      .card.c6 { --card-accent: #7c3aed; }
+
+      /* ─── FOOTER ─── */
+      .footer {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 48px;
+        padding-top: 24px;
+        border-top: 1px solid rgba(15, 22, 41, 0.08);
+      }
+
+      .agents {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .agents-label {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .agents-list {
+        font-weight: 700;
+        font-size: 24px;
+        color: #0f1629;
+        letter-spacing: 0.01em;
+      }
+
+      .agents-list .sep {
+        color: #cbd5e1;
+        margin: 0 12px;
+        font-weight: 400;
+      }
+
+      .repo {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .repo-label {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .repo-url {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 22px;
+        color: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide">
+      <!-- HEADER -->
+      <header class="header">
+        <div class="brand">
+          <div class="eyebrow">Claude Code Plugin · v0.1.2</div>
+          <h1 class="brand-name">manufacturing<span class="accent">-skill</span></h1>
+          <p class="tagline">
+            裝起來後你會多 <strong>5 個內建懂製造業的 AI 同事</strong>，幫你工廠做這
+            <strong>6 件事</strong>
+          </p>
+        </div>
+        <div class="meta-stack">
+          <div class="badge">30 分鐘上線</div>
+          <div class="ver">本機跑 · 圖紙不外流</div>
+        </div>
+      </header>
+
+      <!-- 6 CAPABILITY CARDS -->
+      <main class="grid">
+        <div class="card c1">
+          <div class="card-num">01</div>
+          <div class="card-title-row">
+            <span class="card-emoji">📞</span>
+            <span class="card-title">接報價</span>
+          </div>
+          <p class="card-desc">
+            客戶 RFQ 一進來，AI 自動算成本、估交期、組報價單。<strong>發現工程矛盾會主動提替代方案</strong>（例：不鏽鋼客戶要陽極處理）
+          </p>
+        </div>
+
+        <div class="card c2">
+          <div class="card-num">02</div>
+          <div class="card-title-row">
+            <span class="card-emoji">📅</span>
+            <span class="card-title">排生產</span>
+          </div>
+          <p class="card-desc">
+            訂單接下來，AI 看當前產能能不能接、要不要加班、什麼時候交得出去 —
+            <strong>不再憑感覺答交期</strong>
+          </p>
+        </div>
+
+        <div class="card c3">
+          <div class="card-num">03</div>
+          <div class="card-title-row">
+            <span class="card-emoji">🏭</span>
+            <span class="card-title">追工單</span>
+          </div>
+          <p class="card-desc">
+            工單跑到哪了？哪台機台卡住了？哪個訂單可能延誤？<strong>隨時用中文問</strong>，不用學新介面
+          </p>
+        </div>
+
+        <div class="card c4">
+          <div class="card-num">04</div>
+          <div class="card-title-row">
+            <span class="card-emoji">🔍</span>
+            <span class="card-title">顧品管</span>
+          </div>
+          <p class="card-desc">
+            不良追蹤、客訴 8D 處理、IATF 稽核準備 — AI <strong>引導你跑完合規流程</strong>，新人也不會漏項
+          </p>
+        </div>
+
+        <div class="card c5">
+          <div class="card-num">05</div>
+          <div class="card-title-row">
+            <span class="card-emoji">📦</span>
+            <span class="card-title">管庫存</span>
+          </div>
+          <p class="card-desc">
+            BOM 對帳、缺料預警、出貨檢查清單 — <strong>不用每天叫倉管手動盤點</strong>
+          </p>
+        </div>
+
+        <div class="card c6">
+          <div class="card-num">06</div>
+          <div class="card-title-row">
+            <span class="card-emoji">🛠️</span>
+            <span class="card-title">客製給自己工廠</span>
+          </div>
+          <p class="card-desc">
+            不是 CNC 廠？<strong>fork 一份改成你的行業</strong>（PCB / 射出 / 食品 / 製藥都有起點範本）
+          </p>
+        </div>
+      </main>
+
+      <!-- FOOTER -->
+      <footer class="footer">
+        <div class="agents">
+          <div class="agents-label">5 個 AI 同事</div>
+          <div class="agents-list">
+            🧮 報價師<span class="sep">·</span>📞 業助<span class="sep">·</span>📅
+            生管<span class="sep">·</span>🔍 品管<span class="sep">·</span>📦 倉管
+          </div>
+        </div>
+        <div class="repo">
+          <div class="repo-label">Open Source · MIT License</div>
+          <div class="repo-url">github.com/jason-simhope-ai/manufacturing-skill</div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
