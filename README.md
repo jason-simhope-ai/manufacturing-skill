@@ -19,10 +19,12 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 **The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
 
-> Want the full transcript or an interactive playable mock?
->
+**🎬 19-second demo animation** (full flow from `/quote` to structured quote):
+
+![manufacturing-skill /quote 19s animation](docs/demo/quote-demo-en.gif)
+
 > - Plain-text capture: [docs/demo/real-claude-response.md](docs/demo/real-claude-response.md)
-> - Auto-playing browser animation: serve `docs/demo/` (`python -m http.server 8080`) and open [quote-demo.html](docs/demo/quote-demo.html)
+> - Interactive replay: [docs/demo/quote-demo-en.html](docs/demo/quote-demo-en.html)
 
 ---
 
@@ -46,6 +48,22 @@ Manufacturing AI adoption usually fails on three things:
 | AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 4 know-how docs — AI understands ISO/Lean/OEE on day one |
 | Every factory is different | Hire an SI, pay for full custom build                          | Core + profile overlay — fork, edit your profile, done                               |
 | IT blocks cloud SaaS       | Cannot pass customer audits (drawings must not leave premises) | On-prem-first design with GB10/Ollama runtime                                        |
+
+---
+
+## 💰 Cost expectations
+
+**Cheapest path: try cloud Claude Code Pro for one month, total ~US$20**
+
+| Stage                          | Monthly       | One-time                 |
+| ------------------------------ | ------------- | ------------------------ |
+| Try it out (Cloud Pro)         | $17-20 / mo   | 0                        |
+| Heavy daily use (Cloud Max)    | $100-200 / mo | 0                        |
+| Drawings can't leave (on-prem) | Electricity   | NT$200K+ (GB10 hardware) |
+
+**Reference comparison**: hiring an SI to custom-build a comparable system runs **NT$300K-1M one-time** (development + integration + training). This plugin is fork-friendly open source — that's what you save.
+
+> 💡 Monthly plans are no-commit. Try Pro for 1-2 months (~NT$650-1,300 total) before deciding to upgrade or self-host. Anthropic usually gives new users some free credits.
 
 ---
 
