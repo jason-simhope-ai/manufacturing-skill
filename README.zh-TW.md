@@ -29,9 +29,12 @@
 **真實場景**：客戶 RFQ 寫「SUS304 不鏽鋼支架要 RAL9005 黑陽極」 — 工程上根本做不到（陽極處理是給鋁/鈦的）。
 plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代方案、parking 在客戶書面確認上才鎖價。
 
+**🎬 19 秒 demo 動畫**（從 user 打 `/quote` 到完整報價單產出全程）：
+
+![manufacturing-skill /quote 19 秒動畫](docs/demo/quote-demo.gif)
+
 > - 完整文字版：[docs/demo/real-claude-response.md](docs/demo/real-claude-response.md)
-> - ▶ 互動式 demo（瀏覽器點擊式回放）：[docs/demo/quote-demo.html](docs/demo/quote-demo.html) — 用 `python -m http.server 8080` 在 `docs/demo/` 跑起來
-> - 🎬 30 秒 demo 影片：TODO（規劃中）
+> - ▶ 互動式 demo（瀏覽器點擊式回放）：[docs/demo/quote-demo.html](docs/demo/quote-demo.html)
 
 ---
 
