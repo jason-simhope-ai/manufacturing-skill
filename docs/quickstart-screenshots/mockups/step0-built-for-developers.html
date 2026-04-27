@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>step0 mockup · Built for developers warning</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: #1a1a1c;
+        font-family: "Inter", "Noto Sans TC", sans-serif;
+        color: #e6e6e6;
+        min-height: 100vh;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .page {
+        width: 1680px;
+        min-height: 760px;
+        background: #1a1a1c;
+        position: relative;
+        padding: 32px 64px 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* Top nav (simplified) */
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 8px;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Source Serif Pro", serif;
+        font-size: 24px;
+        color: #f4f4f4;
+      }
+      .logo-asterisk {
+        width: 22px;
+        height: 22px;
+        background: #cc785c;
+        border-radius: 50%;
+        position: relative;
+      }
+      .logo-asterisk::before,
+      .logo-asterisk::after {
+        content: "✱";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 16px;
+      }
+      .nav-links {
+        display: flex;
+        gap: 28px;
+        font-size: 13px;
+        color: #b8b8bc;
+      }
+      .nav-cta {
+        display: flex;
+        gap: 12px;
+      }
+      .btn-secondary {
+        padding: 8px 16px;
+        font-size: 13px;
+        color: #f4f4f4;
+        background: transparent;
+        border: 1px solid #3a3a3d;
+        border-radius: 999px;
+        font-weight: 500;
+      }
+      .btn-primary {
+        padding: 8px 18px;
+        font-size: 13px;
+        color: #1a1a1c;
+        background: #f4f4f4;
+        border-radius: 999px;
+        font-weight: 600;
+      }
+
+      /* Breadcrumb */
+      .breadcrumb {
+        font-size: 12px;
+        color: #7a7a7e;
+        padding: 8px 0;
+      }
+
+      /* Hero */
+      .hero {
+        margin-top: 40px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        background: rgba(204, 120, 92, 0.12);
+        border: 1px solid rgba(204, 120, 92, 0.3);
+        border-radius: 999px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: #cc785c;
+      }
+      .badge::before {
+        content: "✱";
+        color: #cc785c;
+      }
+      .headline {
+        font-family: "Source Serif Pro", serif;
+        font-size: 92px;
+        font-weight: 400;
+        line-height: 1;
+        color: #e6e6e6;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: baseline;
+        gap: 24px;
+        white-space: nowrap;
+      }
+      .headline .arrow {
+        color: #cc785c;
+        font-weight: 300;
+      }
+      .headline .target {
+        font-style: italic;
+        color: #cc785c;
+      }
+      .subhead {
+        font-size: 19px;
+        color: #b8b8bc;
+        font-weight: 400;
+        line-height: 1.6;
+        max-width: 720px;
+      }
+
+      /* Install command box */
+      .cmd-row {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin-top: 16px;
+        background: #232327;
+        border: 1px solid #36363a;
+        border-radius: 999px;
+        padding: 6px;
+      }
+      .cmd-btn {
+        padding: 10px 20px;
+        background: transparent;
+        color: #f4f4f4;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cmd-divider {
+        width: 1px;
+        height: 24px;
+        background: #36363a;
+      }
+      .cmd-text {
+        padding: 10px 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        color: #d4d4d8;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cmd-text .cmd-name {
+        color: #cc785c;
+      }
+      .cmd-text .cmd-pipe {
+        color: #6c8eef;
+      }
+      .cmd-copy {
+        padding: 10px 14px;
+        color: #888;
+      }
+      .docs-link {
+        font-size: 13px;
+        color: #888;
+        margin-top: -6px;
+      }
+      .docs-link a {
+        color: #d0d0d4;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      /* Logo strip */
+      .logos {
+        margin-top: 56px;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        opacity: 0.55;
+        gap: 56px;
+      }
+      .logo-item {
+        font-family: "Inter", sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+        color: #b8b8bc;
+        letter-spacing: -0.02em;
+      }
+      .logo-item.spotify::before { content: "● "; color: #b8b8bc; }
+      .logo-item.stubhub {
+        background: #6f4cb6;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 18px;
+      }
+      .logo-item.shopify::before { content: "🛍 "; }
+
+      /* mockup label */
+      .mockup-label {
+        position: absolute;
+        top: 14px;
+        right: 16px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #888;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        z-index: 20;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="mockup-label">示意圖 / MOCKUP（仿 claude.com/claude-code）</div>
+
+      <nav class="nav">
+        <div class="logo">
+          <span class="logo-asterisk"></span>
+          <span>Claude</span>
+        </div>
+        <div class="nav-links">
+          <span>Meet Claude ▾</span>
+          <span>Platform ▾</span>
+          <span>Solutions ▾</span>
+          <span>Pricing ▾</span>
+          <span>Resources ▾</span>
+          <span>Login</span>
+        </div>
+        <div class="nav-cta">
+          <span class="btn-secondary">Contact sales</span>
+          <span class="btn-primary">Try Claude</span>
+        </div>
+      </nav>
+
+      <div class="breadcrumb">Product / Claude Code</div>
+
+      <div class="hero">
+        <div class="badge">Debugging...</div>
+        <h1 class="headline">
+          Built for <span class="arrow">&gt;</span> <span class="target">developers</span>
+        </h1>
+        <p class="subhead">
+          Work with Claude directly in your codebase. Build, debug, and ship from your terminal,
+          IDE, Slack, or the web. Describe what you need, and Claude handles the rest.
+        </p>
+
+        <div class="cmd-row">
+          <span class="cmd-btn">Get Claude Code <span style="font-size: 10px; color: #888;">▾</span></span>
+          <span class="cmd-divider"></span>
+          <span class="cmd-text">
+            <span class="cmd-name">irm</span>
+            <span>https://claude.ai/install.ps1</span>
+            <span class="cmd-pipe">|</span>
+            <span class="cmd-name">iex</span>
+          </span>
+          <span class="cmd-copy">⧉</span>
+        </div>
+        <div class="docs-link">Or read the <a href="#">documentation</a></div>
+      </div>
+
+      <div class="logos">
+        <div class="logo-item">intercom</div>
+        <div class="logo-item spotify">Spotify</div>
+        <div class="logo-item stubhub">StubHub</div>
+        <div class="logo-item shopify">shopify</div>
+      </div>
+    </div>
+  </body>
+</html>

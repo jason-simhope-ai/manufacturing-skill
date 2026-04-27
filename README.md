@@ -120,7 +120,7 @@ manufacturing-skill/
 ├── adapters/claude-code/     # Plugin install adapter
 ├── infra/                    # MCP servers, on-prem LLM setup
 ├── docs/
-│   ├── explainers/           # Three printable Traditional-Chinese cards (boss / IT / operator)
+│   ├── explainers/           # Four printable Traditional-Chinese cards (boss / IT / operator / quick start)
 │   ├── architecture.md
 │   ├── adoption-guide.md     # For consultants deploying to customers
 │   ├── profile-development.md  # For people creating new vertical profiles
@@ -157,7 +157,7 @@ If you're a developer / SI wanting to build a profile for a new vertical (e.g., 
 
 | Version            | Content                                                                                                           | Target                |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------- |
-| **v0.1** (current) | Core + CNC profile + 3 explainers + Claude Code adapter                                                           | 2026-04               |
+| **v0.1** (current) | Core + CNC profile + 4 explainers + Claude Code adapter                                                           | 2026-04               |
 | v0.2               | One additional complete vertical profile (community-driven)                                                       | TBD                   |
 | v0.3               | Cursor / Gemini CLI adapters                                                                                      | After v0.1 stabilizes |
 | v1.0               | First real-world adoption case study                                                                              | TBD                   |
