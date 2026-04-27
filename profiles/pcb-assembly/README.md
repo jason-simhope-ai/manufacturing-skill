@@ -52,6 +52,6 @@ PCB 組裝（電子組裝服務 / EMS）流程：
 
 ## Why this is still a stub
 
-v1 focuses on CNC machining (the 機械業二代協進會 launch audience). PCB profile is not in v1 scope but is structurally ready to receive contribution.
+v1 focuses on CNC machining as the launch industry pack. PCB profile is not in v1 scope but is structurally ready to receive contribution.
 
 If your company is a PCB / EMS shop and you'd like to commission this profile (paid contract for SIMHOPE consulting), contact [Jason Lin](mailto:jasonlin@simhope.com.tw).

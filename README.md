@@ -160,7 +160,7 @@ If you're a developer / SI wanting to build a profile for a new vertical (e.g., 
 | **v0.1** (current) | Core + CNC profile + 3 explainers + Claude Code adapter                                                           | 2026-04               |
 | v0.2               | One additional complete vertical profile (community-driven)                                                       | TBD                   |
 | v0.3               | Cursor / Gemini CLI adapters                                                                                      | After v0.1 stabilizes |
-| v1.0               | First real-world adoption case study from 機械業二代協進會                                                        | TBD                   |
+| v1.0               | First real-world adoption case study                                                                              | TBD                   |
 | v2.0               | Self-hosted CLI runtime (Telegram bot integration, on-prem orchestrator — see [docs/ROADMAP.md](docs/ROADMAP.md)) | Market-driven         |
 
 ---

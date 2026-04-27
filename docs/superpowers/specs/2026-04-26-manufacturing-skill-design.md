@@ -27,7 +27,7 @@
 
 | 受眾 | 看什麼 | 期待結果 |
 |---|---|---|
-| **機械業二代協進會會員（老闆）** | 架構總覽 explainer + README.zh-TW.md | 5 分鐘理解能解決什麼、值不值得導 |
+| **製造業老闆 / 接班人** | 架構總覽 explainer + README.zh-TW.md | 5 分鐘理解能解決什麼、值不值得導 |
 | **企業 IT 部門** | IT 部門系統說明 explainer + adapters/ + infra/on-prem/ | 知道架構、安裝步驟、資安疑慮 |
 | **業助 / 廠長 / 品管（最終使用者）** | 使用者 cheatsheet explainer | 每天會用到的指令一張紙搞定 |
 | **AI 導入顧問（包括 Jason 自己對外）** | docs/adoption-guide.md | 拿這個 playbook 直接去客戶端導入 |
@@ -406,7 +406,7 @@ source: ISO 9001:2015
 | v0.1 | 此 spec 描述的 v1 | 2026-04 |
 | v0.2 | PCB / injection / food / pharma 其中一個 profile 補完 | 視 contributor |
 | v0.3 | Cursor / Gemini CLI adapter | 等 v1 stable |
-| v1.0 | 第一個機械業二代協進會企業真實導入 case study | 視合作機會 |
+| v1.0 | 第一個真實導入 case study | 視合作機會 |
 | v2.0 | 自建 CLI runtime（圖二架構，Telegram bot 整合，地端 orchestrator） | 視市場需求 |
 
 ---

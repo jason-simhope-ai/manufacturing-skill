@@ -9,7 +9,7 @@
 
 - 製造業內部 IT / AI 專案負責人
 - 外部 AI 導入 SI / 顧問
-- 機械業二代協進會會員想自己導入
+- 製造業老闆 / 接班人想自己導入
 
 ---
 
@@ -168,7 +168,7 @@ W6：上線 + 文件
 導入完不是結束。建議：
 
 - 訂閱 plugin GitHub repo 的 release（v0.2 + 會持續發）
-- 加入機械業二代協進會 AI 導入經驗交流群（如有）
+- 加入製造業 AI 導入經驗交流群（如有）
 - 每季 sync 一次 best practice
 - 準備好客戶稽核時隨時拿出來的「AI 應用說明書」
 
@@ -176,4 +176,4 @@ W6：上線 + 文件
 
 ## 聯絡
 
-[Jason Lin](mailto:jasonlin@simhope.com.tw) — SIMHOPE / 機械業二代 AI 導入顧問
+[Jason Lin](mailto:jasonlin@simhope.com.tw) — SIMHOPE / 製造業 AI 導入顧問
