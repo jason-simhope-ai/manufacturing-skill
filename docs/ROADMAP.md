@@ -50,7 +50,7 @@
 
 **主題：第一個真實導入 case study**
 
-- 🎯 機械業二代協進會 1-2 家會員企業完整導入
+- 🎯 1-2 家指標客戶完整導入
 - 🎯 公開 case study（含 ROI 數據、踩雷教訓、最終流程）
 - 🎯 IATF 16949 客戶稽核通過實證
 - 🎯 plugin 穩定性達生產級
@@ -124,7 +124,7 @@ manufacturing-cli (自建 orchestrator)
 1. **GitHub Issues** — 開 feature request，標 `enhancement` 或 `vertical-profile`
 2. **PR** — 直接 contribute，最快納入
 3. **商業合作** — 想要某 vertical / 某整合提早做？聯絡 Jason 談 sponsorship
-4. **社群討論** — 機械業二代協進會 AI 群（如有）/ Discord（規劃中）
+4. **社群討論** — 製造業 AI 導入社群 / Discord（規劃中）
 
 ---
 

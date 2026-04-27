@@ -33,7 +33,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 ## 三個身份的快速入門
 
-### 👔 我是老闆 / 機械業二代
+### 👔 我是老闆 / 接班人
 
 → 讀 [README.zh-TW.md](README.zh-TW.md) → 看 [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)
 
