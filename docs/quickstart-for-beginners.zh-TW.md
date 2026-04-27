@@ -185,7 +185,11 @@ bash adapters/claude-code/install.sh
 
 ✅ **看到 AI 自己抓到「不鏽鋼不能陽極」這個矛盾 = plugin 在工作。**
 
-![/quote 跑完的成功 output（示意圖，文字內容為真實 Opus 4.7 回應）](quickstart-screenshots/step6-quote-success-mockup.png)
+**🎬 19 秒動畫示意：使用者打 `/quote` → AI 抓矛盾 → 補資訊 → 出完整報價單**
+
+![/quote 19 秒動畫（示意，內容為真實 Opus 4.7 回應）](demo/quote-demo.gif)
+
+> 想看靜態截圖版（適合對著讀的學習）：[step6-quote-success-mockup.png](quickstart-screenshots/step6-quote-success-mockup.png)
 
 ---
 
