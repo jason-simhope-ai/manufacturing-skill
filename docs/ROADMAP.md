@@ -9,14 +9,14 @@
 第一個可發行版本：
 
 - ✅ 六層架構（USE / FLOW / ROLE / INFRA / REF / HOOK）
-- ✅ Core 完整：6 段流程、5 隻 agent、9 個 skill、4 份 know-how、4 個 hook
+- ✅ Core 完整：6 段流程、5 隻 agent、11 個 skill（6 段流程 + 5 個通用）、8 份 know-how、4 個 hook
 - ✅ CNC profile 完整：4 agent、3 skill、4 know-how、1 hook
 - ✅ 4 個 stub profile（PCB / 射出 / 食品 / 製藥）
 - ✅ Claude Code adapter（含 install.sh）
 - ✅ scheduler-mcp 範例（含 mock data 可立即跑）
 - ✅ erp-connector contract（template，實作交給用戶）
 - ✅ GB10 地端 LLM 安裝指南
-- ✅ 3 張繁中 explainer 圖卡（架構 / IT / cheatsheet）
+- ✅ 4 張繁中 explainer 圖卡（架構 / IT / cheatsheet / 5 分鐘懶人包）
 - ✅ 完整 docs（architecture / adoption-guide / profile-development / 此 ROADMAP）
 - ✅ 合成 demo data（examples/）
 
