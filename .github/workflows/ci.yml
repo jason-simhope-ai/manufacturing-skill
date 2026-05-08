@@ -159,3 +159,131 @@ jobs:
             exit 1
           fi
           echo "ok  install.sh stays bash 3.2-compatible"
+
+      # ---------------------------------------------------------------
+      # Step 7: profile.json schema sanity — every profile manifest
+      # must declare the fields install.sh + adapters expect to read
+      # ---------------------------------------------------------------
+      - name: profile.json schema sanity
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          required = {
+              "name", "displayName", "version", "description",
+              "extends-core", "applicableTo", "tags",
+              "agents", "skills", "knowHow", "hooks",
+          }
+          list_fields = {"agents", "skills", "knowHow", "hooks",
+                         "applicableTo", "tags"}
+          fail = False
+          for pj in sorted(glob.glob("profiles/*/profile.json")):
+              data = json.load(open(pj, encoding="utf-8"))
+              missing = required - data.keys()
+              if missing:
+                  print(f"::error file={pj}::missing required fields: "
+                        f"{sorted(missing)}")
+                  fail = True
+              for k in list_fields:
+                  if k in data and not isinstance(data[k], list):
+                      print(f"::error file={pj}::{k!r} must be a list, "
+                            f"got {type(data[k]).__name__}")
+                      fail = True
+              if "extends-core" in data and not isinstance(
+                      data["extends-core"], bool):
+                  print(f"::error file={pj}::extends-core must be a boolean")
+                  fail = True
+              print(f"ok  {pj}")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 8: Orphan detection — every .md file in profiles/<X>/agents,
+      # /skills, /know-how, /hooks must be listed in that profile's
+      # profile.json. Catches forgotten manifest updates after add/rename.
+      # Files starting with "_" (e.g. _templates) are exempt.
+      # ---------------------------------------------------------------
+      - name: Profile filesystem vs manifest (orphan check)
+        run: |
+          python3 - <<'PY'
+          import json, glob, os, sys
+          kind_to_dir = {"agents": "agents", "skills": "skills",
+                         "knowHow": "know-how", "hooks": "hooks"}
+          fail = False
+          for pj in sorted(glob.glob("profiles/*/profile.json")):
+              data = json.load(open(pj, encoding="utf-8"))
+              prof_dir = os.path.dirname(pj)
+              for kind, dirname in kind_to_dir.items():
+                  listed = set(data.get(kind, []))
+                  d = os.path.join(prof_dir, dirname)
+                  if not os.path.isdir(d):
+                      continue
+                  on_disk = {
+                      os.path.splitext(f)[0]
+                      for f in os.listdir(d)
+                      if f.endswith(".md") and not f.startswith("_")
+                  }
+                  for orphan in sorted(on_disk - listed):
+                      path = f"{d}/{orphan}.md"
+                      print(f"::error file={path}::file present but not "
+                            f"listed in {pj}'s {kind!r} array")
+                      fail = True
+                  print(f"ok  {prof_dir}/{dirname} "
+                        f"({len(on_disk)} on disk, {len(listed)} in manifest)")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 9: Markdown internal link validation — catches broken
+      # cross-references that piecewise renames create. External URLs,
+      # mailto:, and anchor-only (#section) links are skipped. Code
+      # blocks and inline code are stripped before scanning to avoid
+      # false positives on syntax examples.
+      # ---------------------------------------------------------------
+      - name: Markdown internal link check
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+          REPO = Path(".").resolve()
+          EXCLUDE = {".git", "node_modules", ".claude"}
+          LINK_RE = re.compile(
+              r'!?\[([^\]]*)\]\(\s*([^\s)]+)'
+              r'(?:\s+"[^"]*"|\s+\'[^\']*\')?\s*\)'
+          )
+          fail = False
+          checked = 0
+          for root, dirs, files in os.walk(REPO):
+              dirs[:] = [d for d in dirs if d not in EXCLUDE]
+              for f in files:
+                  if not f.endswith(".md"):
+                      continue
+                  md = Path(root) / f
+                  rel = md.relative_to(REPO)
+                  text = md.read_text(encoding="utf-8", errors="replace")
+                  text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+                  text = re.sub(r"`[^`\n]+`", "", text)
+                  for _, target in LINK_RE.findall(text):
+                      if re.match(r"^[a-zA-Z][a-zA-Z0-9+\-.]*:", target):
+                          continue
+                      if target.startswith("#") or target.startswith("//"):
+                          continue
+                      path_part = target.split("#", 1)[0].split("?", 1)[0]
+                      if not path_part:
+                          continue
+                      resolved = (md.parent / path_part).resolve()
+                      try:
+                          resolved.relative_to(REPO)
+                      except ValueError:
+                          print(f"::error file={rel}::link escapes repo "
+                                f"root: {target}")
+                          fail = True
+                          continue
+                      if not resolved.exists():
+                          rel_resolved = resolved.relative_to(REPO)
+                          print(f"::error file={rel}::broken link "
+                                f"{target!r} -> {rel_resolved}")
+                          fail = True
+                      checked += 1
+          print(f"checked {checked} internal markdown links")
+          sys.exit(1 if fail else 0)
+          PY
