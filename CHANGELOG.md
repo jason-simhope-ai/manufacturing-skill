@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 — Nothing yet.
 
+## [0.1.3] — 2026-05-08
+
+Documentation-only release. No agent / skill / command behaviour changes; the
+plugin surface is identical to v0.1.2. Released so that the polished onboarding
+materials are reachable via a tagged version, and so the GitHub Release page
+reflects the live README state instead of the v0.1.2 snapshot.
+
+### Added
+
+- **Beginner quickstart guide** (`docs/quickstart-for-beginners.zh-TW.md`) —
+  6-step walkthrough for users who have never installed a CLI tool, written for
+  non-engineer factory staff. Includes Windows / macOS terminal basics, "what
+  Claude Code is" plain-Chinese framing, install troubleshooting, and a
+  cost-expectations section.
+- **Quickstart visual assets** (`docs/quickstart-screenshots/`) — 7 step-by-step
+  images: real screenshots for steps 1-3 (download page, first launch, sign-in)
+  and HTML-rendered mockups for steps 4-6 (main window, profile picker, /quote
+  success). `CAPTURE-GUIDE.md` documents how each was produced.
+- **`/quote` live-demo GIFs** (`docs/demo/quote-demo.gif`, `quote-demo-en.gif`)
+  — 19-second screen recordings of the real /quote flow, embedded in both
+  README files and the beginner guide. Bilingual (繁中 + EN).
+- **Six-capability demo slide** (`docs/demo/slides/`) — HTML + retina PNG, used
+  in introductions to position what the plugin actually does end-to-end.
+
+### Changed
+
+- **`README.zh-TW.md`** reworked per first-round demo feedback: removed
+  二代協進會 references that were specific to one audience, tightened the
+  positioning paragraph, embedded the GIF demo above the fold.
+- **Quickstart for beginners** facts corrected: install path, profile picker
+  behaviour, IATF gloss, and step counts now match what install.sh actually
+  does.
+- **`plugin.json` version**: 0.1.2 → 0.1.3.
+
+### Notes
+
+- This release is the cumulative result of PRs #1, #2, #4, #5, #6, and #7,
+  all merged between 2026-04-27 and 2026-04-27. PR #3 was a closed duplicate
+  of #4.
+- No `core/` or `profiles/` content changed in this window — the plugin
+  installation experience is byte-identical to v0.1.2 once installed.
+
 ## [0.1.2] — 2026-04-26
 
 ### Added
@@ -101,7 +143,8 @@ Initial public release. Built from the [v0.1 design spec](docs/superpowers/specs
 - Authoring credit: created at SIMHOPE (Taiwan precision machining); maintained by Jason Lin (<jasonlin@simhope.com.tw>).
 - Architectural inspiration credited in README to [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) and Anthropic's [superpowers](https://github.com/anthropics/superpowers) skill conventions.
 
-[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jason-simhope-ai/manufacturing-skill/releases/tag/v0.1.0
