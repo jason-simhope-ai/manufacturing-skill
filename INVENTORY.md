@@ -2,8 +2,8 @@
 
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
-> 規模：91 檔案 · 5 commits · v0.1.0 · MIT
-> 最後更新：2026-04-26
+> 規模：139 檔案 · 34 commits · v0.1.3 · MIT
+> 最後更新：2026-05-08
 
 ---
 
@@ -11,6 +11,7 @@
 
 | 你是誰                        | 從這裡讀                                                                                                                                      |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 第一次看到、完全不懂          | [docs/quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                              |
 | 想 5 分鐘看懂這玩意           | [docs/explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                                          |
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
@@ -180,18 +181,23 @@ INVENTORY.md              ← 這份
 
 ### `docs/` — 文件層
 
-| 檔                                                                                                                            | 對象 / 用途                                  |
-| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| [architecture.md](docs/architecture.md)                                                                                       | 開發者：六層架構詳解                         |
-| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算           |
-| [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile            |
-| [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                         |
-| [explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                               | 老闆：5 分鐘看懂                             |
-| [explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html)                                                   | IT：infra / security / ops 視角              |
-| [explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                               | 業助 / 廠長 / 品管：每日指令快查             |
-| [explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                               | 不想看字：6 步驟視覺操作流                   |
-| [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 4 張的 PNG 版本（給 LinkedIn / 簡報用） |
-| [superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md) | 設計史：v0.1 spec 完整版                     |
+| 檔                                                                                                                            | 對象 / 用途                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
+| [architecture.md](docs/architecture.md)                                                                                       | 開發者：六層架構詳解                                            |
+| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
+| [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
+| [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
+| [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
+| [explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                               | 老闆：5 分鐘看懂                                                |
+| [explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html)                                                   | IT：infra / security / ops 視角                                 |
+| [explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                               | 業助 / 廠長 / 品管：每日指令快查                                |
+| [explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                               | 不想看字：6 步驟視覺操作流                                      |
+| [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 4 張的 PNG 版本（給 LinkedIn / 簡報用）                    |
+| [quickstart-screenshots/](docs/quickstart-screenshots/)                                                                       | 6 步驟安裝實機截圖 + mockup（含 CAPTURE-GUIDE.md 紀錄產出方式） |
+| [demo/quote-demo.gif](docs/demo/quote-demo.gif) · [demo/quote-demo-en.gif](docs/demo/quote-demo-en.gif)                       | `/quote` 19 秒實錄 GIF（雙語版）                                |
+| [demo/slides/](docs/demo/slides/)                                                                                             | 6-capability 介紹簡報（HTML + retina PNG）                      |
+| [superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md) | 設計史：v0.1 spec 完整版                                        |
 
 ---
 
@@ -220,17 +226,17 @@ INVENTORY.md              ← 這份
 
 ## 隱藏 / 不在 repo 但相關
 
-| 路徑                                     | 內容                                             |
-| ---------------------------------------- | ------------------------------------------------ |
-| `~/.claude/plugins/manufacturing-skill/` | 安裝後的 plugin 目錄（install.sh 的 target）     |
-| `~/.claude/CLAUDE.md`                    | Global 個人 conventions（包括 commit signature） |
-| `.claude/` (本 repo)                     | Claude Code 本機 session state，整個 gitignored  |
-| GitHub Releases                          | 還沒做（v0.2 計畫）                              |
-| GitHub Actions CI                        | 還沒做（v0.2 計畫）                              |
+| 路徑                                     | 內容                                                                                                                    |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `~/.claude/plugins/manufacturing-skill/` | 安裝後的 plugin 目錄（install.sh 的 target）                                                                            |
+| `~/.claude/CLAUDE.md`                    | Global 個人 conventions（包括 commit signature）                                                                        |
+| `.claude/` (本 repo)                     | Claude Code 本機 session state，整個 gitignored                                                                         |
+| GitHub Releases                          | v0.1.3 起開始 tag（見 CHANGELOG.md）                                                                                    |
+| GitHub Actions CI                        | [.github/workflows/ci.yml](.github/workflows/ci.yml)（v0.1.1 起；JSON / plugin schema / frontmatter / install.sh 驗證） |
 
 ---
 
-## Repo metrics（v0.1.2）
+## Repo metrics（v0.1.3）
 
 ```
 頂層檔                  : 9 (README × 2, LICENSE, plugin.json, manufacturing.md,
@@ -244,12 +250,17 @@ CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
 Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
 Explainers (HTML)       : 4 + 4 PNG snapshots
-Demo                    : 2 styled HTML (繁中/EN) + 1 mock animation + 2 PNG
+Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
+                              + 1 hero) + CAPTURE-GUIDE.md
+Demo                    : /quote 19s GIFs (繁中/EN) + 2 styled HTML + 6-capability slide
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 4 (architecture / adoption-guide / profile-dev / ROADMAP)
+Docs                    : 5 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners)
 Infra                   : 2 MCP servers + 1 on-prem guide
 Examples                : 4 files
-.github/                : CI workflow + 3 issue templates + PR template
+.github/                : CI workflow + 4 issue templates (incl. config.yml router)
+                              + PR template
+Tracked files           : 139
 ```
 
 ---
