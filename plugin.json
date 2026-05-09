@@ -1,7 +1,7 @@
 {
   "name": "manufacturing-skill",
   "displayName": "Manufacturing Skill",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "AI starter kit for manufacturers — fork it, profile it, ship it.",
   "author": {
     "name": "Jason Lin",

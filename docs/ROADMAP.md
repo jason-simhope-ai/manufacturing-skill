@@ -28,15 +28,21 @@
 
 - ✅ **部分內容繼承**（`extends: core/<kind>/<name>` + `<!-- inherit -->` / `<!-- replace-section -->` / `<!-- override-body -->`）— see [CHANGELOG `[0.1.4]`](../CHANGELOG.md) and [spec](superpowers/specs/2026-05-08-profile-inheritance-design.md)
 
+## v0.1.5 (2026-05-09)
+
+**Pulled forward from v0.2**: multi-profile active shipped early as experimental.
+
+- ✅ **多 profile 同時 active**（`install.sh cnc-machining,injection-molding` + refuse-on-conflict + `active-profiles.json` aggregation + `/add-profile` slash command + CI pairwise scan）— see [CHANGELOG `[0.1.5]`](../CHANGELOG.md) and [spec](superpowers/specs/2026-05-09-multi-profile-active-design.md)
+
 ## v0.2 (預計 2026-Q3)
 
 **主題：profile 多樣化 + override 機制成熟**
 
 - 🎯 補完一個社群 profile（最有可能：射出成型，因為下一個目標客戶可能是射出廠）
 - ✅ ~~部分內容繼承~~（v0.1.4 提早出貨）
-- 🎯 多 profile 同時 active（橫跨 vertical 的工廠用）
-- ✅ GitHub Actions CI（v0.1.1 起；v0.1.3 加結構檢查；v0.1.4 加 inheritance lint）
-- 🎯 自動產生 explainer HTML（從 plugin.json + manifests 動態 render）
+- ✅ ~~多 profile 同時 active~~（v0.1.5 提早出貨）
+- ✅ GitHub Actions CI（v0.1.1 起；v0.1.3 加結構檢查；v0.1.4 加 inheritance lint；v0.1.5 加 multi-profile pairwise scan）
+- 🎯 自動產生 explainer HTML（從 plugin.json + manifests 動態 render）— 部分達成（v0.1.4 stat panel auto-regen + drift detection），更全面的 catalog 自動化仍 pending
 
 ---
 

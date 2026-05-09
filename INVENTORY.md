@@ -2,7 +2,7 @@
 
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
-> 規模：v0.1.4 · MIT （inheritance 機制 experimental ship）
+> 規模：v0.1.5 · MIT （multi-profile active experimental ship）
 > 最後更新：2026-05-09
 
 ---
@@ -60,17 +60,18 @@ INVENTORY.md              ← 這份
 
 #### `core/commands/` — 7 個 slash commands
 
-| 指令                                                     | 用途                        |
-| -------------------------------------------------------- | --------------------------- |
-| [`/quote`](core/commands/quote.md)                       | 啟動報價（圖紙 / 描述都可） |
-| [`/order-status`](core/commands/order-status.md)         | 查訂單目前在哪段流程        |
-| [`/bom-check`](core/commands/bom-check.md)               | BOM 健檢 + 缺料預警         |
-| [`/inspect`](core/commands/inspect.md)                   | IQC / IPQC / FQC / OQC 檢驗 |
-| [`/install-profile`](core/commands/install-profile.md)   | 切換 vertical profile       |
-| [`/manufacturing`](core/commands/manufacturing.md)       | 看 plugin 狀態              |
-| [`/manufacturing init`](core/commands/init.md)           | 第一次用的 4 問題引導       |
-| [`/morning-briefing`](core/commands/morning-briefing.md) | 廠長每日 8 AM 早會懶人包    |
-| [`/8d`](core/commands/8d.md)                             | 啟動 8D 客訴 / 重大不良處理 |
+| 指令                                                     | 用途                                                             |
+| -------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`/quote`](core/commands/quote.md)                       | 啟動報價（圖紙 / 描述都可）                                      |
+| [`/order-status`](core/commands/order-status.md)         | 查訂單目前在哪段流程                                             |
+| [`/bom-check`](core/commands/bom-check.md)               | BOM 健檢 + 缺料預警                                              |
+| [`/inspect`](core/commands/inspect.md)                   | IQC / IPQC / FQC / OQC 檢驗                                      |
+| [`/install-profile`](core/commands/install-profile.md)   | 切換 vertical profile（v0.1.5+ 支援 `<p1>,<p2>,...` 多 profile） |
+| [`/add-profile`](core/commands/add-profile.md)           | v0.1.5+ — 在現有 active set 加一個 profile（add 語意）           |
+| [`/manufacturing`](core/commands/manufacturing.md)       | 看 plugin 狀態                                                   |
+| [`/manufacturing init`](core/commands/init.md)           | 第一次用的 4 問題引導                                            |
+| [`/morning-briefing`](core/commands/morning-briefing.md) | 廠長每日 8 AM 早會懶人包                                         |
+| [`/8d`](core/commands/8d.md)                             | 啟動 8D 客訴 / 重大不良處理                                      |
 
 #### `core/agents/` — 6 隻 universal persona
 
@@ -160,15 +161,20 @@ INVENTORY.md              ← 這份
 
 ### `adapters/claude-code/` — Claude Code 安裝層
 
-| 檔                                                               | 用途                                                                                              |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [install.sh](adapters/claude-code/install.sh)                    | 互動式 / CLI 安裝（POSIX bash 3.2+ 相容）。v0.1.4 起加 `--resolve` flag 預覽 extends 合併輸出     |
-| [\_resolve_extends.py](adapters/claude-code/_resolve_extends.py) | v0.1.4+ profile inheritance resolver（被 install.sh 叫用；有 `extends:` 的 profile 檔交給它合併） |
-| [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)      | source → `~/.claude/plugins/` 映射說明                                                            |
+| 檔                                                               | 用途                                                                                                                                                             |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [install.sh](adapters/claude-code/install.sh)                    | 互動式 / CLI 安裝（POSIX bash 3.2+ 相容）。v0.1.4 起加 `--resolve` flag 預覽 extends 合併輸出。v0.1.5 起接 `<p1>,<p2>,...` 多 profile 與 `--list-conflicts` flag |
+| [\_resolve_extends.py](adapters/claude-code/_resolve_extends.py) | v0.1.4+ profile inheritance resolver（被 install.sh 叫用；有 `extends:` 的 profile 檔交給它合併）                                                                |
+| [\_multiprofile.py](adapters/claude-code/_multiprofile.py)       | v0.1.5+ multi-profile helper：`scan` 衝突偵測 + `scan-all` CI 批掃 + `aggregate` 產 `active-profiles.json`                                                       |
+| [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)      | source → `~/.claude/plugins/` 映射說明（v0.1.5 加多 profile 章節）                                                                                               |
 
 ### `tests/extends/` — Inheritance resolver 測試 fixtures
 
 13 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
+
+### `tests/multiprofile/` — Multi-profile helper 單元測試
+
+`test_multiprofile.py` — 8 個測試 in-process 驗證 `scan_set` / `scan_pair` / `aggregate_profiles` 的行為（含合成衝突 / 三 profile 部分衝突 / list 欄位 union dedupe）。CI Step 13 會跑。
 
 ---
 

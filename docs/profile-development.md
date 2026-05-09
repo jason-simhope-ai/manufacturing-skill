@@ -198,6 +198,67 @@ bash adapters/claude-code/install.sh --resolve cnc-machining/agents/quote-specia
 
 ---
 
+## 多 profile 同時 active（v0.1.5+ 實驗性）
+
+橫跨 vertical 的工廠（CNC + 射出、EMS + 塑膠殼、混合 job shop）以前要在兩個 profile 中二選一。v0.1.5 起可以：
+
+```bash
+bash adapters/claude-code/install.sh cnc-machining,injection-molding
+```
+
+`agents/cnc-programmer` 跟 `agents/mold-designer` 同時可用，core 普世 agents 也都在。
+
+### Refuse-on-conflict 規則
+
+兩個 active profile 若各自包含同名 `<kind>/<basename>.md`（譬如都有自己的 `agents/quote-specialist.md`），install.sh **拒絕安裝**，明確列出衝突檔。**conflict scan 在 backup 之前跑**，所以失敗不會毀掉現有 install。
+
+範例輸出：
+
+```text
+→ Scanning for file conflicts across 2 profiles...
+::error::agents/quote-specialist.md present in multiple profiles: cnc-machining, future-medical-cnc
+1 file collision(s) across 2 profiles
+
+❌ Cannot install — conflicting files in active profiles.
+   Resolve by either:
+     (a) Pick only one of the conflicting profiles
+     (b) Create a merged profile that combines both
+```
+
+### 不確定？dry-run
+
+```bash
+# 特定組合
+bash install.sh --list-conflicts cnc-machining,injection-molding
+
+# 全 repo 所有 pair（CI 也是跑這個）
+bash install.sh --list-conflicts
+```
+
+### 寫新 profile 時要避免衝突
+
+contributing 一個新 profile 時，**避免和其他 profile 共用同名 agent / skill / know-how / hook**。具體做法：
+
+- ✅ 用 vertical-specific 名字（`cnc-programmer`, `mold-designer`, `smt-process-engineer` 各自獨特）
+- ❌ 不要每個 profile 都寫自己的 `agents/quote-specialist.md`（那是 core 的職責；要客製 → 用 `extends:`）
+- ❌ 不要每個 profile 都寫自己的 `know-how/iso-9001.md`（同樣應該繼承 core）
+
+CI Step 12（pairwise scan）會在 PR 時擋下任何破壞 pairwise compatibility 的提交。
+
+### `active-profiles.json` 聚合視圖
+
+多 profile install 後，`~/.claude/plugins/manufacturing-skill/` 會多一個 `active-profiles.json`：
+
+- `primary`：第一個 profile 名稱（決定 legacy `active-profile.json` 內容）
+- `profiles[]`：每個 active profile 的完整 manifest 副本（順序 = arg order）
+- `aggregated`：list 欄位 union 後的合併視圖（`tags`, `applicableTo`, `complianceFrameworks`, `mcp.recommended`/`optional`, `wantedContributions`, `warnings`）
+
+讀取的代碼（譬如 `/manufacturing` slash command）優先讀 `active-profiles.json`，找不到時 fallback 讀 v0.1.x 的 `active-profile.json` 單一字串檔。
+
+完整 spec：[docs/superpowers/specs/2026-05-09-multi-profile-active-design.md](superpowers/specs/2026-05-09-multi-profile-active-design.md)。
+
+---
+
 ## Profile 命名規範
 
 - 全小寫、`-` 分隔（不用 `_` 或 camelCase）
