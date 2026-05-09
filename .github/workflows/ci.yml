@@ -297,6 +297,17 @@ jobs:
         run: python3 tests/extends/run.py
 
       # ---------------------------------------------------------------
+      # Step 11: Explainer auto-section drift check. The stat panel
+      # in docs/explainers/01-架構總覽.html is regenerated from
+      # plugin.json + filesystem counts. Fail the build if the
+      # committed HTML doesn't match what the generator produces —
+      # i.e., someone added a new agent/skill/etc. without re-running
+      # the generator.
+      # ---------------------------------------------------------------
+      - name: Explainer auto-sections — drift check
+        run: python3 scripts/regen_explainers.py --check
+
+      # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
       # file. Validates extends path, mode marker presence (exactly
       # one of <!-- inherit --> or <!-- override-body -->),

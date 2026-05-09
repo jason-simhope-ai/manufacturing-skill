@@ -76,6 +76,7 @@ Body (when needed): explain _why_, not _what_. Wrap at ~72 chars.
 - **Self-contained.** No external CDN, no bundlers, no build step. CSS inline in `<style>`.
 - **Print-friendly.** Test that the page prints to A3 landscape without overflow.
 - **Mobile-friendly.** Use responsive grids (the existing files are good references).
+- **Auto-managed sections.** Some HTML blocks (currently the stat panel in `01-架構總覽.html`) are auto-regenerated from `plugin.json` + filesystem counts. They're wrapped in `<!-- AUTO-START: <id> -->` / `<!-- AUTO-END: <id> -->`. **Don't hand-edit between those markers** — your change will be overwritten next CI. Instead: change the source data (add the agent/skill/etc.), then run `python scripts/regen_explainers.py` and commit the regenerated HTML. CI Step 11 fails the build if you forget.
 
 ## What needs review vs what doesn't
 
