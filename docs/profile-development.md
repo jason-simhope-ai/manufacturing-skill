@@ -129,17 +129,72 @@ profiles/cnc-machining/agents/quote-specialist.md  → override
 profiles/cnc-machining/agents/cnc-programmer.md  → 純加（core 沒這隻）
 ```
 
-### 部分內容繼承（v1 暫不支援，v0.2 計畫）
+### 部分內容繼承 — `extends:`（v0.1.4+ 實驗性）
 
-未來會支援在 profile agent prompt 開頭寫：
+不想為了加 20 行 IATF 條款而 copy 整份 100 行 quote-specialist？用 `extends:`：
 
 ```markdown
-<!-- extends: core/agents/quote-specialist.md -->
+---
+name: quote-specialist
+description: 報價師（CNC 版）
+extends: core/agents/quote-specialist
+---
 
-[在這裡只寫差異 / 加碼內容]
+<!-- inherit -->
+
+## CNC 特殊條款
+
+- IATF 16949 PPAP 文件成本必須列入
+- FAI 需扣 1-2 工作天
 ```
 
-v1 先靠完整檔案 override。
+`bash install.sh cnc-machining` 跑下去，install.sh 偵測到 `extends:`，呼叫 `_resolve_extends.py` 把 core 的 100 行內容跟 profile 的 delta 合併，輸出到 `~/.claude/plugins/manufacturing-skill/agents/quote-specialist.md`。
+
+#### 三個 directive
+
+| Directive                             | 用途                                                           |
+| ------------------------------------- | -------------------------------------------------------------- |
+| `<!-- inherit -->`                    | 在這個位置插入 core 的整份 body                                |
+| `<!-- replace-section: <heading> -->` | 替換 core 中 `## <heading>` 那段（用下面的內容），其他段落保留 |
+| `<!-- override-body -->`              | 不繼承 core body，profile 自己重寫整段（只繼承 frontmatter）   |
+
+`extends:` 的檔案**必須**有 `<!-- inherit -->` 或 `<!-- override-body -->` 其中一個（不能兩個都有，也不能都沒有）。
+
+#### Frontmatter 合併規則
+
+- **Scalar 欄位**（`name`, `description`, `model` 等）：profile 蓋過 core
+- **List 欄位**（`tools`, `tags`, `applicableTo` 等）：**預設 union**（去重後合併）
+- **強制取代 list**：在 profile 加 `<field>-replace: true`（譬如 `tools-replace: true` 強制取代而非 union）
+
+#### 預覽合併結果
+
+不想實際 install 就想看 merged 出來長怎樣？
+
+```bash
+bash adapters/claude-code/install.sh --resolve cnc-machining/agents/quote-specialist
+```
+
+直接印 stdout，不寫進 `~/.claude/plugins/`。
+
+#### 限制
+
+- `extends:` 只支援 `agents` / `skills` / `know-how` / `hooks`，**不支援 `commands`**（commands 應另開新檔名而非繼承）
+- `replace-section: X` 的 `X` 必須完全等於 core 內某個 `## X` heading（NFKC normalize 後比對）
+- 跨 profile 繼承不支援（`profiles/A/agents/X.md` 無法 extends `profiles/B/agents/X.md`）
+- 多語 heading 注意：core 是 zh-TW heading 時，profile 也得用相同字元的 zh-TW heading
+
+完整 spec：[docs/superpowers/specs/2026-05-08-profile-inheritance-design.md](superpowers/specs/2026-05-08-profile-inheritance-design.md)。
+
+---
+
+### 不寫 `extends:` = 整檔 override（v0.1.x 行為仍保留）
+
+上面的繼承機制是 opt-in。如果一個 profile 檔不寫 `extends:`，install.sh 走老邏輯：profile 同名檔完全取代 core 同名檔。
+
+什麼時候用整檔 override：
+
+- profile 想完全重寫 prompt 結構（用 `<!-- override-body -->` + `extends:` 也可以，差別是是否繼承 frontmatter）
+- profile 加新名字 agent（core 沒這隻），這種情況根本沒 conflict
 
 ---
 

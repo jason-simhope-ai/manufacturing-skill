@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 — Nothing yet.
 
+## [0.1.4] — 2026-05-09
+
+**Profile inheritance mechanism** ships as **experimental**. Profiles can now declare `extends: core/<kind>/<name>` in frontmatter and incrementally merge against a core file at install time, instead of copy-pasting the whole core file as v0.1.x required.
+
+### Added
+
+- **`adapters/claude-code/_resolve_extends.py`** — install-time merge resolver. Pure stdlib + PyYAML. Handles per-field frontmatter merge (lists union by default, scalars profile-wins, `<field>-replace: true` opt-out), three body directives (`<!-- inherit -->`, `<!-- replace-section: <heading> -->`, `<!-- override-body -->`), NFKC-normalized heading match, and code-block-aware directive scanning so authored docs with example markdown don't trigger directives.
+- **`tests/extends/`** — 13 golden-file fixtures pinning down resolver behaviour: pure inherit, append, single replace-section, multiple replace-sections, override-body, list union, list replace-flag opt-out, and 6 error cases (missing mode marker, both markers, bad extends path, bad replace heading, extends-on-command, code-block escape). Runner: `python tests/extends/run.py`.
+- **`install.sh --resolve <profile>/<kind>/<file>`** — preview merged output without committing to a full install. Useful for PR reviewers to see what the model actually reads after merge, not just the profile delta.
+- **CI Step 10a** — lint every profile file with `extends:` against the resolver in lint mode.
+- **CI Step 10b** — bidirectional heading-anchor protection. A core PR that renames or removes a `## ` heading still referenced by any profile's `<!-- replace-section: <heading> -->` fails on the **core PR**, not silently at install time months later.
+- **CI Step 10c** — runs the 13-fixture test suite on every CI run.
+
+### Changed
+
+- **`adapters/claude-code/install.sh`** Stage 2: per-file dispatch. Files with `extends:` go through the resolver; files without continue to use plain `cp` (v0.1.x whole-file override). Detects Python via `py` launcher (Windows), `python3`, or `python`, with `--version` sanity check to dodge Microsoft Store stubs that exit 49 on actual use.
+- **`docs/profile-development.md`** — new "部分內容繼承 — `extends:`" subsection replaces the old "v0.2 計畫" placeholder. Documents the three directives, frontmatter merge rules, `--resolve` preview, and limitations (no commands extends, no cross-profile inheritance, NFKC heading match).
+- **`plugin.json` version**: 0.1.3 → 0.1.4.
+
+### Notes — experimental status
+
+`extends:` is shipped as **experimental** for v0.1.4. The mechanism is not used by any current profile in this repo (CNC, injection-molding); both still use whole-file overrides which continue to work unchanged. The first real consumer of `extends:` will validate the design against a live use case before we lock the contract in v0.2.
+
+If you hit a resolver bug or have feedback on the directive surface, open an issue and tag `extends-experimental`.
+
+### Notes — Python / PyYAML dependency
+
+A profile using `extends:` requires Python 3 + PyYAML on the install machine. Profiles that don't use `extends:` continue to install with no Python dependency at all. `install.sh` detects the missing dependency and prints a clear install-pip command before bailing.
+
+### Spec
+
+Full design rationale: [docs/superpowers/specs/2026-05-08-profile-inheritance-design.md](docs/superpowers/specs/2026-05-08-profile-inheritance-design.md). Approved 2026-05-09 after a v1 → v2 self-review pass that surfaced 3 high-severity gaps (frontmatter list merge, core-side heading rename protection, silent fall-through on missing inherit marker), all patched in v2.
+
 ## [0.1.3] — 2026-05-08
 
 Documentation-only release. No agent / skill / command behaviour changes; the
@@ -143,7 +176,8 @@ Initial public release. Built from the [v0.1 design spec](docs/superpowers/specs
 - Authoring credit: created at SIMHOPE (Taiwan precision machining); maintained by Jason Lin (<jasonlin@simhope.com.tw>).
 - Architectural inspiration credited in README to [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) and Anthropic's [superpowers](https://github.com/anthropics/superpowers) skill conventions.
 
-[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.0...v0.1.1

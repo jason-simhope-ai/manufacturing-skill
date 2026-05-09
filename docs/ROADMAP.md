@@ -22,14 +22,20 @@
 
 ---
 
+## v0.1.4 (2026-05-09)
+
+**Pulled forward from v0.2**: profile inheritance shipped early as experimental.
+
+- ✅ **部分內容繼承**（`extends: core/<kind>/<name>` + `<!-- inherit -->` / `<!-- replace-section -->` / `<!-- override-body -->`）— see [CHANGELOG `[0.1.4]`](../CHANGELOG.md) and [spec](superpowers/specs/2026-05-08-profile-inheritance-design.md)
+
 ## v0.2 (預計 2026-Q3)
 
 **主題：profile 多樣化 + override 機制成熟**
 
 - 🎯 補完一個社群 profile（最有可能：射出成型，因為下一個目標客戶可能是射出廠）
-- 🎯 部分內容繼承（profile agent prompt 開頭可寫 `<!-- extends: core/... -->` 不用 copy 整檔）
+- ✅ ~~部分內容繼承~~（v0.1.4 提早出貨）
 - 🎯 多 profile 同時 active（橫跨 vertical 的工廠用）
-- 🎯 GitHub Actions CI（lint markdown frontmatter、驗證 plugin.json schema）
+- ✅ GitHub Actions CI（v0.1.1 起；v0.1.3 加結構檢查；v0.1.4 加 inheritance lint）
 - 🎯 自動產生 explainer HTML（從 plugin.json + manifests 動態 render）
 
 ---

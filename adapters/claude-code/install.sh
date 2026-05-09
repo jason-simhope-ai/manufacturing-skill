@@ -6,11 +6,13 @@
 #   bash adapters/claude-code/install.sh <profile_name>   # explicit
 #   bash adapters/claude-code/install.sh --list           # list available
 #   bash adapters/claude-code/install.sh --core-only      # no profile, core only
+#   bash adapters/claude-code/install.sh --resolve <p>/<k>/<f>  # preview merged extends
 #
 # Examples:
 #   bash adapters/claude-code/install.sh cnc-machining
 #   bash adapters/claude-code/install.sh injection-molding
 #   bash adapters/claude-code/install.sh --core-only       # try without commitment
+#   bash adapters/claude-code/install.sh --resolve cnc-machining/agents/quote-specialist
 
 set -euo pipefail
 
@@ -21,12 +23,82 @@ DEFAULT_PROFILE="cnc-machining"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
+# ─── Helpers ─────────────────────────────────────────────
+
+# Detect a working Python 3 interpreter. We invoke `--version` as a
+# sanity check because Windows ships a fake `python3` shim that
+# routes to the Microsoft Store and returns exit 49 on actual use.
+detect_python() {
+  local cand
+  for cand in "${PYTHON3:-}" python3 python py; do
+    [[ -z "${cand}" ]] && continue
+    if command -v "${cand}" >/dev/null 2>&1; then
+      if "${cand}" --version >/dev/null 2>&1; then
+        echo "${cand}"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+# Return 0 if file has an `extends:` field in its YAML frontmatter
+has_extends() {
+  awk '/^---$/{c++; if (c==2) exit; next} c==1' "$1" \
+    | grep -qE '^extends:[[:space:]]'
+}
+
+# Resolve a profile file via the Python resolver, write to target.
+# Args: <profile-source> <target-output>
+resolve_extends_file() {
+  local src="$1"
+  local dst="$2"
+  if [[ -z "${PYTHON_BIN:-}" ]]; then
+    PYTHON_BIN="$(detect_python || true)"
+  fi
+  if [[ -z "${PYTHON_BIN}" ]]; then
+    echo "❌ Python 3 not found. Required for profiles using \`extends:\`." >&2
+    echo "   Install python3 (and run \`pip install pyyaml\`)." >&2
+    exit 1
+  fi
+  if ! "${PYTHON_BIN}" -c 'import yaml' 2>/dev/null; then
+    echo "❌ PyYAML not installed. Run: ${PYTHON_BIN} -m pip install pyyaml" >&2
+    exit 1
+  fi
+  "${PYTHON_BIN}" "${PLUGIN_ROOT}/adapters/claude-code/_resolve_extends.py" \
+    --repo-root "${PLUGIN_ROOT}" \
+    resolve "${src}" --out "${dst}"
+}
+
 # ─── Argument parsing ────────────────────────────────────
 ARG="${1:-}"
 CORE_ONLY=false
 PROFILE=""
 
 case "${ARG}" in
+  --resolve)
+    REL="${2:-}"
+    if [[ -z "${REL}" ]]; then
+      echo "Usage: install.sh --resolve <profile>/<kind>/<file>" >&2
+      echo "Example: install.sh --resolve cnc-machining/agents/quote-specialist" >&2
+      exit 1
+    fi
+    SRC="${PLUGIN_ROOT}/profiles/${REL}.md"
+    if [[ ! -f "${SRC}" ]]; then
+      echo "❌ profile file not found: ${SRC}" >&2
+      exit 1
+    fi
+    if [[ -z "${PYTHON_BIN:-}" ]]; then
+      PYTHON_BIN="$(detect_python || true)"
+    fi
+    if [[ -z "${PYTHON_BIN}" ]]; then
+      echo "❌ Python 3 required for --resolve" >&2
+      exit 1
+    fi
+    "${PYTHON_BIN}" "${PLUGIN_ROOT}/adapters/claude-code/_resolve_extends.py" \
+      --repo-root "${PLUGIN_ROOT}" resolve "${SRC}"
+    exit $?
+    ;;
   --list)
     echo "Available profiles:"
     for p in "${PLUGIN_ROOT}/profiles/"*/; do
@@ -174,14 +246,27 @@ cp -r "${PLUGIN_ROOT}/core/skills"   "${TARGET_DIR}/skills"
 cp -r "${PLUGIN_ROOT}/core/hooks"    "${TARGET_DIR}/hooks"
 cp -r "${PLUGIN_ROOT}/core/know-how" "${TARGET_DIR}/know-how"
 
-# Stage 2: overlay profile (filename-based override) — skip if --core-only
+# Stage 2: overlay profile (filename-based override) — skip if --core-only.
+# Files with `extends:` frontmatter are merged via _resolve_extends.py;
+# files without are copied as-is (v0.1.x whole-file override).
 if [[ "${CORE_ONLY}" == "false" ]]; then
   echo "→ Overlaying profile: ${PROFILE}..."
   PROF_DIR="${PLUGIN_ROOT}/profiles/${PROFILE}"
   for sub in agents skills know-how hooks; do
-    if [[ -d "${PROF_DIR}/${sub}" ]]; then
-      cp -r "${PROF_DIR}/${sub}/." "${TARGET_DIR}/${sub}/" 2>/dev/null || true
-    fi
+    if [[ ! -d "${PROF_DIR}/${sub}" ]]; then continue; fi
+    for f in "${PROF_DIR}/${sub}/"*.md; do
+      [[ -f "${f}" ]] || continue
+      base="$(basename "${f}")"
+      # Skip _templates/ stubs
+      case "${base}" in _*) continue;; esac
+      target="${TARGET_DIR}/${sub}/${base}"
+      if has_extends "${f}"; then
+        echo "  ↳ resolving extends: ${sub}/${base}"
+        resolve_extends_file "${f}" "${target}"
+      else
+        cp "${f}" "${target}"
+      fi
+    done
   done
 else
   echo "→ Skipping profile overlay (core-only mode)"
