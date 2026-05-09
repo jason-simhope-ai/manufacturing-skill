@@ -1,9 +1,9 @@
 # Profile Inheritance Mechanism — v0.2 Design Spec
 
-- **Date**: 2026-05-08（v1）, **revised 2026-05-09**（v2）
+- **Date**: 2026-05-08（v1）, **revised 2026-05-09**（v2）, **approved 2026-05-09**（v2 final）
 - **Author**: Jason Lin (SIMHOPE) + Claude
-- **Status**: 📋 Draft v2 — pending review by Jason
-- **Target version**: 0.2.0 (or 0.1.4-experimental — see Q5)
+- **Status**: ✅ Approved by Jason 2026-05-09 (`ok` — all 6 recommendations accepted)
+- **Target version**: 0.1.4 (experimental, plain semver per Q5b-α)
 - **Related**: [docs/ROADMAP.md](../../ROADMAP.md) v0.2 line item _"部分內容繼承（profile agent prompt 開頭可寫 `<!-- extends: core/... -->` 不用 copy 整檔）"_
 
 ## Revision history
@@ -551,14 +551,16 @@ After v0.1.4 (or v0.2.0):
 
 When Jason confirms the open questions above, this spec moves from 📋 Draft v2 → ✅ Approved, and the implementation PR can begin.
 
-| Question | Recommendation                              | Approved? |
-| -------- | ------------------------------------------- | --------- |
-| Q1       | HTML-comment syntax                         | ⬜        |
-| Q2       | Allow multiple replace-section blocks       | ⬜        |
-| Q3       | Agents/skills/hooks/know-how only; commands rejected at install + CI | ⬜ |
-| Q4       | Document the bilingual heading constraint, NFKC-normalize on match | ⬜ |
-| Q5a      | Ship as next-patch experimental, not bundled with full v0.2  | ⬜  |
-| Q5b      | Plain `0.1.4` + CHANGELOG flag, no schema changes            | ⬜  |
+| Question | Recommendation                                                            | Approved?           |
+| -------- | ------------------------------------------------------------------------- | ------------------- |
+| Q1       | HTML-comment syntax                                                       | ✅ 2026-05-09 Jason |
+| Q2       | Allow multiple replace-section blocks                                     | ✅ 2026-05-09 Jason |
+| Q3       | Agents/skills/hooks/know-how only; commands rejected at install + CI      | ✅ 2026-05-09 Jason |
+| Q4       | Document the bilingual heading constraint, NFKC-normalize on match        | ✅ 2026-05-09 Jason |
+| Q5a      | Ship as next-patch experimental, not bundled with full v0.2               | ✅ 2026-05-09 Jason |
+| Q5b      | Plain `0.1.4` + CHANGELOG flag, no schema changes                         | ✅ 2026-05-09 Jason |
+
+Implementation begins immediately on branch `claude/c2-inheritance-impl`, target version v0.1.4.
 
 ### v2 patch summary (what changed since v1 review)
 
