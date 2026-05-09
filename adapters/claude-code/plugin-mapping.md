@@ -115,6 +115,31 @@ bash adapters/claude-code/install.sh injection-molding
 
 會清掉舊的 `~/.claude/plugins/manufacturing-skill/`（先備份），重裝 core + 指定 profile。
 
+## 多 profile 同時 active（v0.1.5+）
+
+```bash
+bash adapters/claude-code/install.sh cnc-machining,injection-molding
+```
+
+兩個（或更多）profile 一起 install。**install.sh 在 backup 前先做 conflict scan**：兩個 profile 若各自包含同名 `<kind>/<basename>.md`，install 拒絕並列出衝突檔，現有 install 不受影響（atomicity）。
+
+設定後 `~/.claude/plugins/manufacturing-skill/` 多兩個檔：
+
+| 檔                     | 內容                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `active-profile.json`  | 第一個 profile 的 manifest（v0.1.x 相容；singular field）                           |
+| `active-profiles.json` | v0.1.5+ aggregated 視圖：schema-versioned + 所有 profile manifest + list 欄位 union |
+| `.installed`           | 多了 `activeProfiles: [...]` 陣列；`activeProfile` 仍保留為第一個 profile 名稱      |
+
+不確定組合會不會衝突，先 dry-run：
+
+```bash
+bash adapters/claude-code/install.sh --list-conflicts cnc-machining,injection-molding
+# 或：bash install.sh --list-conflicts  （無參數 → 掃所有 pair）
+```
+
+詳：[`docs/superpowers/specs/2026-05-09-multi-profile-active-design.md`](../../docs/superpowers/specs/2026-05-09-multi-profile-active-design.md)。
+
 ---
 
 ## 解除安裝

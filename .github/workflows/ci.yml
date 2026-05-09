@@ -308,6 +308,26 @@ jobs:
         run: python3 scripts/regen_explainers.py --check
 
       # ---------------------------------------------------------------
+      # Step 12: Multi-profile pairwise conflict scan. For every
+      # unordered pair of profiles in plugin.json's `profiles.available`
+      # list, run the conflict scanner. Fail if any pair shares a
+      # `<kind>/<basename>.md`. This catches the case where two
+      # contributors independently land profile changes that would
+      # silently collide pairwise.
+      # ---------------------------------------------------------------
+      - name: Multi-profile — pairwise conflict scan
+        run: python3 adapters/claude-code/_multiprofile.py scan-all
+
+      # ---------------------------------------------------------------
+      # Step 13: Multi-profile helper unit tests. Exercises scan_set,
+      # scan_pair, and aggregate_profiles against synthetic mini-repos
+      # and asserts behavior. Also includes a check that the real
+      # repo's profile pairs scan clean.
+      # ---------------------------------------------------------------
+      - name: Multi-profile — helper unit tests
+        run: python3 tests/multiprofile/test_multiprofile.py
+
+      # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
       # file. Validates extends path, mode marker presence (exactly
       # one of <!-- inherit --> or <!-- override-body -->),

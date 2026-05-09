@@ -1,8 +1,8 @@
 # Multi-Profile Active — v0.2 Design Spec
 
-- **Date**: 2026-05-09 (v1), revised same-day (v2)
+- **Date**: 2026-05-09 (v1), revised same-day (v2), approved 2026-05-09 (Jason merged spec PR #13)
 - **Author**: Jason Lin (SIMHOPE) + Claude
-- **Status**: 📋 Draft v2 — pending review by Jason
+- **Status**: ✅ Approved by Jason 2026-05-09 — implementation under way on `claude/c4-multiprofile-impl`
 - **Target version**: 0.1.5 experimental (per Q5 recommendation)
 - **Related**: [docs/ROADMAP.md](../../ROADMAP.md) v0.2 line item _"多 profile 同時 active（橫跨 vertical 的工廠用）"_
 - **Predecessor**: [2026-05-08-profile-inheritance-design.md](2026-05-08-profile-inheritance-design.md) — multi-active is the natural follow-up that exercises the inheritance mechanism in the multi-profile case.
@@ -428,10 +428,10 @@ Recommendation: **(b) v0.1.5 experimental**. Independent of remaining v0.2 work;
 
 ## 11. Approval block
 
-| Question | Recommendation                                                         | Approved? |
-| -------- | ---------------------------------------------------------------------- | --------- |
-| Q1       | Replace by default; separate `/add-profile` for additive case          | ⬜        |
-| Q2       | Stay agnostic, no `profileSets` in v1                                  | ⬜        |
-| Q3       | Order-insignificant in v1 (refuse on conflict; no priority resolution) | ⬜        |
-| Q4       | Defer declared-incompatibility to v0.3                                 | ⬜        |
-| Q5       | Ship as v0.1.5 experimental, not bundled with full v0.2                | ⬜        |
+| Question | Recommendation                                                         | Approved?           |
+| -------- | ---------------------------------------------------------------------- | ------------------- |
+| Q1       | Replace by default; separate `/add-profile` for additive case          | ✅ 2026-05-09 Jason |
+| Q2       | Stay agnostic, no `profileSets` in v1                                  | ✅ 2026-05-09 Jason |
+| Q3       | Order-insignificant in v1 (refuse on conflict; no priority resolution) | ✅ 2026-05-09 Jason |
+| Q4       | Defer declared-incompatibility to v0.3                                 | ✅ 2026-05-09 Jason |
+| Q5       | Ship as v0.1.5 experimental, not bundled with full v0.2                | ✅ 2026-05-09 Jason |

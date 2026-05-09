@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 — Nothing yet.
 
+## [0.1.5] — 2026-05-09
+
+**Multi-profile active** ships as **experimental**. `install.sh` now accepts a comma-separated list of profiles (`cnc-machining,injection-molding`) and overlays them all alongside core. A factory that genuinely spans verticals — CNC + injection, EMS + plastic enclosure, mixed job shop — no longer has to pick exactly one.
+
+### Added
+
+- **`adapters/claude-code/_multiprofile.py`** — multi-profile helper. Three subcommands: `scan <p1> <p2> ...` (collision detection across active profiles), `scan-all` (enumerate every pair from `plugin.json`'s `profiles.available`), `aggregate <p1> <p2> ...` (emit the new `active-profiles.json`).
+- **Comma-separated profile arg** in `install.sh`: `bash install.sh cnc-machining,injection-molding`. Whitespace tolerated, empty entries skipped, duplicates warn-and-deduped instead of silently dropped (M2 in spec §4.1).
+- **Comma-separated interactive picker**: tip "enter `1,2` for multi-profile" rendered in the prompt; `1,2` parses to `[cnc-machining, injection-molding]`.
+- **`install.sh --list-conflicts [<list>]`** — dry-run conflict scan. With args: scan a specific profile combination. With no args: enumerate all pairs from `plugin.json` (same as CI Step 12). Exit 0 clean, exit 1 on any conflict.
+- **`active-profiles.json`** (new file in install dir) — schema-versioned aggregated view: `primary` (first profile), `profiles[]` (full manifest copies in arg order), `aggregated` (list-typed metadata unioned: `tags`, `applicableTo`, `complianceFrameworks`, `mcp.recommended`/`optional`, `wantedContributions`, `warnings`).
+- **`/add-profile <name>`** — new slash command for additive semantics ("add this profile to whatever is already active"). Mirrors `/install-profile` which is replace semantics.
+- **CI Step 12** — pairwise profile conflict scan over every unordered pair in `plugin.json`'s available list. Catches the case where two contributors independently land profile changes that silently collide pairwise.
+- **CI Step 13** — `tests/multiprofile/test_multiprofile.py` (8 in-process tests covering `scan_set` / `scan_pair` / `aggregate_profiles` against synthetic mini-repos plus a guard that the real repo's profile pairs scan clean).
+
+### Changed
+
+- **`install.sh` validation order** (M5 atomicity per spec): validate-each-profile-exists + cross-profile-conflict-scan now run **before** the existing-install backup step. A bad arg list no longer destroys a working install.
+- **`.installed` format** (additive): adds `activeProfiles` array. Singular `activeProfile` retained indefinitely, set to first profile in the active list, for backwards compatibility with v0.1.x readers (`/manufacturing` slash command etc.).
+- **`/install-profile` and `/manufacturing` slash command docs** updated to document multi-profile syntax and active-profiles.json reading order (plural first, fall back to singular).
+- **`adapters/claude-code/plugin-mapping.md`**: new section on multi-profile install + `--list-conflicts` dry-run.
+- **`docs/profile-development.md`**: new section "多 profile 同時 active" with the refuse-on-conflict rule, dry-run instructions, naming guidance for new profile contributors, and `active-profiles.json` schema.
+- **`docs/ROADMAP.md`**: marks the v0.2 line items "多 profile 同時 active" and (partially) "自動產生 explainer HTML" as shipped early in v0.1.4 / v0.1.5.
+- **`plugin.json` version**: 0.1.4 → 0.1.5.
+
+### Notes — experimental status
+
+`extends:` (v0.1.4) and multi-profile-active (v0.1.5) are both **experimental**. No current profile in this repo uses either feature in a way that exercises the conflict-resolution edge cases. Both features are opt-in and have well-bounded refuse-loudly semantics — using them is safe, and not using them keeps the v0.1.x install path unchanged.
+
+The first real consumer of multi-profile-active (a factory that genuinely needs CNC + injection, or PCB + plastic enclosure, etc.) will validate the design against a live use case before we lock the contract for v0.2.
+
+### Notes — Python dependency
+
+Multi-profile install (≥ 2 profiles) requires Python 3 on the install machine. Single-profile installs without `extends:` files continue to install with no Python dependency. `install.sh` detects the missing dependency at the point where it actually needs Python and prints a clear install message before bailing.
+
+### Spec & approval
+
+[Full design spec](docs/superpowers/specs/2026-05-09-multi-profile-active-design.md) — drafted v1, adversarial-reviewed to v2 patching 2 HIGH + 5 MEDIUM + 3 LOW gaps, approved by Jason 2026-05-09 with all 5 Q-block recommendations accepted (HTML-comment-style reject; profile-set agnosticism; v1 order-insignificant; defer declared-incompatibility; ship as v0.1.5 experimental).
+
 ## [0.1.4] — 2026-05-09
 
 **Profile inheritance mechanism** ships as **experimental**. Profiles can now declare `extends: core/<kind>/<name>` in frontmatter and incrementally merge against a core file at install time, instead of copy-pasting the whole core file as v0.1.x required.
@@ -176,7 +215,8 @@ Initial public release. Built from the [v0.1 design spec](docs/superpowers/specs
 - Authoring credit: created at SIMHOPE (Taiwan precision machining); maintained by Jason Lin (<jasonlin@simhope.com.tw>).
 - Architectural inspiration credited in README to [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) and Anthropic's [superpowers](https://github.com/anthropics/superpowers) skill conventions.
 
-[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jason-simhope-ai/manufacturing-skill/compare/v0.1.1...v0.1.2
