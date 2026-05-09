@@ -2,8 +2,8 @@
 
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
-> 規模：139 檔案 · 34 commits · v0.1.3 · MIT
-> 最後更新：2026-05-08
+> 規模：v0.1.4 · MIT （inheritance 機制 experimental ship）
+> 最後更新：2026-05-09
 
 ---
 
@@ -160,10 +160,15 @@ INVENTORY.md              ← 這份
 
 ### `adapters/claude-code/` — Claude Code 安裝層
 
-| 檔                                                          | 用途                                      |
-| ----------------------------------------------------------- | ----------------------------------------- |
-| [install.sh](adapters/claude-code/install.sh)               | 互動式 / CLI 安裝（POSIX bash 3.2+ 相容） |
-| [plugin-mapping.md](adapters/claude-code/plugin-mapping.md) | source → `~/.claude/plugins/` 映射說明    |
+| 檔                                                               | 用途                                                                                              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [install.sh](adapters/claude-code/install.sh)                    | 互動式 / CLI 安裝（POSIX bash 3.2+ 相容）。v0.1.4 起加 `--resolve` flag 預覽 extends 合併輸出     |
+| [\_resolve_extends.py](adapters/claude-code/_resolve_extends.py) | v0.1.4+ profile inheritance resolver（被 install.sh 叫用；有 `extends:` 的 profile 檔交給它合併） |
+| [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)      | source → `~/.claude/plugins/` 映射說明                                                            |
+
+### `tests/extends/` — Inheritance resolver 測試 fixtures
+
+13 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
 
 ---
 

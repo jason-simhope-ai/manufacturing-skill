@@ -287,3 +287,121 @@ jobs:
           print(f"checked {checked} internal markdown links")
           sys.exit(1 if fail else 0)
           PY
+
+      # ---------------------------------------------------------------
+      # Step 10c: Run inheritance resolver golden-file tests. 13 cases
+      # under tests/extends/, each one a fixture pinning down a specific
+      # behaviour or failure mode of the resolver.
+      # ---------------------------------------------------------------
+      - name: Profile extends — resolver fixtures
+        run: python3 tests/extends/run.py
+
+      # ---------------------------------------------------------------
+      # Step 10a: Profile inheritance — lint every `extends:` profile
+      # file. Validates extends path, mode marker presence (exactly
+      # one of <!-- inherit --> or <!-- override-body -->),
+      # replace-section heading existence, and frontmatter
+      # post-merge requirements. See spec §10.1.
+      # ---------------------------------------------------------------
+      - name: Profile extends — lint
+        run: |
+          python3 - <<'PY'
+          import os, sys, glob, subprocess
+          resolver = "adapters/claude-code/_resolve_extends.py"
+          fail = False
+          checked = 0
+          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
+              # Skip _templates
+              if any(p.startswith("_") for p in f.replace("\\","/").split("/")):
+                  continue
+              try:
+                  with open(f, encoding="utf-8") as fp:
+                      text = fp.read()
+              except OSError:
+                  continue
+              if not text.startswith("---"):
+                  continue
+              parts = text.split("---", 2)
+              if len(parts) < 3:
+                  continue
+              fm_block = parts[1]
+              if "\nextends:" not in "\n" + fm_block:
+                  continue
+              proc = subprocess.run(
+                  ["python3", resolver, "--repo-root", ".", "lint", f],
+                  capture_output=True, text=True,
+              )
+              if proc.returncode != 0:
+                  sys.stdout.write(proc.stderr)
+                  fail = True
+              else:
+                  print(f"ok  {f}")
+              checked += 1
+          print(f"checked {checked} profile files with `extends:`")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 10b: Core-side heading-anchor protection. When a PR
+      # touches core/<kind>/*.md, diff the `## ` headings against the
+      # base. For any removed/renamed heading, fail if any profile's
+      # `<!-- replace-section: <heading> -->` still references it
+      # without the same PR also updating that profile. Spec §10.2.
+      # ---------------------------------------------------------------
+      - name: Profile extends — core heading-anchor protection
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -e
+          # Need full base history for the diff
+          git fetch --no-tags --depth=1 origin "${BASE_SHA}" || true
+          changed=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
+            -- 'core/*/**.md' || true)
+          if [[ -z "${changed}" ]]; then
+            echo "no core/ markdown files touched — skip"
+            exit 0
+          fi
+          touched_profiles=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
+            -- 'profiles/*/**.md' || true)
+          fail=0
+          while IFS= read -r core_file; do
+            [[ -z "${core_file}" ]] && continue
+            base_headings=$(git show "${BASE_SHA}:${core_file}" 2>/dev/null \
+              | grep -E '^## ' | sed 's/^## //' || true)
+            head_headings=$(grep -E '^## ' "${core_file}" \
+              | sed 's/^## //' || true)
+            removed=$(comm -23 \
+              <(printf '%s\n' "${base_headings}" | sort -u) \
+              <(printf '%s\n' "${head_headings}" | sort -u) | sed '/^$/d')
+            if [[ -z "${removed}" ]]; then
+              echo "ok  ${core_file} (no removed headings)"
+              continue
+            fi
+            # For each removed heading, check if profiles still reference
+            while IFS= read -r heading; do
+              [[ -z "${heading}" ]] && continue
+              python3 adapters/claude-code/_resolve_extends.py \
+                --repo-root . lint-anchors "${core_file}" "${heading}" \
+                || fail=1
+              # Check if any profile that references this heading is
+              # also being updated in the same PR (acceptable case)
+              referencing=$(python3 -c "
+          import sys
+          sys.path.insert(0, 'adapters/claude-code')
+          import _resolve_extends as r
+          from pathlib import Path
+          for p, _ in r.find_referencing_profiles(
+                  Path('.'), Path('${core_file}'), ['${heading}']):
+              print(p)
+          " 2>/dev/null || true)
+              while IFS= read -r ref_path; do
+                [[ -z "${ref_path}" ]] && continue
+                if ! grep -qF "${ref_path}" <<< "${touched_profiles}"; then
+                  echo "::error file=${core_file}::removed heading '## ${heading}' is referenced by ${ref_path} which is NOT updated in this PR"
+                fi
+              done <<< "${referencing}"
+            done <<< "${removed}"
+          done <<< "${changed}"
+          exit $fail
