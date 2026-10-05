@@ -60,3 +60,11 @@ team/.build/
 logs/
 **/audit/
 **/memory/
+
+# Exports and de-identified exports belong OUTSIDE the clone (/tmp or $MFG_TEAM_DATA_T1; see
+# team/local/README.md). Belt and braces in case one lands here anyway. examples/** stays tracked.
+*.deid.csv
+team/local/**/*.csv
+# Stricter, optional: ignore every CSV in the clone but keep the synthetic examples tracked.
+# *.csv
+# !examples/**/*.csv

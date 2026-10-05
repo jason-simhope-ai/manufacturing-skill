@@ -24,7 +24,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _teamlib as lib  # noqa: E402
+try:
+    import _teamlib as lib  # noqa: E402
+except ImportError as _exc:      # e.g. the read-only installed plugin copy has no infra/
+    sys.exit(f"teamctl: {_exc}\nRun the team tools from your git clone, not from the installed plugin copy: "
+             "its path is the \"source\" field of <CLAUDE_CONFIG_DIR or ~/.claude>/plugins/manufacturing-skill/.installed.")
 
 
 def _root(arg) -> Path:

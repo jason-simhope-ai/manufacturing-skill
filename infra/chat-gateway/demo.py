@@ -93,6 +93,7 @@ def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
     shown = roster_path.relative_to(REPO) if roster_path.is_relative_to(REPO) else roster_path.name
     out.write("digital-twin team — offline chat-gateway demo (v0.2.0-alpha)\n")
     out.write("DEMO KEYS — public demo HMAC keys · mock adapter + mock driver · no network, no credentials\n")
+    out.write("replies are canned: the mock driver matches keywords in fixtures/mock_driver.json, it is not a model\n")
     out.write(f"roster: {shown} (synthetic) · clock fixed at 2026-10-05 07:50 +08:00\n")
     if not (roster.get("_identities") or {}).get("users"):
         roster["_identities"] = json.loads(DEMO_IDENTITIES.read_text(encoding="utf-8"))

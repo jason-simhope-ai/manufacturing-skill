@@ -1,5 +1,6 @@
 digital-twin team — offline chat-gateway demo (v0.2.0-alpha)
 DEMO KEYS — public demo HMAC keys · mock adapter + mock driver · no network, no credentials
+replies are canned: the mock driver matches keywords in fixtures/mock_driver.json, it is not a model
 roster: infra/chat-gateway/fixtures/roster/roster.json (synthetic) · clock fixed at 2026-10-05 07:50 +08:00
 gateway up: audit #1 config_loaded
 

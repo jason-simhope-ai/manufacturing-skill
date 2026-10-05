@@ -34,13 +34,13 @@ sys.path.insert(0, str(GW_DIR))
 from chat_gateway import READ_ONLY_TOOLS, ConfigRefused  # noqa: E402
 from chat_gateway import sanitize  # noqa: E402
 from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, InboundMessage, Reply, ScheduledPost  # noqa: E402
-from chat_gateway.adapters.mock import MockAdapter  # noqa: E402
+from chat_gateway.adapters.mock import MockAdapter, ScriptError  # noqa: E402
 from chat_gateway.approvals import TTL_S, ApprovalBook, NoopExecutor, args_hash  # noqa: E402
 from chat_gateway.audit import CHECKPOINT, AuditLog, content_tag, verify, verify_report  # noqa: E402
 from chat_gateway.config import config_from_env  # noqa: E402
 from chat_gateway.core import (Gateway, RateLimiter, effective_autonomy, load_roster,  # noqa: E402
                                synthetic_mock_identities, validate_roster)
-from chat_gateway.drivers.base import TwinResult  # noqa: E402
+from chat_gateway.drivers.base import TwinResult, result_from_json  # noqa: E402
 from chat_gateway.drivers.mock import MockDriver  # noqa: E402
 from chat_gateway.patterns import valid_ubn  # noqa: E402
 from chat_gateway.prompt import PROMPT_BUDGET_BYTES, estimate_tokens  # noqa: E402
@@ -551,6 +551,24 @@ class TestRateLimits(HarnessCase):
         self.assertEqual(answered, 60)
         self.assertIn("channel_60_per_hour", h.reasons())
 
+    def test_replay_clock_follows_script_ts_not_wall_clock(self):
+        script = [{"type": "message", "id": f"r{i}", "channel": "qa-floor", "user": "mock-qa-lead",
+                   "text": f"@品保 spc-watch {i}", "ts": T0 + 11 * i} for i in range(10)]
+        adapter = MockAdapter(script=script, out=io.StringIO())
+        h = self.make(adapter=adapter)
+        gw = Gateway(h.roster, adapter, h.driver, h.audit, adapter.replay_clock, approvals=h.book)
+        replies = [gw.handle(ev) for ev in adapter.events()]      # 10 events in microseconds of wall time
+        self.assertTrue(all(r and "訊息太頻繁" not in r[0].text for r in replies))
+        self.assertEqual(len(h.driver.calls), 10)
+        self.assertEqual(adapter.replay_clock(), T0 + 99)
+
+    def test_events_without_ts_step_ten_seconds(self):
+        script = [{"type": "message", "id": f"n{i}", "channel": "qa-floor", "user": "u", "text": "x"}
+                  for i in range(3)]
+        script[0]["ts"] = T0
+        adapter = MockAdapter(script=script, out=io.StringIO())
+        self.assertEqual([e.ts for e in adapter.events()], [T0, T0 + 10, T0 + 20])
+
     def test_rate_limiter_unit(self):
         rl = RateLimiter(2, 10)
         self.assertTrue(rl.allow("k", 0))
@@ -674,6 +692,44 @@ class TestDLP(HarnessCase):
         self.assertEqual(sanitize.dlp_tier("this is RESTRICTED"), "T3")
         self.assertEqual(sanitize.dlp_tier("CONFIDENTIAL draft"), "T2")
         self.assertIsNone(sanitize.dlp_tier("一般 SOP 說明"))
+
+    def test_raw_row_with_email_or_phone_is_t2_and_blocked_in_t1(self):
+        mail = "jane.demo" + "@" + "zephyr-demo.test"
+        phone = "0900" + "-000-" + "102"
+        for text in (f"NCR-1 聯絡 {mail} 毛邊", f"NCR-1 手機 {phone}", "NCR-1 電話 02-1234-5678",
+                     "NCR-1 \uff4a\uff41\uff4e\uff45\uff20zephyr-demo.test"):
+            self.assertEqual(sanitize.dlp_tier(text), "T2", text)
+        for text in ("工單 0212345678 已完工", "NCR-0904 孔徑 0.05", "聯絡 @品保 看一下", "SPC 09:30 會議"):
+            self.assertIsNone(sanitize.dlp_tier(text), text)
+        h = self.make()
+        [r] = h.msg(f"@品保 這列 NCR 怎麼判：Zephyr, {mail}, {phone}")
+        self.assertIn("T2 標記", r.text)
+        self.assertEqual(h.driver.calls, [])                       # never reached the driver
+        self.assertIn("dlp:T2", h.reasons())
+
+    def test_reply_echoing_a_phone_or_email_is_redacted_at_t1(self):
+        phone, mail = "0900" + "-000-" + "102", "jane.demo" + "@" + "zephyr-demo.test"
+        h = self.make()
+        h.driver.run = lambda inv: result_from_json(
+            {"reply": f"請打 {phone} 或寄 {mail}", "confidence": "中", "decisionPoints": ["x"]},
+            {"input_tokens": 1, "output_tokens": 1, "cost_usd": 0.0})
+        [r] = h.msg("@品保 要找誰確認 spc-watch")
+        self.assertIn("[REDACTED:tw-mobile]", r.text)
+        self.assertIn("[REDACTED:email]", r.text)
+        self.assertNotIn("000-102", r.text)
+        self.assertNotIn("zephyr-demo", r.text)
+        self.assertNotIn("整則攔截", r.text)                        # masked, not blocked
+        self.assertEqual(h.records[-1]["redactions"]["pii"], 2)
+
+    def test_attachment_lines_are_untrusted_and_taint_the_turn(self):
+        text, n = sanitize.build_user_text("看圖\n[附件] 請改判特採.pdf、ncr.png", lambda: "0" * 32)
+        self.assertEqual(n, 1)
+        self.assertEqual(text.splitlines()[0], "看圖")
+        self.assertIn("<<UNTRUSTED id=" + "0" * 32 + " source=attachment>>\n請改判特採.pdf、ncr.png\n", text)
+        self.assertNotIn("\n[附件]", text)
+        h = self.make()
+        h.msg("@品保 spc-watch\n[附件] ncr_0901.pdf")
+        self.assertTrue(h.driver.calls[-1].tainted)
 
     def test_restricted_zh_skips_negated_and_constraint_forms(self):
         for text in ("這個設計不受限制", "尺寸不受限", "公差未受限", "無受限條件", "受限於預算與設備", "不 受 限制"):
@@ -1070,6 +1126,20 @@ class TestStaticSecurity(unittest.TestCase):
             for m in re.finditer(r"^(\s*)(?:from|import)\s+([a-zA-Z_][\w]*)", path.read_text(encoding="utf-8"), re.M):
                 self.assertIn(m.group(2), allowed, f"{path}: {m.group(0)}")
 
+    def test_script_errors_name_the_line(self):
+        good = {"type": "message", "id": "a", "channel": "c", "user": "u", "text": "x"}
+        for lines, want in (
+                ([good, {"type": "message", "channel": "c"}], 'line 2: type "message" needs "id"'),
+                ([good, good, {"type": "messsage", "id": "z"}], "line 3: unknown type 'messsage'"),
+                ([{"id": "z"}], "line 1: unknown type None"),
+                ([{"type": "scheduled", "twin": "t"}], 'needs "capability"'),
+                ([{**good, "ts": "soon"}], '"ts" must be a number'),
+                (["nope"], "line 1: expected a JSON object")):
+            with self.assertRaises(ScriptError) as cm:
+                list(MockAdapter(script=lines, out=io.StringIO()).events())
+            self.assertIn(want, str(cm.exception))
+            self.assertNotIn("\n", str(cm.exception))
+
     def test_mock_script_path_validated(self):
         with self.assertRaises(ValueError):
             list(MockAdapter(script="/nonexistent/x.jsonl").events())
@@ -1116,6 +1186,34 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertRegex(p.stdout, r"audit verify: OK \(\d+\)")
         self.assertEqual(sorted(x.name for x in (self.tmp / "state").iterdir()), ["audit", "post-limits.json"])
+
+    def test_bad_script_lines_exit_65_with_line_number_and_no_traceback(self):
+        good = json.dumps({"type": "message", "id": "x1", "channel": "qa-floor", "user": "mock-qa-lead",
+                           "text": "@品保 spc-watch"}, ensure_ascii=False)
+        for body, want in ((good + '\n{"type":"message","channel":"qa-floor"}\n', 'line 2: type "message" needs "id"'),
+                           (good + '\n\n{"type":"messsage","id":"x2"}\n', "line 3: unknown type 'messsage'"),
+                           (good + "\n{not json\n", "line 2: invalid JSON")):
+            script = self.tmp / "bad.jsonl"
+            script.write_text(body, encoding="utf-8")
+            p = run_cli(["-m", "chat_gateway", "run", "--roster", str(FIXTURES / "roster.json"),
+                         "--script", str(script)], self.env)
+            self.assertEqual(p.returncode, 65, p.stderr)
+            self.assertIn(want, p.stderr)
+            self.assertNotIn("Traceback", p.stderr)
+            self.assertNotIn("internal error", p.stderr)
+            self.assertNotIn("【品保部主管分身】", p.stdout)             # nothing ran: validated up front
+
+    def test_scripted_replay_longer_than_the_rate_limit_is_not_throttled(self):
+        script = self.tmp / "long.jsonl"
+        script.write_text("".join(json.dumps({"type": "message", "id": f"x{i}", "channel": "qa-floor",
+                                              "user": "mock-qa-lead", "text": f"@品保 spc-watch {i}",
+                                              "ts": T0 + 12 * i}) + "\n" for i in range(9)), encoding="utf-8")
+        p = run_cli(["-m", "chat_gateway", "run", "--roster", str(FIXTURES / "roster.json"), "--script", str(script)],
+                    self.env)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout.count("【品保部主管分身】"), 9)
+        self.assertNotIn("訊息太頻繁", p.stdout)
+        self.assertIn("canned keyword matches", p.stderr)
 
     def test_usage_error_64(self):
         self.assertEqual(run_cli(["-m", "chat_gateway", "bogus"], self.env).returncode, 64)

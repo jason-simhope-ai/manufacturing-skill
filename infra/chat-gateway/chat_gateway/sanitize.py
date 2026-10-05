@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from . import tier_rank
-from .patterns import DLP_PATTERNS, DLP_TIERS, GENERIC_SECRET, SECRET_PATTERNS, ubn_hit
+from .patterns import DLP_PATTERNS, DLP_TIERS, GENERIC_SECRET, PII_MASKS, SECRET_PATTERNS, ubn_hit
 
 # ── inbound normalisation ────────────────────────────────────────────
 # Invisible / format characters that can split a marker ("機\u00ad密") without being
@@ -78,7 +78,7 @@ _FENCE = re.compile(r"```.*?(?:```|$)", re.DOTALL)
 
 
 def split_untrusted(text: str) -> tuple[str, list[tuple[str, str]]]:
-    """Separate the author's own words from quoted (`>`) lines and code fences."""
+    """Separate the author's own words from quoted (`>`) lines, code fences and `[附件]` file-name lines."""
     segments: list[tuple[str, str]] = []
 
     def _code(m: re.Match) -> str:
@@ -88,7 +88,9 @@ def split_untrusted(text: str) -> tuple[str, list[tuple[str, str]]]:
     text = _FENCE.sub(_code, text)
     authored, quote = [], []
     for line in text.splitlines():
-        if line.lstrip().startswith(">"):
+        if line.lstrip().startswith("[附件]"):          # adapter-added file names: attacker-chosen text
+            segments.append(("attachment", line.lstrip()[4:].strip()))
+        elif line.lstrip().startswith(">"):
             quote.append(line.lstrip()[1:].strip())
         else:
             if quote:
@@ -192,9 +194,9 @@ MAX_REPLY_CHARS = 3000
 
 def filter_output(text: str, channel_tier: str,
                   extra: Iterable[tuple[str, re.Pattern]] = ()) -> tuple[str, dict]:
-    """Strip URLs/images → neutralise mass mentions → mask secrets → tier block → cap length.
+    """Strip URLs/images → neutralise mass mentions → mask secrets, emails, phones → tier block → cap length.
     `extra` = local denylist (tier T2), same as inbound DLP."""
-    stats = {"urls": 0, "mentions": 0, "secret": 0, "blocked": None, "truncated": False}
+    stats = {"urls": 0, "mentions": 0, "secret": 0, "pii": 0, "blocked": None, "truncated": False}
     text, n1 = _MD_IMAGE.subn("[圖片已移除]", text)
     text, n2 = _MD_LINK.subn(lambda m: m.group(1), text)
     text, n3 = _SLACK_LINK.subn(lambda m: m.group(1) or "[連結已移除]", text)
@@ -205,6 +207,9 @@ def filter_output(text: str, channel_tier: str,
     for name, pat in [*SECRET_PATTERNS, GENERIC_SECRET]:
         text, n = pat.subn(f"[REDACTED:{name}]", text)
         stats["secret"] += n
+    for name, pat in PII_MASKS:                     # emails / phone numbers echoed by the model
+        text, n = pat.subn(f"[REDACTED:{name}]", text)
+        stats["pii"] += n
     tier = dlp_tier(text, extra)
     if tier and tier_rank(tier) > tier_rank(channel_tier):
         stats["blocked"] = tier

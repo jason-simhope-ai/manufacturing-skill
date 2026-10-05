@@ -10,6 +10,8 @@ Layers:
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import re
@@ -498,6 +500,54 @@ class DeidUnit(unittest.TestCase):
                             "--map", str(REPO / "team" / "map.yaml")])
             self.assertEqual(rc, 2)
             self.assertFalse((REPO / "team" / "map.yaml").exists())
+
+
+class DeidHonestReport(unittest.TestCase):
+    def run_deid(self, csv_text, *extra, deny=None):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        (d / "in.csv").write_text(csv_text, encoding="utf-8")
+        if deny is not None:
+            (d / "names.denylist").write_text(deny, encoding="utf-8")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = deid.main(["--in", str(d / "in.csv"), "--out", str(d / "o.csv"),
+                            "--map", str(d / "deid-map.local.yaml"), *extra])
+        return rc, buf.getvalue(), d
+
+    def test_clean_run_without_denylist_says_what_was_not_checked(self):
+        rc, out, _ = self.run_deid("customer,desc\nAlpha Co,毛邊 DWG-AB12345\n")
+        self.assertEqual(rc, 0)
+        self.assertIn("residual hits=0", out)
+        self.assertIn("WARNING no denylist loaded", out)
+        self.assertIn("part-number scan = NOT scanned", out)
+        self.assertIn("NOT scanned: English names", out)
+        self.assertIn("at least 10 output rows", out)
+
+    def test_denylist_entry_count_is_reported(self):
+        rc, out, _ = self.run_deid("customer,desc\nAlpha Co,ok\n", deny="# c\nFOO-\\d+\nBAR\n")
+        self.assertEqual(rc, 0)
+        self.assertIn("denylist 2 entries", out)
+        self.assertNotIn("no denylist loaded", out)
+
+    def test_part_numbers_scanned_only_with_a_pattern(self):
+        text = "customer,desc\nAlpha Co,孔徑偏大 DWG-AB12345\n"
+        rc, _, _ = self.run_deid(text)
+        self.assertEqual(rc, 0)                                   # no pattern: passes through
+        rc, out, d = self.run_deid(text, "--partno-pattern", r"DWG-[A-Z]{2}\d{5}")
+        self.assertEqual(rc, 1)
+        self.assertIn("matches part-number", out)
+        self.assertIn("regex 'DWG-[A-Z]{2}\\d{5}'", out)
+        self.assertNotIn("DWG-AB12345", out)                      # values are never printed
+        self.assertFalse((d / "o.csv").exists())
+        rc, out, _ = self.run_deid(text, "--partno-pattern", "(")
+        self.assertEqual(rc, 2)
+
+    def test_ragged_rows_are_reported(self):
+        rc, out, d = self.run_deid("customer,desc\nAlpha Co,hello,0912,extra\nBeta Co\n")
+        self.assertEqual(rc, 0)
+        self.assertIn("WARNING 2 row(s) do not have 2 cells (first: row 2 has 4)", out)
 
 
 class CliExitCodes(unittest.TestCase):

@@ -58,10 +58,15 @@ ACME-\d{4}
 DWG-[A-Z]{2}\d{5}
 ```
 
-`deid-map.local.yaml` 由 `team/tools/deid.py` 自動建立與更新：
+`deid-map.local.yaml` 由 `team/tools/deid.py` 自動建立與更新。**來源匯出檔與輸出檔都放在 repo 外**（`/tmp` 或 `$MFG_TEAM_DATA_T1`），不要放在 clone 裡；對照表放 `team/local/`（已被 `.gitignore` 擋）：
 
 ```
-python3 team/tools/deid.py --in ncr.csv --out ncr.deid.csv --map team/local/deid-map.local.yaml --drop inspector,phone
+export EXPORT=/tmp/ncr-export && mkdir -p -m 700 "$EXPORT"      # 來源檔 ncr.csv 也放這裡，用完刪除
+python3 team/tools/deid.py --in "$EXPORT/ncr.csv" --out "${MFG_TEAM_DATA_T1:-$EXPORT}/ncr.deid.csv" \
+    --map team/local/deid-map.local.yaml --drop inspector,phone \
+    --partno-pattern 'DWG-[A-Z]{2}\d{5}'      # 你自己的圖號／料號樣式；不給就不掃圖號
 ```
+
+跑完會印出「掃了什麼、沒掃什麼」：有沒有載入 denylist、載入幾行（沒有會警告）、圖號是否掃描，並提醒你抽查至少 10 列。`residual hits=0` 只代表「已掃的樣式沒命中」，不是「乾淨」。`.gitignore` 另外擋 `*.deid.csv` 與 `team/local/**/*.csv` 作為最後防線，但不要靠它。
 
 驗證：`python3 team/tools/teamctl.py check`（預設讀 `team/local/roster.local.yaml`，並檢查上述 overlay）。

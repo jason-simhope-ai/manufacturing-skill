@@ -3,7 +3,8 @@
 
     deid.py --in FILE.csv --out FILE.csv --map team/local/deid-map.local.yaml
             [--drop COL,...] [--keep COL,...] [--text COL,...]
-            [--customer-cols COL,...] [--denylist FILE] [--allow-residual]
+            [--customer-cols COL,...] [--denylist FILE] [--partno-pattern REGEX]
+            [--allow-residual]
 
 * every cell is NFKC-normalised, stripped of invisible/format characters, and
   matched with whitespace folded, so `Acme  Precision` and full-width `ＡＣＭＥ`
@@ -17,6 +18,13 @@
   title or honorific), the local denylist; and any
   non-placeholder value left in a contact column (聯絡人 / contact / ship_to /
   attention / attn), which must be dropped or mapped
+* the denylist is `--denylist FILE`, else `names.denylist` next to --map. The run always says
+  whether one was loaded and how many entries it has, and warns loudly when there is none
+* part / drawing numbers are scanned ONLY with `--partno-pattern REGEX` (your own shape, e.g.
+  `DWG-[A-Z]{2}\d{5}|PN-\d{5}-[A-Z]`); without it they pass through, and the run says so
+* not scanned in any case: English names or aliases that are not in the map or the denylist,
+  LINE ids and other handles. Spot-check at least 10 output rows by eye before sharing
+* rows with more or fewer cells than the header (unquoted commas) are reported; extra cells are dropped
 * any residual hit -> report per row and per column, nothing written, exit 1,
   unless --allow-residual (written anyway, still reported). Values are never printed.
 
@@ -70,10 +78,12 @@ def name_pattern(name: str) -> re.Pattern:
     return re.compile(body, re.I)
 
 
-def residual_classes(cell: str, denylist) -> list[str]:
+def residual_classes(cell: str, denylist, partno=None) -> list[str]:
     squeezed = _WS.sub("", cell)
     classes = lib.dlp_scan(cell)
     classes += [n for n, rx in lib.PII_PATTERNS if rx.search(cell)]
+    if partno is not None and (partno.search(cell) or partno.search(squeezed)):
+        classes.append("part-number")
     if any(p.search(cell) or p.search(squeezed) for p in denylist):
         classes.append("denylist")
     return classes
@@ -115,10 +125,10 @@ def _map_is_safe(map_path: Path) -> bool:
 
 
 def deid_rows(rows, header, *, mapping, customer_cols, drop, keep, text_cols,
-              denylist, contact_cols=None):
+              denylist, contact_cols=None, partno=None):
     """Pure core: returns (out_header, out_rows, counts, residual list)."""
     counts = {"customer": 0, "customer_in_text": 0, "dropped_columns": 0,
-              "residual": 0}
+              "residual": 0, "ragged_rows": 0, "ragged_first": None}
     idx = list(range(len(header)))
     if keep:
         idx = [i for i in idx if header[i] in keep]
@@ -140,6 +150,10 @@ def deid_rows(rows, header, *, mapping, customer_cols, drop, keep, text_cols,
         folded.items(), key=lambda kv: len(kv[0]), reverse=True) if k]
     out, residual = [], []
     for r, row in enumerate(rows, start=2):
+        if len(row) != len(header):
+            counts["ragged_rows"] += 1
+            if counts["ragged_first"] is None:
+                counts["ragged_first"] = (r, len(row))
         new = []
         for i in kept:
             col = header[i]
@@ -155,7 +169,7 @@ def deid_rows(rows, header, *, mapping, customer_cols, drop, keep, text_cols,
                 counts["customer_in_text"] += k
             classes = []
             if not text_cols or col in text_cols or col in contact_cols:
-                classes = residual_classes(cell, denylist)
+                classes = residual_classes(cell, denylist, partno)
             if col in contact_cols and not PLACEHOLDER_ONLY.match(cell.strip()):
                 classes.append("contact-column")
             for c in dict.fromkeys(classes):
@@ -164,6 +178,24 @@ def deid_rows(rows, header, *, mapping, customer_cols, drop, keep, text_cols,
         out.append(new)
     counts["residual"] = len(residual)
     return [header[i] for i in kept], out, counts, residual
+
+
+def scan_report(deny_path: Path, denylist, partno: str | None) -> list[str]:
+    """What this run did and did not look for, so `residual hits=0` is never read as 'clean'."""
+    lines = []
+    if denylist:
+        lines.append(f"deid: scanned = generic patterns (DLP words, UBN, amounts, email, phone, surname+title) "
+                     f"+ denylist {len(denylist)} entries from {deny_path}")
+    else:
+        lines.append("deid: scanned = generic patterns (DLP words, UBN, amounts, email, phone, surname+title) only")
+        lines.append(f"deid: WARNING no denylist loaded (none at {deny_path}, or it has no entries): "
+                     "customer aliases, drawing numbers and project codes are NOT checked. "
+                     "Fill team/local/names.denylist or pass --denylist FILE")
+    pn = f"regex '{partno}'" if partno else "NOT scanned (no --partno-pattern)"
+    lines.append(f"deid: part-number scan = {pn}")
+    lines.append("deid: NOT scanned: English names or aliases that are not in the map or denylist, LINE ids and "
+                 "other handles. Spot-check at least 10 output rows by eye before sharing")
+    return lines
 
 
 def _write_private(path: Path, text: str) -> None:
@@ -184,6 +216,8 @@ def main(argv=None) -> int:
     ap.add_argument("--text", default="")
     ap.add_argument("--customer-cols", default="")
     ap.add_argument("--denylist")
+    ap.add_argument("--partno-pattern", dest="partno", metavar="REGEX",
+                    help="also treat matches of this regex (your part/drawing number shape) as residual")
     ap.add_argument("--allow-residual", action="store_true",
                     help="write the output even with residual hits (still reported)")
     args = ap.parse_args(argv)
@@ -215,11 +249,17 @@ def main(argv=None) -> int:
         deny_path = Path(args.denylist) if args.denylist else (
             map_path.parent / "names.denylist")
         denylist = _load_denylist(deny_path)
+        try:
+            partno = re.compile(args.partno) if args.partno else None
+        except re.error as e:
+            print(f"deid: bad --partno-pattern ({e})", file=sys.stderr)
+            return 2
         before = dict(mapping)
         out_h, out_rows, counts, residual = deid_rows(
             rows, header, mapping=mapping, customer_cols=set(cols),
             drop=set(_csv_list(args.drop)), keep=set(_csv_list(args.keep)),
-            text_cols=set(_csv_list(args.text)), denylist=denylist)
+            text_cols=set(_csv_list(args.text)), denylist=denylist,
+            partno=partno)
     except (OSError, ValueError, lib.LoadError, UnicodeDecodeError) as e:
         print(f"deid: {e}", file=sys.stderr)
         return 2
@@ -227,6 +267,13 @@ def main(argv=None) -> int:
           f"in-text={counts['customer_in_text']} "
           f"columns dropped={counts['dropped_columns']} "
           f"residual hits={counts['residual']}")
+    for line in scan_report(deny_path, denylist, args.partno):
+        print(line)
+    if counts["ragged_rows"]:
+        r, n = counts["ragged_first"]
+        print(f"deid: WARNING {counts['ragged_rows']} row(s) do not have {len(header)} cells "
+              f"(first: row {r} has {n}); extra cells are dropped, missing ones read as empty. "
+              "Quote commas in the source export.")
     if residual:
         for r, col, cls in residual[:20]:
             print(f"residual: row {r} column {col!r} matches {cls}")

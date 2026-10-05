@@ -1,6 +1,6 @@
 # 「需要分身嗎？」閘門
 
-流程修正能解決的，就不開分身。由 `/team gate <position>` 逐題引導；全部通過才可填 `result: twin`。每季複審一次。
+流程修正能解決的，就不開分身。由 `/team gate <position>` 逐題引導 G1–G6；**G7 不在對話中問**，由人在下方 roster 片段的註解裡自己填 yes／no。全部通過才可填 `result: twin`。每季複審一次。
 
 ## 問卷
 
@@ -12,9 +12,9 @@
 | G4 | 在職者願意每週花 15 分鐘 review 嗎？ | `defer` |
 | G5 | 需要的資料都可讀（已數位化、可匯出）嗎？ | `defer` |
 | G6 | 實際在做事的人（常是下屬）已訪談，`today` 已填嗎？ | `defer` |
-| G7 | 涉及 T3（高安規客製專案）嗎？ | alpha 不開，見 `team/policies/restricted.md` |
+| G7 | 涉及 T3（高安規客製專案）嗎？**紙上自行確認，不要輸入任何聊天或 AI 對話**（答「有，某某國防案」本身就洩漏）。在 roster 片段的 G7 註解填 yes／no | yes → alpha 不開，`result` 只能是 `defer`，見 `team/policies/restricted.md` |
 
-G2、G3 答「是」就走對應的出口，不再往下問。
+G2、G3 答「是」就走對應的出口，不再往下問。G7 是人自己填的 yes／no，工具與分身都不問、不記。
 
 ## 結果與去向
 
@@ -29,6 +29,7 @@ G2、G3 答「是」就走對應的出口，不再往下問。
 ## 輸出：貼進 roster 的片段
 
 ```yaml
+# G7 涉及 T3？ 請你自己在這裡填 yes / no（不要在聊天回答）：____    yes → result 改 defer，alpha 不開
 needsTwinGate:
   result: twin
   rationale: 一句話寫出痛點、已訪談誰、資料在哪

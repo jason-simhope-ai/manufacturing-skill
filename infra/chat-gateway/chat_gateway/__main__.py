@@ -5,7 +5,7 @@
     audit-verify FILE_OR_DIR
     self-check   [--roster P] [--adapter …] [--driver …]
 
-Exit: 0 OK · 3 T3 refused · 64 usage · 70 internal · 78 config refused.
+Exit: 0 OK · 3 T3 refused · 64 usage · 65 bad script line · 70 internal · 78 config refused.
 """
 from __future__ import annotations
 
@@ -13,13 +13,14 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from . import EXIT_CONFIG, EXIT_INTERNAL, EXIT_OK, EXIT_USAGE, ConfigRefused
+from . import EXIT_CONFIG, EXIT_DATA, EXIT_INTERNAL, EXIT_OK, EXIT_USAGE, ConfigRefused
 from .adapters import load_adapter_class
 from .adapters.base import ApprovalCard, ScheduledPost
-from .adapters.mock import MockAdapter
+from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
 from .audit import AuditLog, heads, verify_report
 from .config import AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, stale_state_help
@@ -64,12 +65,17 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
         raise ConfigRefused(f"local denylist unusable: {exc}") from None
     adapter = _make_adapter(cfg, roster, script)
     driver = _make_driver(cfg, env)
+    if cfg.driver == "mock":
+        print("mock driver: replies are canned keyword matches from fixtures/mock_driver.json, "
+              "not model output", file=sys.stderr)
+    # Replay: the script's own `ts` is the gateway clock, so rate limits and dedupe follow script time.
+    clock = adapter.replay_clock if isinstance(adapter, MockAdapter) and script else time.time
     try:
-        audit = AuditLog(cfg.state_dir / "audit", cfg.audit_key)
+        audit = AuditLog(cfg.state_dir / "audit", cfg.audit_key, clock=clock)
     except ConfigRefused as exc:
         raise ConfigRefused(str(exc) + stale_state_help(cfg.state_dir, env), exc.exit) from None
     data_root = env.get("MFG_TEAM_DATA_T1")
-    return Gateway(roster, adapter, driver, audit, approvals=ApprovalBook(cfg.approval_key),
+    return Gateway(roster, adapter, driver, audit, clock, approvals=ApprovalBook(cfg.approval_key, clock=clock),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,
                    max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp)
 
@@ -158,6 +164,9 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
     except ConfigRefused as exc:
         print(f"chat_gateway: refused to start (exit {exc.exit}): {exc}", file=sys.stderr)
         return exc.exit
+    except ScriptError as exc:
+        print(f"chat_gateway: {exc}", file=sys.stderr)
+        return EXIT_DATA
     except (ValueError, ImportError) as exc:
         print(f"chat_gateway: {exc}", file=sys.stderr)
         return EXIT_USAGE

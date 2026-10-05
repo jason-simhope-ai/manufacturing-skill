@@ -1,6 +1,8 @@
 """Mock adapter: scripted JSONL events or a console REPL; local, max tier T2 (§9.2).
 
-Script lines (one JSON object each; unknown keys ignored):
+Script lines (one JSON object each; unknown keys ignored; full field table in
+infra/chat-gateway/README.md "Write your own replay script"). The whole script is
+validated before anything runs: a bad line raises ScriptError naming the line number.
 
     {"type":"message","id":"m1","channel":"qa-floor","user":"mock-qa-lead","text":"@品保 …",
      "mention":true,"bot":false,"dm":false,"external":false,"thread":null,"ts":1790000000}
@@ -22,6 +24,31 @@ from typing import Callable, Iterator, TextIO
 from .base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply, ScheduledPost
 
 MAX_SCRIPT_BYTES = 2_000_000
+STEP_S = 10.0   # replay: an event without "ts" lands this many seconds after the previous one
+
+_REQUIRED = {"message": ("id",), "approval_click": ("id",), "scheduled": ("twin", "capability", "channel"),
+             "note": ()}
+
+
+class ScriptError(ValueError):
+    """A replay-script line is unusable. The message is one line and starts with the line number."""
+
+
+def _check(n: int, obj) -> dict:
+    if not isinstance(obj, dict):
+        raise ScriptError(f"script line {n}: expected a JSON object")
+    kind = obj.get("type")
+    if kind not in _REQUIRED:
+        raise ScriptError(f"script line {n}: unknown type {kind!r} (use {', '.join(_REQUIRED)})")
+    for key in _REQUIRED[kind]:
+        if obj.get(key) in (None, ""):
+            raise ScriptError(f'script line {n}: type "{kind}" needs "{key}"')
+    if "ts" in obj:
+        try:
+            float(obj["ts"])
+        except (TypeError, ValueError):
+            raise ScriptError(f'script line {n}: "ts" must be a number (epoch seconds)') from None
+    return obj
 
 
 def _hhmm(ts: float, offset_h: int) -> str:
@@ -45,11 +72,24 @@ class MockAdapter:
     # ── inbound ──
     def _lines(self) -> list[dict]:
         if isinstance(self.script, list):
-            return list(self.script)
+            return [_check(n, o) for n, o in enumerate(self.script, 1)]
         path = Path(self.script)
         if not path.is_file() or path.stat().st_size > MAX_SCRIPT_BYTES:
             raise ValueError(f"mock script missing or too large: {path}")
-        return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        out = []
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ScriptError(f"script line {n}: invalid JSON ({exc.msg}, column {exc.colno})") from None
+            out.append(_check(n, obj))
+        return out
+
+    def replay_clock(self) -> float:
+        """Script time: the `ts` of the event being handled (wall clock until the first event)."""
+        return self.last_ts or self.clock()
 
     def to_event(self, obj: dict) -> Event | None:
         """Pure mapping of one script object to an Event (None for notes / unknown)."""
@@ -91,7 +131,8 @@ class MockAdapter:
                 if self.on_note:
                     self.on_note(obj)
                 continue
-            self.last_ts = float(obj.get("ts", self.last_ts or self.clock()))
+            self.last_ts = float(obj["ts"]) if "ts" in obj else (
+                self.last_ts + STEP_S if self.last_ts else self.clock())
             ev = self.to_event(obj)
             if ev is not None:
                 self._echo(ev)
@@ -99,7 +140,8 @@ class MockAdapter:
 
     def _repl(self) -> Iterator[Event]:
         n = 0
-        self.out.write("mock REPL — '<channel> <user> <text>', text starting with @ = mention; Ctrl-D to quit\n")
+        self.out.write("mock REPL — '<channel> <user> <text>', text starting with @ = mention; Ctrl-D to quit\n"
+                       "replies are canned keyword matches from the mock driver, not model output\n")
         for line in self.inp:
             parts = line.strip().split(maxsplit=2)
             if len(parts) < 3:

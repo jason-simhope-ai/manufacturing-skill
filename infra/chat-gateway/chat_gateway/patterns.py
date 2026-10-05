@@ -70,8 +70,19 @@ PII_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("name-with-title", _P(rf"[{SURNAMES}][{_CJK}]{{0,3}}?(?:先生|小姐|經理|課長|主任|協理|副理|廠長|董事長)")),
 ]
 
+# Contact data in chat (T2): the same email / mobile shapes as the deid scan, plus landlines only
+# when the area code is separated (02-1234-5678), so plain 10-digit work-order numbers do not trip.
+# sanitize.filter_output also masks these in replies (PII_MASKS) before the tier check.
+_PII = dict(PII_PATTERNS)
+PII_MASKS: list[tuple[str, re.Pattern]] = [
+    ("email", _PII["email"]),
+    ("tw-mobile", _PII["tw-mobile"]),
+    ("tw-landline", _P(r"(?<!\d)(?:\+?886[\s-]?\(?|\(?0)[2-8]\)?[\s-]\d{3,4}[\s-]?\d{4}(?!\d)")),
+]
+
 # DLP tripwire (alert, not a defence). Tier of each pattern lives in DLP_TIERS.
 DLP_PATTERNS: list[tuple[str, re.Pattern]] = [
+    *PII_MASKS,
     ("confidential-zh", _P(r"機密")),
     ("confidential-en", _P(r"(?i)(?<![a-z])confidential(?![a-z])")),
     ("restricted-en", _P(r"(?i)(?<![a-z])restricted(?![a-z])")),
@@ -99,7 +110,7 @@ DLP_PATTERNS: list[tuple[str, re.Pattern]] = [
 ]
 DLP_TIERS: dict[str, str] = {
     "confidential-zh": "T2", "confidential-en": "T2", "tw-ubn": "T2",
-    "tw-national-id": "T2", "amount-ntd": "T2", "amount-usd": "T2", "amount-zh": "T2",
+    "tw-national-id": "T2", "email": "T2", "tw-mobile": "T2", "tw-landline": "T2", "amount-ntd": "T2", "amount-usd": "T2", "amount-zh": "T2",
     "restricted-en": "T3", "restricted-zh": "T3", "defense-zh": "T3",
     "aerospace-zh": "T3", "military-zh": "T3", "medical-device-zh": "T3",
     "export-permit-zh": "T3", "export-control-en": "T3", "control-zh": "T3",

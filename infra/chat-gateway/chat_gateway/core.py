@@ -536,7 +536,7 @@ class Gateway:
         usage = dict(result.usage) if isinstance(result.usage, dict) else {}
         cost = float(usage.get("cost_usd", 0.0) or 0.0)
         self._spend[(tid, day)] = self._spend.get((tid, day), 0.0) + cost
-        redactions = {"secret": stats["secret"], "pii": 0, "amount": 0}
+        redactions = {"secret": stats["secret"], "pii": stats["pii"], "amount": 0}
         if text is None:
             reply = self._say(ctx, tid, lambda s: notice(twin["title"], "回覆含高於本頻道分級的標記，已整則攔截", s),
                               decision="deny", usage=usage, latency_ms=latency, redactions=redactions,

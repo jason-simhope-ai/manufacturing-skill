@@ -17,6 +17,10 @@ PYTHONPATH=infra/chat-gateway python3 -m chat_gateway run --roster infra/chat-ga
     --script infra/chat-gateway/fixtures/demo.jsonl
 ```
 
+> **The demo and the mock driver are canned.** Every reply comes from keyword matching in
+> `fixtures/mock_driver.json` (first matching entry wins, otherwise the default line). Nothing is
+> inferred by a model, so a reply says nothing about what a real twin would answer.
+
 When no HMAC keys are set, mock mode prints a `DEMO KEYS` banner and uses public demo keys.
 With adapter and driver both `mock` and no `identities.json` next to the roster (the example
 build), the gateway uses synthetic users `mock-<position>` (listed on stderr), and the mock REPL
@@ -31,7 +35,47 @@ prints a one-line `(no reply: policy_denied <reason> · audit #n)` instead of st
 | `python3 -m chat_gateway audit-verify FILE_OR_DIR` | Check the keyed audit chain(s) against `checkpoint.json` (needs `MFG_TEAM_AUDIT_HMAC_KEY`; falls back to the demo key with a notice). Prints each problem, or the per-tier heads to copy off-host. |
 | `python3 -m chat_gateway self-check` | Load the roster, the adapter and the driver, then exit. |
 
-Exit codes: `0` OK · `3` T3 refused · `64` usage error · `70` internal error · `78` config refused.
+Exit codes: `0` OK · `3` T3 refused · `64` usage error · `65` bad line in a `--script` file · `70` internal error · `78` config refused.
+
+### Write your own replay script
+
+Use it with `python3 -m chat_gateway run --adapter mock --script F.jsonl`.
+
+One JSON object per line. Blank lines are skipped, unknown keys are ignored. The whole file is checked
+before anything runs: a bad line stops the run with one line such as
+`chat_gateway: script line 2: type "message" needs "id"` and exit 65 (no traceback, nothing replayed).
+Unknown `type` values, bad JSON, a missing required field and a non-numeric `ts` are all caught that way.
+The file may be at most 2,000,000 bytes.
+
+| `type` | Field | Required | Default | Meaning |
+| ------ | ----- | -------- | ------- | ------- |
+| `message` | `id` | yes | — | Event id. Reusing an id inside 10 minutes of script time is rejected as `duplicate_event`. |
+| | `channel` | no | `""` | Bound channel ref (case-sensitive; for the example roster: `qa-floor`, `daily-ops`). An unknown one is `unbound_channel`. |
+| | `user` | no | `""` | Platform user id. It must exist in `identities.json`. With no `identities.json` next to the roster, use the synthetic `mock-<position>` ids that the gateway lists on stderr (example: `mock-qa-lead`). |
+| | `text` | no | `""` | The message. Start with the twin's name or alias (`@品保 …`) to route. Otherwise the channel's `defaultTwin` answers. |
+| | `mention` | no | `true` | `false` = not @-mentioned: dropped as `no_mention`. |
+| | `bot`, `dm`, `external` | no | `false` | Mark the author as a bot, a DM, an externally shared channel. Each is denied and audited. |
+| | `thread` | no | `null` | Thread ref. |
+| | `ts` | no | previous event + 10 s | Epoch seconds. The first event without one uses the wall clock. |
+| `approval_click` | `id` | yes | — | Event id. |
+| | `approval_id`, `nonce`, `user` | no | `""` | From the approval card the gateway printed. |
+| | `decision` | no | `deny` | `approve`, or anything else = deny. |
+| | `ts` | no | previous + 10 s | As above. |
+| `scheduled` | `twin`, `capability`, `channel` | yes | — | A cron-style post. Limit: 3 per channel per day. |
+| `note` | any, e.g. `title`, `beat` | no | — | Narration for `demo.py`. Not an event; the CLI ignores it. |
+
+```jsonl
+{"type":"message","id":"m1","channel":"qa-floor","user":"mock-qa-lead","text":"@品保 NCR-EX-012 要不要升級 8D？","ts":1791158100}
+{"type":"approval_click","id":"c1","approval_id":"apv-0000","nonce":"0000","user":"mock-qa-lead","decision":"approve","ts":1791158160}
+{"type":"scheduled","twin":"production-manager","capability":"briefing-risk-check","channel":"daily-ops"}
+{"type":"note","title":"narration only"}
+```
+
+Rules to know before you replay NCRs:
+
+- **Replies are canned.** The mock driver picks a reply by keyword from `fixtures/mock_driver.json` (a tracked file); for any other text you get the default line. To make your own question get a useful answer you must edit a copy of that file for now. There is no `--fixture` option yet (spec follow-up).
+- **Rate limits follow the script's clock.** In `--script` mode the gateway clock is the script's `ts`, not the wall clock, so a replay is never throttled by how fast it runs. The limits still apply to script time: more than 6 messages from one user within 60 script seconds, or more than 60 in a channel within an hour, are `rate_limited`. Spread the `ts` values (default: 10 s apart). `--pace S` only sleeps between events so you can read the output. Audit records carry script time.
+- Never put real customer data, names or ids in a script that lives in the repo. Keep such files under `team/local/` or outside the repo.
 
 ## Environment (secrets come only from here)
 
@@ -69,11 +113,12 @@ imported lazily. `import chat_gateway.core` never needs a third-party SDK.
 - It ignores messages from bots, DMs, externally shared channels, unbound channels and unknown identities. Each case is audited as `policy_denied`.
 - Twins have read-only tools (`Read, Grep, Glob`). Any action a model proposes is logged as `tool_denied` and dropped. Approvals come only from structured button clicks, never from chat text.
 - Input is NFKC-normalised and stripped of every format/zero-width/bidi/tag character, variation selectors and CGJ before DLP, tripwires and @-routing.
-- Quoted text and code blocks are wrapped in `<<UNTRUSTED>>` envelopes. A tripwire hit, or an untrusted message still in the channel window, taints the turn. A tainted turn is capped at `suggest`, gets no approval card, and has its URLs stripped. Replies carry only their own turn's taint, so the taint leaves once the offending message rolls out of the window.
+- Quoted text, code blocks and `[附件]` file-name lines are wrapped in `<<UNTRUSTED>>` envelopes. A tripwire hit, or an untrusted message still in the channel window, taints the turn. A tainted turn is capped at `suggest`, gets no approval card, and has its URLs stripped. Replies carry only their own turn's taint, so the taint leaves once the offending message rolls out of the window.
 - The compiled prompt's `promptSha` is re-checked on every call; a changed file is refused (`driver_error prompt_sha_mismatch`).
 - An approved action runs exactly as hashed: the book deep-copies it at creation and re-hashes it before executing.
 - `policy.cloudTierCeiling` and `saasTierCeiling` above T1 are refused at load (alpha hard cap; lint E047).
-- Output filtering runs in this order: strip URLs and images, neutralize mass mentions, mask secrets, block the whole reply if a higher tier is detected, then cap the length at 3,000 characters.
+- Output filtering runs in this order: strip URLs and images, neutralize mass mentions, mask secrets, mask emails and Taiwan phone numbers (`[REDACTED:email]`, `[REDACTED:tw-mobile]`; counted in the audit `redactions.pii`), block the whole reply if a higher tier is detected, then cap the length at 3,000 characters.
+- Inbound DLP is a word-and-shape alarm. T2 (blocked in a T1 channel): `機密`/`confidential`, a Taiwan unified business number only with a cue word (`統編`, `統一編號`, `VAT`, `公司`, `股份`, `發票`) and a valid checksum, national id, NT$/US$/萬元 amounts, any email address, Taiwan mobile numbers, Taiwan landlines written with a separator after the area code (`02-1234-5678`), and the local denylist. T3 (refused): the Chinese words and `ITAR`/`EAR`/`CUI` listed in `patterns.py`.
 - Rate limits: 6 messages per user per minute, 60 per channel per hour, and 3 scheduled posts per channel per day. Duplicate event ids are rejected for 10 minutes or 1,000 entries.
 - Calls are single-threaded, so concurrency is 1, which is within the spec's limit of 2.
 
@@ -116,7 +161,7 @@ content, and the adapter drops it.
 - Only @mentions reach the gateway. The bot mention is removed from the text. The bot's own messages are dropped.
 - Messages from bots or webhooks, DMs, externally shared channels and non-allowlisted guilds are forwarded with their flags set but with the text removed. The gateway can then audit `policy_denied` without seeing the content.
 - Discord leaves any guild that holds no bound channel. It does this at startup and whenever it is added to a guild, and it emits an event that the gateway audits.
-- Attachments are reported by file name only, as a `[附件] …` line. They are never downloaded.
+- Attachments are reported by file name only, as a `[附件] …` line. They are never downloaded. The gateway wraps that line in an `<<UNTRUSTED … source=attachment>>` envelope, so a message with an attachment is a tainted turn (no approval card, no URLs, autonomy at most `suggest`).
 - Approvals come only from button clicks, which the platform delivers over the authenticated socket. Chat text is never parsed as a click. A malformed or unknown button is dropped.
 - `post()` refuses any channel that is not in `bindings.json` by raising `PermissionError`. This also covers DMs.
 - Error messages name a missing variable but never print its value, and `repr()` never shows tokens. Do not turn on `DEBUG` logging for `slack_sdk` or `discord`.
@@ -162,4 +207,4 @@ claude -p --output-format json --restricted --strict-mcp-config --tools "Read,Gr
 - **Output.** The CLI's JSON envelope is parsed; `structured_output` (or a JSON `result` string) becomes a `TwinResult`, with `usage` filled from the envelope. `TWIN_RESULT_SCHEMA` is also kept as `chat_gateway_ext/twin_result.schema.json`; a test keeps the two identical.
 - **Failures.** A non-zero exit, a timeout (the process group is killed), unparsable output or a CLI-reported error becomes a `DriverError` with a short message. Raw stderr is never forwarded.
 - **Self-check.** `self_check()` runs `claude --version` and `claude --help` and refuses to start (exit 78) if any pinned flag is missing. `--system-prompt[-file]` in the help text is accepted. It also requires the config dir and the API key.
-- **Billing.** The driver spends the operator's Anthropic account or subscription, not a metered Messages-API budget. `--max-budget-usd` caps each call. Use a service account, not a personal login, for a shared bot.
+- **Billing.** The driver needs an Anthropic API key (`ANTHROPIC_API_KEY`) and spends that account's API credit, not a personal subscription. `--max-budget-usd` caps each call. Use a service account, not a personal login, for a shared bot.

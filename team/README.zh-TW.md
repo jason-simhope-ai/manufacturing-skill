@@ -7,7 +7,7 @@
 
 ## 先看這裡：誰不該現在導入
 
-先確認五件事，**任何一項是「否」就先不要導入**，改用既有的 `/command`（例如 `/inspect`、`/quote`）並跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`，紙上就能做）：
+先確認五件事，**任何一項是「否」就先不要導入**（第一天只能先暫答，其中兩位主管、去識別、接受上雲幾項要到逐日表指定的日子補齊；金鑰保管人第一天就要指定），改用既有的 `/command`（例如 `/inspect`、`/quote`）並跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`，紙上就能做）：
 
 | 要有 | 說明 |
 | ---- | ---- |
@@ -52,8 +52,8 @@
 
 1. 設定層：roster 裡出現任何 T3 頻道或 T3 分身，gateway 啟動就拒絕（exit 3），什麼都不載入。
 2. 字樣層（DLP 關鍵字告警）：訊息含下列字樣時，gateway 擋下、不送進模型，並回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
-   - 視為 T3：`受限`／`RESTRICTED`、`國防`、`航太`、`軍工`、`軍規`、`醫材`／`醫療器材`、`ITAR`、`EAR`、`CUI`、`外銷許可`、`管制`（不含 `管制圖`、`文件管制`、`製程管制` 等品管用語）。
-   - 視為 T2（送進 T1 頻道會被擋）：`機密`／`CONFIDENTIAL`、統一編號、身分證字號、`NT$`／`US$`／`USD` 金額、`萬元`／`千元`，以及你自己放進 `team/local/names.denylist` 的客戶名、圖號、專案代號。
+   - 視為 T3（與 `patterns.py` 完全一致）：中文 `受限`、`國防`、`航太`、`軍工`、`軍規`、`醫材`、`醫療器材`、`外銷許可`、`管制`，英文只有 `RESTRICTED`、`ITAR`、`EAR`、`CUI`。`不受限制`、`將軍規模`、`管制圖`、`文件管制`、`製程管制` 等日常用語不算。**英文同義詞（defense、aerospace、medical device、export permit、Mil-Spec）與混淆字元（例如西里爾字母的 `ІТАR`）不擋。**
+   - 視為 T2（送進 T1 頻道會被擋）：`機密`／`CONFIDENTIAL`、統一編號（只有前後 12 字內出現「統編」「統一編號」「VAT」「公司」「股份」「發票」且檢查碼正確才擋，單獨一串 8 位數字不擋）、身分證字號、`NT$`／`US$`／`USD` 金額、`萬元`／`千元`、email、手機號碼、有分隔的市話（`02-1234-5678`），以及你自己放進 `team/local/names.denylist` 的客戶名、圖號、專案代號。**人名不擋**（只有放進 denylist 的才擋；`deid.py` 會掃「姓＋職稱」，gateway 不會）。回覆裡出現的 email／手機另外會被遮成 `[REDACTED:email]`／`[REDACTED:tw-mobile]`。
    - **這是字樣比對，不是內容理解**：換個說法、縮寫、圖號、客戶代號、照片裡的文字都擋不到；`受限` 也會誤擋「不受限制」。所以不要對同仁說「T3 一律不處理」，要說「T3 不准進來，系統只會擋明顯字樣，其餘靠你自己」。同仁自己要先判斷，不要把 T3 話題丟進任何分身頻道。
 
 **模型在雲端**：T1 內容會由 gateway 以 `claude -p` 送到 Anthropic API（用營運者自己的 API 金鑰），同時也留在 Slack／Discord 上。保留期限、資料區域與零留存條款取決於你和供應商的合約，本 repo 不替你保證。全 repo 的資料流向頁正在準備中，在那之前請以這張表為準。
@@ -111,7 +111,8 @@ outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一�
 
 ## 怎麼開始
 
-1. 跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`）：流程修正或既有指令能解決的，就不開分身。閘門裡「涉及 T3 嗎」那題（G7）**請在紙上自己確認，不要把答案打進任何聊天或 AI 對話**（回答「有，某某國防案」本身就洩漏了 T3 的存在）。
+0. 取得程式碼：`git clone <本 repo 網址>`（或下載 ZIP 解壓），然後 `cd manufacturing-skill`。**本文所有指令都從 repo 根目錄執行**（路徑都是 `team/…`、`infra/…`）；`bash install.sh` 裝出來的 plugin 副本只供閱讀，跑不了這些工具。
+1. 跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`）：流程修正或既有指令能解決的，就不開分身。閘門裡「涉及 T3 嗎」那題（G7）**請自己確認：寫在紙上，或填在閘門 roster 片段的註解裡的 yes／no；不要把答案打進任何聊天或 AI 對話**，`/team gate` 也不會問（回答「有，某某國防案」本身就洩漏了 T3 的存在）。
 2. 前置：Python 3.11+、`pip install pyyaml`。指令用 `python3`（Windows 未驗證）。
 3. 複製 `team/roster.example.yaml` 到 `team/local/roster.local.yaml`，改成自己的部門與職位（只放職稱，不放姓名；本機設定見 `team/local/README.md`）。
 4. `python3 team/tools/teamctl.py check` 通過後，用 `python3 team/tools/build.py --summary` 編譯；離線試玩：`python3 infra/chat-gateway/demo.py`。

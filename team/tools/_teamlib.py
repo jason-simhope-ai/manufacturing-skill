@@ -1054,7 +1054,8 @@ class _Validator:
                         "days", "warning")
             add("W003", f"outsource enabled: twin {tw.get('file')!r} "
                 f"capability {cid!r} (manual practice and teach-back "
-                "are mandatory)", "warning")
+                "are expected; the tool only checks that manualRepsPerMonth is an integer >= 1, "
+                "it cannot verify they happen)", "warning")
         if tw.get("enabled") is True and tf is not None:
             outs = [c for c in caps.values() if c.get("category") == "outsource"]
             en = enabled_here

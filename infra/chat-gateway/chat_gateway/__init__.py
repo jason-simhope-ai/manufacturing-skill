@@ -5,7 +5,7 @@ Stdlib only. The gateway turns chat events into deterministic, audited calls to 
 
 Spec: docs/superpowers/specs/2026-10-05-digital-twin-team-design.md §9, §11.
 
-Exit codes (§18): 0 OK, 3 T3 refused, 64 usage, 70 internal, 78 config refused.
+Exit codes (§18): 0 OK, 3 T3 refused, 64 usage, 65 bad script data, 70 internal, 78 config refused.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ __version__ = "0.2.0-alpha"
 EXIT_OK = 0
 EXIT_T3 = 3
 EXIT_USAGE = 64
+EXIT_DATA = 65
 EXIT_INTERNAL = 70
 EXIT_CONFIG = 78
 
