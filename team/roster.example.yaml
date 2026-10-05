@@ -1,0 +1,60 @@
+# 範例 roster（synthetic：通用部門與職稱，不描述任何真實公司）。
+# 真實 roster 請放 team/local/roster.local.yaml（gitignored）；規則見 team/README.zh-TW.md。
+schema: 1
+synthetic: true
+org: { id: example-machinery-co, displayName: 範例機械設備製造商, timezone: Asia/Taipei }
+profiles: [cnc-machining]
+policy: { saasTierCeiling: T1, cloudTierCeiling: T1, autonomyCeiling: draft, channelWindow: 10 }
+departments:
+  - { id: engineering, title: 技術部, head: engineering-manager, escalation: [engineering-manager, chair-head] }
+  - { id: qa, title: 品保部, head: qa-manager, escalation: [qa-manager, chair-head] }
+  - { id: production, title: 生產部, head: production-manager, escalation: [production-manager, chair-head] }
+  - { id: machining, title: 加工部, head: machining-manager, escalation: [machining-manager, chair-head] }
+  - { id: sales, title: 業務部, head: sales-manager, escalation: [sales-manager, chair-head] }
+  - { id: admin, title: 管理部, head: admin-manager, escalation: [admin-manager, chair-head] }
+  - { id: chair, title: 董事長室, head: chair-head, escalation: [chair-head] }
+positions:
+  - id: engineering-manager
+    department: engineering
+    title: 技術部主管
+    incumbent: LOCAL
+    twin:
+      enabled: false
+      file: engineering-manager
+      autonomyCeiling: draft
+      needsTwinGate:
+        result: defer
+        rationale: ECN 表單與 BOM where-used 尚未數位化（G2、G5 未通過），先做流程修正
+        reviewedOn: "2026-10-05"
+  - id: qa-manager
+    department: qa
+    title: 品保部主管
+    incumbent: LOCAL
+    twin:
+      enabled: true
+      file: qa-manager
+      autonomyCeiling: draft
+      needsTwinGate:
+        result: twin
+        rationale: NCR 翻查與 8D 檢查每週耗數小時；品保工程師已訪談；NCR 匯出已在來源端去識別
+        reviewedOn: "2026-10-05"
+  - id: production-manager
+    department: production
+    title: 生產部主管
+    incumbent: LOCAL
+    twin:
+      enabled: true
+      file: production-manager
+      autonomyCeiling: draft
+      needsTwinGate:
+        result: twin
+        rationale: 晨會簡報每日耗時；生管已訪談；排程資料已數位化
+        reviewedOn: "2026-10-05"
+  - { id: machining-manager, department: machining, title: 加工部主管, incumbent: LOCAL }
+  - { id: sales-manager, department: sales, title: 業務部主管, incumbent: VACANT }
+  - { id: admin-manager, department: admin, title: 管理部主管, incumbent: LOCAL }
+  - { id: chair-head, department: chair, title: 董事長室主管, incumbent: LOCAL }
+channels:
+  - { id: qa-floor, department: qa, tier: T1, adapter: mock, twins: [qa-manager], defaultTwin: qa-manager, autonomyCeiling: draft, askers: [qa-manager] }
+  - { id: production-floor, department: production, tier: T1, adapter: mock, twins: [production-manager], defaultTwin: production-manager, autonomyCeiling: draft, askers: [production-manager] }
+  - { id: daily-ops, department: production, tier: T1, adapter: mock, twins: [production-manager, qa-manager], defaultTwin: production-manager, autonomyCeiling: draft, askers: [production-manager, qa-manager, machining-manager] }
