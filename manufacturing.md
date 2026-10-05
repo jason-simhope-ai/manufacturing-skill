@@ -76,7 +76,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 - 3 個 skill：g-code-review / cutting-parameter-calc / fixture-design-patterns
 - 3 份 know-how：刀具壽命 / 切削參數 / 開發工廠 vs 量產（IATF 16949 已升到 core）
 
-其他 vertical（PCB / 射出 / 食品 / 製藥）v1 是 stub，歡迎 [contribute](docs/profile-development.md)。
+其他 vertical（PCB / 射出 / 食品 / 製藥）v0.1 時為 stub，現已升為 alpha（內容需專業驗證），歡迎 [contribute](docs/profile-development.md)。
 
 ---
 

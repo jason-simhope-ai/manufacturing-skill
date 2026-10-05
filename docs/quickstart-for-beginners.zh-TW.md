@@ -132,10 +132,10 @@ bash adapters/claude-code/install.sh
 ════════════════════════════════════════════════
 
   1) ✅ cnc-machining
-  2) 🚧 stub food-processing
-  3) 🚧 stub injection-molding
-  4) 🚧 stub pcb-assembly
-  5) 🚧 stub pharma
+  2) 🔶 alpha food-processing
+  3) 🔶 alpha injection-molding
+  4) 🔶 alpha pcb-assembly
+  5) 🔶 alpha pharma
   0) 🧪 (core-only, no profile)     — try the framework first
 
   Default: cnc-machining  (press Enter to accept)
@@ -149,7 +149,7 @@ bash adapters/claude-code/install.sh
 | ------------------------ | -------------------------------------------------- |
 | CNC 加工廠               | 直接按 **Enter**（預設選 1）                       |
 | 不是 CNC、想先試框架     | 打 **0** 按 Enter                                  |
-| PCB / 射出 / 食品 / 製藥 | 也建議先打 **0** — 對應產業包目前是 stub（半成品） |
+| PCB / 射出 / 食品 / 製藥 | 也建議先打 **0** — 對應產業包目前是 alpha（有內容、尚待業界驗證） |
 
 按完 Enter，等個 5-10 秒，看到 `✅ Installation complete.` 就成功了。
 

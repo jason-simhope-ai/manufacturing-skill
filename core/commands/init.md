@@ -17,10 +17,10 @@ argument-hint: ""
 
 ```
 A) CNC 精密加工 / 金屬切削                ✅ v1 完整支援
-B) PCB 組裝 / 電子產品                   🚧 stub
-C) 塑膠射出成型 / 模具                   🚧 stub
-D) 食品加工 / 飲料 / 烘焙                🚧 stub
-E) 製藥 / 生技                          🚧 stub（合規敏感）
+B) PCB 組裝 / 電子產品                   🔶 alpha
+C) 塑膠射出成型 / 模具                   🔶 alpha
+D) 食品加工 / 飲料 / 烘焙                🔶 alpha
+E) 製藥 / 生技                          🔶 alpha（合規敏感）
 F) 多元化 / 還沒決定 / 想先試試框架       → core-only 模式
 G) 其他（板金、紡織、化工、模具...）       → 引導 fork CNC profile 客製
 ```
