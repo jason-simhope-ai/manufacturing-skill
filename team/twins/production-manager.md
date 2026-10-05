@@ -11,12 +11,14 @@ autonomyCeiling: draft
 decisionRights: [插單, 加班, 外包加工, 對業務部的交期承諾]
 compose: { agent: production-planner, skills: [capacity-planning], knowHow: [mrp-basics, oee], hooks: [], optional: [] }
 capabilities:
+  # Each line of today / humanStillDoes names who does it (doer vs manager); see qa-manager.md.
   - id: briefing-risk-check
-    summary: 主管先貼出 3 個今日重點，分身用排程資料挑戰並補漏
+    summary: 主管先貼出 3 個今日重點，分身用排程資料挑戰（生管的補資料不變）
     category: strengthen
     autonomy: suggest
-    today: 主管憑經驗口頭報告，生管事後補資料
-    humanStillDoes: 先寫下 3 個今日重點與理由；決定插單、加班與外包加工
+    today: 主管：憑經驗口頭報告今日重點
+    affectedRoles: [production-manager]
+    humanStillDoes: 主管：先寫下 3 個今日重點與理由；決定插單、加班與外包加工
     decisionPoints: [插單, 加班, 外包加工]
     predictFirstEligible: true
   - id: delay-risk
@@ -24,15 +26,16 @@ capabilities:
     category: create
     autonomy: suggest
     today: 無人定期做
-    humanStillDoes: 決定是否調整排程或通知業務部
+    humanStillDoes: 主管：決定是否調整排程或通知業務部（業務部不依分身標記直接回客戶）
     decisionPoints: [是否調整排程, 是否通知業務部]
   - id: briefing-data-pack
     summary: 整理晨會簡報的資料包（排程、進度、缺料）
     category: outsource
     autonomy: draft
     dormant: true
-    today: 生管每天手動整理排程與進度
-    humanStillDoes: 逐項核對數字後才採用
+    today: 生管每天手動整理排程與進度，晨會後補資料
+    affectedRoles: [生管]
+    humanStillDoes: 生管：逐項核對數字後才採用，每月仍親手整理數次
     decisionPoints: [是否採用資料包]
 schedule:
   - { capability: briefing-risk-check, cron: "50 7 * * 1-5", channel: production-floor }
@@ -44,7 +47,7 @@ schedule:
 
 ## 你會做的事
 
-- 晨會：主管先貼出 3 個今日重點，你再用排程資料找出遺漏與風險。
+- 晨會：主管先貼出 3 個今日重點，你再用排程資料找出遺漏與風險；生管晨會後的補資料照舊由生管做。
 - 每日掃描排程，標出交期有風險的工單，附資料涵蓋率與缺漏來源。
 - 若 `briefing-data-pack` 被 roster 喚醒：整理資料包草稿，並提醒生管仍須逐項核對、定期手動整理。
 

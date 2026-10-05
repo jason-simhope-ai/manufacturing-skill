@@ -18,6 +18,7 @@ API itself. The design spec is
 
 ```bash
 python3 infra/chat-gateway/demo.py                 # 8-beat transcript + audit verify + token estimate
+python3 infra/chat-gateway/demo.py --plain         # beats 1-3 for front-line colleagues: zh-TW, no token/audit lines
 python3 tests/gateway/test_gateway.py              # all gateway tests (stdlib unittest)
 python3 tests/gateway/test_adapters.py             # Slack/Discord adapter mapping with fake transports
 PYTHONPATH=infra/chat-gateway python3 -m chat_gateway run --roster infra/chat-gateway/fixtures/roster/roster.json \
@@ -136,6 +137,9 @@ imported lazily. `import chat_gateway.core` never needs a third-party SDK.
 - Twin and channel ids must match `^[a-z][a-z0-9-]{1,40}$` and capability ids `^[a-z0-9][a-z0-9-]{1,40}$` (the same patterns as the linter); anything else is refused at load (exit 78).
 - A post that fails on the chat platform (rate limit, missing channel, timeout, the adapter's own unbound-channel refusal) is audited as `post_failed` with the exception class name only and skipped; the gateway keeps serving other events. `chat_gateway post` exits 70 when its post failed.
 - Calls are single-threaded, so concurrency is 1, which is within the spec's limit of 2.
+- Count-only messages never reach the model: 「我不同意」/「分身錯了」 (`human_override`), 「我親手做了」 (`practice_checkin`, self-reported) and a non-urgent ask on a channel's `twinFreeDays` (`twin_free_day`, reply 「今天請自己判斷」; scheduled posts pause too). These records, and the short reply's `msg_out`, carry only platform, channel, twin and capability: no event id, thread, operator or `operator_ref`. Any known identity in the channel may disagree; rate limits still apply. `audit-verify` prints their totals per channel/capability, never per user.
+- `channels[].learners` may @ a twin without being askers: learner mode is capped at `suggest`, the driver is told to give only similar cases and counter-examples (a prompt rule, not a guarantee), and learner turns are kept out of the channel window. `predictFirstDefault` makes 「我先說」 their default; 「這次直接給」 skips it once.
+- Replies are labelled for readers: `· 建議（草稿）` (suggest), `分身的看法：`, and a fixed line 「這是參考，不是指示；不同意可以回「我不同意」」 before the meta line.
 
 The Slack and Discord adapters have not been tested against the real platforms in CI and need credentials to run.
 

@@ -28,6 +28,13 @@ CATEGORY_LABEL = {"strengthen": "強化既有優勢", "create": "創造新能力
 
 # Byte budgets (spec section 10.1). BUDGETS is mutable on purpose so unit
 # tests can shrink a limit and prove the matching E050 fires.
+#
+# The budgets exist to keep the agent's cold start and every gateway turn cheap
+# (tokens, latency) and to stop roster.json from silently growing. They are NOT
+# a classification control: "roster.json-twin" (600 B) once happened to be the
+# only error when a dormant outsource capability was relabelled `strengthen`
+# (the active entry is longer than the dormant count). Never rely on a size
+# error to catch a mislabel; the category rules are E038 and E061-E063.
 BUDGETS = {
     "TEAM.md": 6000,
     "roster.example.yaml": 6144,
@@ -73,7 +80,7 @@ CODES = {
     "E035": "分身沒有任何 strengthen 或 create 能力",
     "E036": "outsource autonomy 超過 draft",
     "E037": "capability 缺 today 或 humanStillDoes",
-    "E038": "strengthen 的 humanStillDoes 只剩審閱／確認／核准／蓋章",
+    "E038": "strengthen／create 的 humanStillDoes 只剩審閱類字眼（REVIEW_ONLY_WORDS，例：審閱、看過沒問題就送出、若有意見再補充）",
     "E039": "autonomy ≥ suggest 的 capability 缺 decisionPoints",
     "E040": "needsTwinGate.result 不是 twin，卻 enabled: true",
     "E041": "channel tier 超過 adapter 上限（或 SaaS 分級上限）",
@@ -86,6 +93,10 @@ CODES = {
     "E050": "超過 bytes 預算",
     "E051": "build 不確定（兩次輸出不同）",
     "E060": ".gitignore 缺必要項目，或追蹤檔含 *.local.*／team/.build／team/local",
+    "E061": "today 有人在做，capability 卻缺 affectedRoles（今天做這件事的職位或稱呼）",
+    "E062": "today 寫「無人／無」只允許 category: create",
+    "E063": "affectedRoles 含本職位以外的人，卻缺 doerAckedOn（做事的人看過 today 並同意的日期），或日期在未來",
+    "E064": "VACANT 職位啟用分身，缺 vacancyApprovedBy／vacancyApprovedOn，或核准人不在升級梯上（或是本職位）",
     "W001": "autonomy act-with-approval／act：lint 接受，但 gateway 拒載",
     "W002": "outsource 14 天內到期",
     "W003": "已啟用 outsource（每項一則提醒）",
@@ -94,7 +105,31 @@ CODES = {
     "W006": "agent 本文過大，改為索引行而非內嵌",
     "W007": "本機 roster.json 超過 4,000 B 總量",
     "W008": "roster.json 單一分身項目超過 600 B（只有 --ci 檢查範例 roster 時是 E050）",
+    "W009": "today 提到其他職稱（DOER_HINT_WORDS），affectedRoles 卻只列本職位：確認做事的人是否漏列",
 }
+
+# E038 (spec 5.3): words that only describe looking at the twin's output and letting it
+# through. `_only_review` removes these, then REVIEW_FILLER_WORDS and punctuation, per role
+# line ("主管：…；品保工程師：…"); a line with <= 2 characters left names no act of its own.
+# A word list is an aid, not a guarantee: a mislabel phrased in other words still passes,
+# which is why a doer outside the twin's own position must also sign (doerAckedOn, E063).
+REVIEW_ONLY_WORDS = (
+    "審閱", "審核", "審查", "確認", "核准", "核可", "批准", "蓋章", "簽核", "簽名", "簽字",
+    "最終", "過目", "看過", "看完", "看一下", "檢視", "瀏覽", "沒問題", "無誤", "沒意見",
+    "無意見", "若有意見", "有意見", "意見", "補充", "回饋", "送出", "放行", "同意", "通過", "看",
+)
+REVIEW_FILLER_WORDS = (
+    "分身的", "分身", "結論", "結果", "草稿", "內容", "建議", "AI", "即可", "一下", "一遍",
+    "然後", "如果", "就", "則", "若", "如", "再", "後", "才", "有", "的", "並", "時", "之",
+)
+# W009 (heuristic): job words that, when they appear in `today`, usually mean someone other
+# than the twin's own position does the task today.
+DOER_HINT_WORDS = ("工程師", "生管", "檢驗員", "作業員", "技術員", "操作員", "助理", "業助",
+                   "下屬", "組長", "領班", "專員")
+# E062: `today` saying nobody does this today (only valid for `create`).
+NOBODY_TODAY_RE = re.compile(
+    r"^\s*(?:目前|今天|現在|現況)?[：:]?\s*(?:無人|沒有人|没有人|無\s*$|無[（(，,；;。]"
+    r"|none\s*$|n/?a\s*$|[-—]+\s*$)", re.IGNORECASE)
 
 REQUIRED_GITIGNORE = (
     "team/local/*", "!team/local/README.md", "!team/local/.gitkeep",
@@ -169,7 +204,8 @@ _TWIN_REF = {"enabled": ("bool", True), "file": ("id", True),
              "autonomyCeiling": ("autonomy", True),
              "needsTwinGate": (("map", _GATE), True),
              "disable": (("list", "capid"), False),
-             "enableOutsource": (("list", ("map", _OUTSOURCE)), False)}
+             "enableOutsource": (("list", ("map", _OUTSOURCE)), False),
+             "vacancyApprovedBy": ("id", False), "vacancyApprovedOn": ("date", False)}
 _POSITION = {"id": ("id", True), "department": ("id", True),
              "title": ("str", True), "incumbent": ("any", True),
              "twin": (("map", _TWIN_REF), False)}
@@ -178,7 +214,10 @@ _CHANNEL = {"id": ("id", True), "department": ("id", True),
             "twins": (("list", "id"), True), "defaultTwin": ("id", True),
             "autonomyCeiling": ("autonomy", True), "askers": ("askers", True),
             "requesters": (("list", "id"), False),
-            "approvers": (("list", "id"), False)}
+            "approvers": (("list", "id"), False),
+            "learners": (("list", "id"), False),
+            "predictFirstDefault": ("bool", False),
+            "twinFreeDays": (("list", "int"), False)}
 
 
 def _roster_schema(example: bool) -> dict:
@@ -194,6 +233,8 @@ _CAP = {"id": ("capid", True), "summary": ("str", True),
         "category": ("any", False),  # checked by check_caps (E030)
         "autonomy": ("autonomy", True), "today": ("str", "E037"),
         "humanStillDoes": ("str", "E037"),
+        "affectedRoles": (("list", "str"), False),   # checked by check_caps (E061/E063)
+        "doerAckedOn": ("date", False),
         "decisionPoints": (("list", "str"), False),
         "predictFirstEligible": ("bool", False), "dormant": ("bool", False)}
 _COMPOSE = {"agent": ("str", False), "skills": (("list", "str"), True),

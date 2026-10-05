@@ -106,7 +106,7 @@ class RealExampleAcceptance(unittest.TestCase):
         r = lib.load_roster(EXAMPLE)
         self.assertIs(r["synthetic"], True)
         self.assertEqual(len(r["departments"]), 7)
-        self.assertEqual(len(r["positions"]), 7)
+        self.assertEqual(len(r["positions"]), 8)        # + qa-inspector (a learner, no twin)
         with_twin = {p["id"]: p["twin"] for p in r["positions"]
                      if "twin" in p}
         self.assertEqual(set(with_twin), {"production-manager", "qa-manager",
@@ -120,9 +120,13 @@ class RealExampleAcceptance(unittest.TestCase):
             "defer")
         self.assertEqual({p["incumbent"] for p in r["positions"]},
                          {"LOCAL", "VACANT"})
-        self.assertEqual(len(r["channels"]), 3)
+        self.assertEqual(len(r["channels"]), 4)
         for ch in r["channels"]:
             self.assertEqual((ch["tier"], ch["adapter"]), ("T1", "mock"))
+        learning = next(ch for ch in r["channels"] if ch["id"] == "qa-learn")
+        self.assertEqual((learning["askers"], learning["learners"]), ([], ["qa-inspector"]))
+        self.assertIs(learning["predictFirstDefault"], True)
+        self.assertEqual(next(ch for ch in r["channels"] if ch["id"] == "qa-floor")["twinFreeDays"], [15])
 
     def test_pilot_twin_capabilities(self):
         def caps(tid):
@@ -134,10 +138,19 @@ class RealExampleAcceptance(unittest.TestCase):
         self.assertEqual(pm["delay-risk"]["category"], "create")
         self.assertEqual(pm["briefing-data-pack"]["category"], "outsource")
         self.assertIs(pm["briefing-data-pack"]["dormant"], True)
+        self.assertEqual(pm["briefing-data-pack"]["affectedRoles"], ["生管"])
         qa, fm = caps("qa-manager")
         self.assertEqual({k: v["category"] for k, v in qa.items()}, {
-            "ncr-triage": "strengthen", "8d-challenge": "strengthen",
+            "ncr-triage": "strengthen", "ncr-lookup": "outsource", "8d-challenge": "strengthen",
             "spc-watch": "create", "8d-formatting": "outsource"})
+        # E03: the engineer's history lookup is outsource (dormant) for the engineer, not
+        # hidden inside the manager's strengthen line
+        self.assertEqual(qa["ncr-triage"]["affectedRoles"], ["qa-manager"])
+        self.assertEqual(qa["ncr-lookup"]["affectedRoles"], ["品保工程師"])
+        self.assertIs(qa["ncr-lookup"]["dormant"], True)
+        for cap in list(qa.values()) + list(pm.values()):
+            if cap["category"] != "create":
+                self.assertTrue(cap.get("affectedRoles"), cap["id"])
         self.assertEqual(fm["compose"]["agent"], "quality-inspector")
         eng, fm = caps("engineering-manager")
         self.assertEqual(eng["ecn-impact-check"]["category"], "create")
@@ -162,15 +175,18 @@ class RealExampleAcceptance(unittest.TestCase):
                 "aliases", "capabilities", "channels", "department",
                 "effectiveCeiling", "id", "outsource", "prompt", "promptSha",
                 "tierCeiling", "title", "vacant"})
-            self.assertEqual(t["outsource"], {"dormant": 1, "enabled": 0})
+            self.assertEqual(t["outsource"], {"dormant": {"production-manager": 1, "qa-manager": 2}[t["id"]],
+                                              "enabled": 0})
             self.assertEqual(
                 t["promptSha"], lib._sha(a.files[t["prompt"]]))
             self.assertTrue(all(c["category"] != "outsource"
                                 for c in t["capabilities"]))
+        optional = {"learners", "predictFirstDefault", "twinFreeDays"}   # emitted only when set
         for ch in roster["channels"]:
-            self.assertEqual(set(ch), {
+            self.assertEqual(set(ch) - optional, {
                 "adapter", "askers", "autonomyCeiling", "defaultTwin",
                 "department", "id", "tier", "twins"})
+        self.assertEqual(roster["policy"]["timezone"], "Asia/Taipei")
 
     def test_compiled_prompts(self):
         c = lib.compile_all(REPO, EXAMPLE)
@@ -187,6 +203,12 @@ class RealExampleAcceptance(unittest.TestCase):
             self.assertIn("TwinResult", text)
             self.assertNotIn("briefing-data-pack |", text)  # dormant hidden
             self.assertNotIn("8d-formatting |", text)
+            self.assertNotIn("ncr-lookup |", text)
+        qa = c.files["twins/qa-manager.prompt.md"].decode("utf-8")
+        # E16: inside a twin the professional reference only gives comparisons, never a verdict
+        self.assertIn("## 專業參考：quality-inspector", qa)
+        self.assertIn(lib._REF_ROLE, qa)
+        self.assertLess(qa.index(lib._REF_ROLE), qa.index("## 專業參考：quality-inspector") + 200)
         self.assertEqual(c.findings, [])  # no W006 for the pilot twins
 
     def test_refs_are_copied_and_indexed(self):
@@ -372,10 +394,10 @@ class Determinism(unittest.TestCase):
 # (snapshot taken at 6351d8b). The shim must keep exporting exactly these.
 SHIM_PUBLIC_NAMES = (
     "ACTING_MAX_DAYS", "ADAPTERS", "ADAPTER_MAX_TIER", "AUTONOMY", "Any", "BUDGETS", "BUILT_BY",
-    "BuildError", "BuildResult", "CATEGORY_LABEL", "CATEGORY_VALUES", "CODES", "Compiled", "Finding",
-    "GATE_RESULTS", "GATE_STALE_DAYS", "IDENTITY_KEYS", "LoadError", "NAME_OTHER", "NAME_ZH",
-    "OUTSOURCE_MAX_DAYS", "OUTSOURCE_WARN_DAYS", "PII_PATTERNS", "Path", "REF_PREFIX",
-    "REQUIRED_GITIGNORE", "REQUIRED_SECTIONS", "SAFETY_KEYWORDS", "SECRET_PATTERNS", "TIERS",
+    "BuildError", "BuildResult", "CATEGORY_LABEL", "CATEGORY_VALUES", "CODES", "Compiled", "DOER_HINT_WORDS",
+    "Finding", "GATE_RESULTS", "GATE_STALE_DAYS", "IDENTITY_KEYS", "LoadError", "NAME_OTHER", "NAME_ZH",
+    "NOBODY_TODAY_RE", "OUTSOURCE_MAX_DAYS", "OUTSOURCE_WARN_DAYS", "PII_PATTERNS", "Path", "REF_PREFIX",
+    "REQUIRED_GITIGNORE", "REQUIRED_SECTIONS", "REVIEW_FILLER_WORDS", "REVIEW_ONLY_WORDS", "SAFETY_KEYWORDS", "SECRET_PATTERNS", "TIERS",
     "TIER_CAP", "TOOL_REPO", "VERSION", "annotations", "build", "canon", "check_deterministic",
     "compile_all", "dataclasses", "default_roster", "dlp_scan", "effective_autonomy", "est_tokens",
     "find_ref", "fnmatch", "hashlib", "importlib", "json", "load_lint_allow", "load_roster",
@@ -486,10 +508,10 @@ class LoaderAndHelpers(unittest.TestCase):
                        "E024", "E030", "E031", "E032", "E033", "E034", "E035",
                        "E036", "E037", "E038", "E039", "E040", "E041", "E042",
                        "E043", "E044", "E045", "E046", "E047", "E050", "E051",
-                       "E060"}
+                       "E060", "E061", "E062", "E063", "E064"}
         self.assertEqual({c for c in lib.CODES if c[0] == "E"}, spec_errors)
         self.assertEqual({c for c in lib.CODES if c[0] == "W"},
-                         {f"W00{i}" for i in range(1, 9)})
+                         {f"W00{i}" for i in range(1, 10)})
 
     def test_finding_render_is_ci_annotation(self):
         f = lib.Finding("E012", "error", "team/x.md", "line 3: x")
@@ -589,6 +611,73 @@ class DeidHonestReport(unittest.TestCase):
         rc, out, d = self.run_deid("customer,desc\nAlpha Co,hello,0912,extra\nBeta Co\n")
         self.assertEqual(rc, 0)
         self.assertIn("WARNING 2 row(s) do not have 2 cells (first: row 2 has 4)", out)
+
+
+def _repo_copy(tmp: Path) -> Path:
+    import shutil
+    root = Path(tmp)
+    for rel in ("core", "profiles", "team", "plugin.json", "TEAM.md", ".gitignore"):
+        src = REPO / rel
+        if src.is_dir():
+            shutil.copytree(src, root / rel, ignore=shutil.ignore_patterns(".build", "local", "__pycache__"))
+        else:
+            shutil.copy(src, root / rel)
+    return root
+
+
+class ClassificationLint(unittest.TestCase):
+    """SCENARIO-SIM-R7 E02/E15: the review-word list is a documented constant, and the report's
+    mislabel experiments fail against the real twin files (not only on a size budget)."""
+
+    def test_review_word_list_is_documented_and_tested(self):
+        self.assertIn("看過", lib.REVIEW_ONLY_WORDS)
+        self.assertIn("若有意見", lib.REVIEW_ONLY_WORDS)
+        self.assertTrue(all(isinstance(w, str) and w for w in lib.REVIEW_ONLY_WORDS + lib.REVIEW_FILLER_WORDS))
+        self.assertIn("REVIEW_ONLY_WORDS", lib.CODES["E038"])
+
+    def test_only_review_cases(self):
+        flagged = ["審閱後確認", "看過沒問題就送出", "看分身結論後，若有意見再補充", "過目後放行",
+                   "主管：確認", "主管：先寫下嚴重度；品保工程師：看完確認後送出"]
+        fine = ["先寫下嚴重度與理由；決定是否升級 8D", "審閱後親手重新量測並寫下根因",
+                "決定是否核准 ECN 與切換點", "親手寫 D2 問題描述與 D4 根因假說",
+                "主管：先自己圈出缺口再看分身的，決定採信哪個根因；品保工程師：照舊親手寫 D2 與 D4",
+                "親手寫 D4；最後確認"]
+        for t in flagged:
+            self.assertTrue(lib._only_review(t), t)
+        for t in fine:
+            self.assertFalse(lib._only_review(t), t)
+
+    def test_nobody_today(self):
+        for t in ("無人定期做", "無", "目前無人做", "沒有人", "none", "—", "無人每日看趨勢（檢驗員照常填 SPC 表）"):
+            self.assertTrue(lib._nobody_today(t), t)
+        for t in ("無塵室人員每日抽查", "品保工程師人工翻查", "主管：憑經驗口頭報告"):
+            self.assertFalse(lib._nobody_today(t), t)
+
+    def _check(self, edit, mode="ci"):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _repo_copy(Path(tmp))
+            twin = root / "team" / "twins" / "qa-manager.md"
+            twin.write_text(edit(twin.read_text(encoding="utf-8")), encoding="utf-8")
+            return lib.validate(root, root / "team" / "roster.example.yaml", mode=mode, today=TODAY)
+
+    def test_r7_experiment_a_fails_on_the_real_twin(self):
+        def relabel(text):
+            old = ("    category: outsource\n    autonomy: draft\n    dormant: true\n"
+                   "    today: 品保工程師手動排版\n")
+            self.assertIn(old, text)
+            text = text.replace(old, "    category: strengthen\n    autonomy: suggest\n"
+                                     "    today: 品保工程師手動排版\n")
+            return text.replace("品保工程師：逐段核對數值與措辭後才送出", "親手逐段核對數值與措辭後才送出")
+        for mode in ("ci", "local"):
+            errors = codes_of(self._check(relabel, mode), "error")
+            self.assertIn("E063", errors, mode)               # a classification error, not only E050
+
+    def test_r7_experiment_b_fails_on_the_real_twin(self):
+        cap = ("  - id: severity-call\n    summary: 代品保主管判嚴重度\n    category: strengthen\n"
+               "    autonomy: suggest\n    today: 品保部主管判嚴重度\n"
+               "    humanStillDoes: 看分身結論後，若有意見再補充\n    decisionPoints: [嚴重度]\nschedule:\n")
+        errors = codes_of(self._check(lambda t: t.replace("schedule:\n", cap, 1), "local"), "error")
+        self.assertTrue({"E038", "E061"} <= errors, errors)
 
 
 class CliExitCodes(unittest.TestCase):

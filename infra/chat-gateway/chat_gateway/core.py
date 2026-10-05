@@ -56,6 +56,18 @@ DATA_ROOT_REPLY = "資料夾內有不符本頻道分級或規則的檔案，本�
 ID_RE = re.compile(r"[a-z][a-z0-9-]{1,40}")          # twin and channel ids (always fullmatch)
 CAPID_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,40}")    # capability ids may start with a digit (8d-…)
 _TEXT_APPROVAL = re.compile(r"^\s*(?:核准|批准|同意|approved?|lgtm)\s*[。.!！]?\s*$", re.IGNORECASE)
+# Count-only messages (E06, E07). They are audited with channel, twin and capability only:
+# no event id, thread, operator or operator_ref, so the audit log cannot say who disagreed,
+# who practised by hand or who asked on a twin-free day. (The chat platform still shows it.)
+OVERRIDE_WORDS = ("我不同意", "分身錯了")
+CHECKIN_WORDS = ("我親手做了",)           # manualRepsPerMonth: self-reported, count only
+URGENT_WORDS = ("緊急",)                  # a twin-free day still answers these
+SKIP_PREDICT_WORDS = ("這次直接給",)       # learner opts out of the default 我先說 for one turn
+OVERRIDE_REPLY = ("收到你的「不同意」，已記一筆（只記頻道與能力，不記是誰）。這則不產生新答案："
+                  "分身的回答只是參考，請照你的判斷做；簽字採用結論的人負責結論")
+CHECKIN_REPLY = "已記一筆親手練習（自報、只計數，不記是誰）"
+TWIN_FREE_REPLY = "今天是本頻道的不用分身日：今天請自己判斷。真的緊急，訊息裡寫「緊急」再 @ 一次"
+THREAD_MEMO_CAP = 1000
 
 
 # ── roster loading ───────────────────────────────────────────────────
@@ -170,6 +182,13 @@ def validate_roster(roster: dict, base_dir: Path) -> dict:
             _need(tier_rank(c["tier"]) <= tier_rank(twin_tier), f"channel {cid}: tier > twin {tid} tierCeiling (E042)")
         askers = c.get("askers")
         _need(askers == "members" or isinstance(askers, list), f"channel {cid}: askers must be 'members' or a list")
+        learners = c.get("learners", [])
+        _need(isinstance(learners, list) and all(_id_ok(x) for x in learners),
+              f"channel {cid}: learners must be a list of position ids")
+        days = c.get("twinFreeDays", [])
+        _need(isinstance(days, list) and all(isinstance(d, int) and not isinstance(d, bool) and 1 <= d <= 31
+                                             for d in days), f"channel {cid}: twinFreeDays must be days 1..31")
+        _need(isinstance(c.get("predictFirstDefault", False), bool), f"channel {cid}: predictFirstDefault must be a bool")
     out = dict(roster)
     out["_prompts"] = prompts
     return out
@@ -180,7 +199,7 @@ def synthetic_mock_identities(roster: dict) -> dict:
     synthetic user `mock-<position>` per position the roster's channels name."""
     positions: set[str] = set()
     for c in roster.get("channels") or []:
-        for key in ("askers", "approvers", "requesters"):
+        for key in ("askers", "approvers", "requesters", "learners"):
             if isinstance(c.get(key), list):
                 positions.update(str(x) for x in c[key])
     positions.update(str(t.get("id")) for t in roster.get("twins") or [] if t.get("id"))
@@ -190,10 +209,10 @@ def synthetic_mock_identities(roster: dict) -> dict:
 
 # ── autonomy ─────────────────────────────────────────────────────────
 def effective_autonomy(cap: dict, twin: dict, policy: dict, channel: dict, *, asker: bool = True,
-                       tainted: bool = False, degraded: bool = False) -> str | None:
+                       tainted: bool = False, degraded: bool = False, learner: bool = False) -> str | None:
     """min(capability, twin ceiling (file ∧ position, folded by build), policy, channel,
-    tierCap, requesterCap) with outsource ≤ draft, VACANT → observe, tainted ≤ suggest.
-    Returns None when the requester is not an asker (refuse)."""
+    tierCap, requesterCap) with outsource ≤ draft, VACANT → observe, tainted ≤ suggest,
+    learner ≤ suggest (no drafts). Returns None when the requester is not an asker (refuse)."""
     if not asker:
         return None
     levels = [cap["autonomy"], twin.get("effectiveCeiling", ALPHA_MAX_AUTONOMY), policy["autonomyCeiling"],
@@ -202,7 +221,7 @@ def effective_autonomy(cap: dict, twin: dict, policy: dict, channel: dict, *, as
         levels.append("draft")
     if twin.get("vacant"):
         levels.append("observe")
-    if tainted:
+    if tainted or learner:
         levels.append("suggest")
     if degraded:
         levels.append("observe")
@@ -314,10 +333,31 @@ class Gateway:
         self._rl_noticed: dict[str, float] = {}
         self._failures: dict[str, int] = {}
         self._spend: dict[tuple[str, str], float] = {}
+        self._thread_cap: OrderedDict[tuple[str, str], tuple[str, str]] = OrderedDict()
         self.last_deny: tuple[str, str, int] | None = None
         self.frozen_flag = Path(frozen_flag) if frozen_flag else None
         self._frozen_noticed: dict[tuple[str, str], float] = {}
+        self.tz = self._timezone()
         self._startup_checks()
+
+    def _timezone(self) -> _dt.tzinfo:
+        """Day boundary for twinFreeDays: roster policy.timezone, else UTC (refused if a channel
+        needs it and the zone cannot be loaded)."""
+        name = self.policy.get("timezone")
+        if name:
+            try:
+                from zoneinfo import ZoneInfo  # noqa: PLC0415 - stdlib; needs tz data on the host
+                return ZoneInfo(str(name))
+            except Exception:  # noqa: BLE001 - ZoneInfoNotFoundError, ValueError, missing tzdata
+                if any(c.get("twinFreeDays") for c in self.channels.values()):
+                    raise ConfigRefused(f"policy.timezone {str(name)[:40]!r} cannot be loaded; "
+                                        "twinFreeDays needs it (install tzdata)") from None
+        return _dt.timezone.utc
+
+    def is_twin_free_day(self, channel: dict, now: float) -> bool:
+        """Simple calendar rule: the local day of the month is listed in channel.twinFreeDays."""
+        days = channel.get("twinFreeDays") or []
+        return bool(days) and _dt.datetime.fromtimestamp(now, self.tz).day in days
 
     # ── startup ──
     def _startup_checks(self) -> None:
@@ -402,6 +442,37 @@ class Gateway:
                        operator_ref=ctx.operator_ref)
         rec.update(kw)
         return self.audit.append(**rec)
+
+    def _audit_anon(self, ctx: _Ctx, action: str, twin_id: str | None, capability: str | None = None,
+                    decision: str = "allow", **kw) -> int:
+        """Audit with platform, channel, twin and capability only: no event id, thread, operator
+        or operator_ref, so the record cannot be tied to a person."""
+        return self.audit.append(action=action, driver=self.driver.name, platform=ctx.platform,
+                                 channel=ctx.channel_id, channel_tier=ctx.tier, twin=twin_id or None,
+                                 capability=capability, decision=decision, ts=round(self.clock(), 3), **kw)
+
+    def _count_only(self, ctx: _Ctx, action: str, twin_id: str | None, capability: str | None, text: str,
+                    decision: str = "allow") -> list[Reply]:
+        """Count-only turn: audit `action` anonymously, then post `text` in the thread (its msg_out
+        is anonymous too)."""
+        self._audit_anon(ctx, action, twin_id, capability, decision,
+                         deny_reason=action if decision == "deny" else None)
+        title = self.twins[twin_id]["title"] if twin_id in self.twins else None
+        seq = self.audit.next_seq
+        body = notice(title, text, seq)
+        got = self._audit_anon(ctx, "msg_out", twin_id, None, decision, content_sha256=self.audit.content_tag(body),
+                               content_len=None if (ctx.tier or "sys") in ("T2", "T3") else len(body))
+        if got != seq:
+            raise RuntimeError("audit seq raced")
+        return [Reply(ctx.channel_ref or "", ctx.thread, body, twin_id or "", seq)]
+
+    def _remember_thread(self, cid: str, thread: str | None, twin_id: str, cap_id: str) -> None:
+        if not thread:
+            return
+        self._thread_cap[(cid, thread)] = (twin_id, cap_id)
+        self._thread_cap.move_to_end((cid, thread))
+        while len(self._thread_cap) > THREAD_MEMO_CAP:
+            self._thread_cap.popitem(last=False)
 
     def _say(self, ctx: _Ctx, twin_id: str, text_for_seq: Callable[[int], str], **kw) -> Reply:
         seq = self.audit.next_seq
@@ -535,9 +606,12 @@ class Gateway:
         if not self._identify(ctx, ev.platform, ev.user_ref, now):
             return self._deny(ctx, "unknown_identity")
         text = sanitize.sanitize_for_model(ev.text)      # no NFKC: full-width punctuation kept
+        ukey = f"{ev.platform}:{ev.user_ref}"
+        kind = self._count_kind(text, channel, now)
+        if kind:
+            return self._count_message(ctx, channel, text, kind, ukey, now)
         self._audit("msg_in", ctx, content_sha256=self.audit.content_tag(text),
                     content_len=None if tier_rank(ctx.tier) >= 2 else len(text))
-        ukey = f"{ev.platform}:{ev.user_ref}"
         ok_u, ok_c = self.user_rl.check(ukey, now), self.channel_rl.check(cid, now)
         if not (ok_u and ok_c):
             self._deny(ctx, "user_6_per_min" if not ok_u else "channel_60_per_hour", action="rate_limited")
@@ -560,7 +634,9 @@ class Gateway:
             return [self._notice(ctx, "", f"這個分身不在本頻道。本頻道可用：{names}", decision="deny")]
         self._audit("route_decision", ctx, twin=twin_id, decision="allow")
         askers = channel["askers"]
-        if askers != "members" and not set(ctx.positions) & set(askers):
+        is_asker = askers == "members" or bool(set(ctx.positions) & set(askers))
+        learner = not is_asker and bool(set(ctx.positions) & set(channel.get("learners") or []))
+        if not (is_asker or learner):
             self._deny(ctx, "not_asker", twin=twin_id)
             return [self._notice(ctx, twin_id, "你的職位不在本頻道的提問名單，分身不回答", decision="deny")]
         if _TEXT_APPROVAL.match(sanitize.normalize_for_match(rest)):
@@ -581,7 +657,39 @@ class Gateway:
         if hits:
             self._audit("injection_flag", ctx, twin=twin_id, decision="deny",
                         deny_reason=",".join(hits), tainted=True)
-        return self._invoke(ctx, self.twins[twin_id], channel, user_text, own_taint, rest)
+        return self._invoke(ctx, self.twins[twin_id], channel, user_text, own_taint, rest, learner=learner)
+
+    # ── count-only messages: 我不同意 / 分身錯了, 我親手做了, twin-free day ──
+    def _count_kind(self, text: str, channel: dict, now: float) -> str | None:
+        if any(w in text for w in OVERRIDE_WORDS):
+            return "human_override"
+        if any(w in text for w in CHECKIN_WORDS):
+            return "practice_checkin"
+        if self.is_twin_free_day(channel, now) and not any(w in text for w in URGENT_WORDS):
+            return "twin_free_day"
+        return None
+
+    def _count_message(self, ctx: _Ctx, channel: dict, text: str, kind: str, ukey: str,
+                       now: float) -> list[Reply]:
+        """No model call. Rate limits still apply (a flood must not inflate the counts)."""
+        cid = ctx.channel_id or ""
+        if not (self.user_rl.check(ukey, now) and self.channel_rl.check(cid, now)):
+            seq = self._audit_anon(ctx, "rate_limited", None, decision="deny", deny_reason="count_only_rate_limited")
+            self.last_deny = ("rate_limited", "count_only_rate_limited", seq)
+            return []
+        self.user_rl.hit(ukey, now)
+        self.channel_rl.hit(cid, now)
+        head = (text.strip().split(None, 1) or [""])[0]
+        twin_id, cap_id = self._thread_cap.get((cid, ctx.thread or ""), (None, None))
+        if twin_id is None:
+            twin_id = self.aliases.get(sanitize.normalize_for_match(head).lstrip("@"))
+            if twin_id not in channel["twins"]:
+                twin_id = channel["defaultTwin"]
+            cap_id = next((c["id"] for c in self.twins[twin_id]["capabilities"] if c["id"] in text), None)
+        if kind == "twin_free_day":
+            return self._count_only(ctx, kind, twin_id, None, TWIN_FREE_REPLY, decision="deny")
+        return self._count_only(ctx, kind, twin_id, cap_id,
+                                OVERRIDE_REPLY if kind == "human_override" else CHECKIN_REPLY)
 
     # ── scheduled post ──
     def _scheduled(self, ev: ScheduledPost) -> list[Reply | ApprovalCard]:
@@ -595,6 +703,8 @@ class Gateway:
         cap = next((c for c in twin["capabilities"] if c["id"] == ev.capability_id and not c.get("dormant")), None)
         if cap is None:
             return self._deny(ctx, "unknown_capability", twin=twin["id"])
+        if self.is_twin_free_day(channel, self.clock()):
+            return self._deny(ctx, "twin_free_day", twin=twin["id"])
         if not self.post_rl.allow(ev.channel_id, self.clock()):
             return self._deny(ctx, "posts_3_per_day", action="rate_limited", twin=twin["id"])
         text = f"[排程] {cap['id']}"
@@ -602,15 +712,18 @@ class Gateway:
 
     # ── driver invocation (shared) ──
     def _invoke(self, ctx: _Ctx, twin: dict, channel: dict, user_text: str, own_taint: bool,
-                plain: str, cap: dict | None = None) -> list[Reply | ApprovalCard]:
+                plain: str, cap: dict | None = None, learner: bool = False) -> list[Reply | ApprovalCard]:
         tid = twin["id"]
         window = self._window(ctx.channel_id)
         tainted = own_taint or any(e.get("tainted") for e in window)
         caps = [c for c in twin["capabilities"] if not c.get("dormant")]
         cap = cap or next((c for c in caps if c["id"] in plain), caps[0])
-        predict_first = "我先說" in plain and bool(cap.get("predictFirstEligible"))
+        wants_first = "我先說" in plain or (learner and bool(channel.get("predictFirstDefault"))
+                                          and not any(w in plain for w in SKIP_PREDICT_WORDS))
+        predict_first = wants_first and bool(cap.get("predictFirstEligible"))
         degraded = self._failures.get(tid, 0) >= self.FAILURES_TO_DEGRADE
-        level = effective_autonomy(cap, twin, self.policy, channel, tainted=tainted, degraded=degraded)
+        level = effective_autonomy(cap, twin, self.policy, channel, tainted=tainted, degraded=degraded,
+                                   learner=learner)
         day = _dt.datetime.fromtimestamp(self.clock(), _dt.timezone.utc).date().isoformat()
         if self.daily_budget_usd is not None and self._spend.get((tid, day), 0.0) >= self.daily_budget_usd:
             self._deny(ctx, "daily_budget", twin=tid)
@@ -624,7 +737,8 @@ class Gateway:
             twin_id=tid, prompt_path=self.prompts.get(tid, ""), user_text=user_text, prompt_sha=twin.get("promptSha"),
             channel_window=tuple(dict(e) for e in window), tier=channel["tier"], effective_autonomy=level,
             tools=tools_for(level, tainted), read_roots=self.read_roots, tainted=tainted,
-            predict_first=predict_first, timeout_s=self.timeout_s, max_budget_usd=self.max_budget_usd)
+            predict_first=predict_first, learner=learner, timeout_s=self.timeout_s,
+            max_budget_usd=self.max_budget_usd)
         started = time.perf_counter()
         try:
             result = self.driver.run(inv)
@@ -649,7 +763,8 @@ class Gateway:
         seq = self.audit.next_seq
         text, stats = sanitize.filter_output(format_reply(
             twin["title"], level, result, category=cap.get("category"), seq=seq, tainted=tainted,
-            add_generic_decision=add_generic, suggest_title=self.twins[sugg]["title"] if sugg else None), ctx.tier,
+            add_generic_decision=add_generic, suggest_title=self.twins[sugg]["title"] if sugg else None,
+            learner=learner), ctx.tier,
             self.extra_dlp)
         if stats["blocked"]:
             self._audit("dlp_blocked", ctx, decision="deny", deny_reason=f"output:{stats['blocked']}", **common)
@@ -665,6 +780,11 @@ class Gateway:
         else:
             reply = self._say(ctx, tid, lambda s: text, usage=usage, latency_ms=latency, redactions=redactions,
                               **{k: v for k, v in common.items() if k != "twin"})
+        if ctx.channel_id:
+            self._remember_thread(ctx.channel_id, ctx.thread, tid, cap["id"])
+        if learner:
+            # A learner's own judgement (their draft) never reaches a later answer in this channel.
+            return [reply]
         window.append({"role": "user", "text": user_text, "tainted": own_taint})
         # The reply carries only this turn's own taint, so a taint leaves the channel once the
         # offending message rolls out of the window (it does not re-infect every later reply).

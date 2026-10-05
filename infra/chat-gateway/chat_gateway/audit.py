@@ -44,8 +44,11 @@ ACTIONS = frozenset(
     "msg_in msg_out route_decision tool_proposed tool_denied approval_requested "
     "approval_granted approval_denied approval_expired injection_flag policy_denied "
     "rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded "
-    "config_refused post_failed frozen".split()
+    "config_refused post_failed frozen human_override practice_checkin twin_free_day".split()
 )
+# Count-only actions: written without event_id / thread / operator / operator_ref (core.py
+# `_count_only`), read back by `counts()` for the quarterly review. Never broken down per person.
+COUNT_ACTIONS = ("human_override", "practice_checkin", "twin_free_day")
 _FILE_KEYS = ("T0", "T1", "T2", "T3", "sys")
 GENESIS = "sha256:0"
 VERSION = 2
@@ -256,6 +259,27 @@ def verify(path: str | os.PathLike, key: bytes) -> tuple[bool, int]:
     """(ok, number_of_records). See `verify_report` for the problem list."""
     ok, n, _ = verify_report(path, key)
     return ok, n
+
+
+def counts(path: str | os.PathLike, key: bytes) -> dict[str, dict[str, int]]:
+    """Totals of the count-only actions per `channel/capability` (or `channel`), for the quarterly
+    review. Only verified logs are read. There is no per-person breakdown: those records carry
+    no operator field, and this function never reads one."""
+    ok, _n, _problems = verify_report(path, key)
+    if not ok:
+        return {}
+    p = Path(path)
+    files = [p] if p.is_file() else [p / k / "audit.jsonl" for k in _FILE_KEYS if (p / k / "audit.jsonl").is_file()]
+    out: dict[str, dict[str, int]] = {}
+    for f in files:
+        recs, _ = _read_records(f)
+        for rec in recs:
+            action = rec.get("action")
+            if action in COUNT_ACTIONS:
+                where = "/".join(str(x) for x in (rec.get("channel"), rec.get("capability")) if x)
+                bucket = out.setdefault(action, {})
+                bucket[where or "-"] = bucket.get(where or "-", 0) + 1
+    return out
 
 
 def heads(path: str | os.PathLike, key: bytes) -> dict | None:

@@ -44,6 +44,7 @@ class TwinInvocation:
     read_roots: tuple[str, ...] = ()
     tainted: bool = False
     predict_first: bool = False
+    learner: bool = False                # learner mode: similar cases and counter-examples only, no verdict
     timeout_s: int = 60
     max_budget_usd: float = 0.10
     prompt_sha: str | None = None        # roster promptSha; drivers that read the file re-check it

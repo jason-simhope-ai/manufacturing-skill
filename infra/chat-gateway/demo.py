@@ -5,6 +5,7 @@ real routing / classification / rate-limit / approval / audit / taint code.
     python3 infra/chat-gateway/demo.py                       # print transcript
     python3 infra/chat-gateway/demo.py --check GOLDEN.txt    # exit 1 on any diff
     python3 infra/chat-gateway/demo.py --roster team/.build/roster.json   # other roster (golden won't match)
+    python3 infra/chat-gateway/demo.py --plain               # beats 1-3 for colleagues: zh-TW, no token/audit lines
 
 Zero credentials, zero network, deterministic (fixed clock, fixed ids, public
 DEMO KEYS). Audit records go to a temporary directory that is removed on exit.
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import re
 import difflib
 import hashlib
 import io
@@ -41,6 +43,11 @@ DEMO_IDENTITIES = HERE / "fixtures" / "roster" / "identities.json"   # used when
 REPO = HERE.parents[1]
 START_TS = 1791157800.0          # 2026-10-05 07:50 +08:00
 BEATS = 8
+PLAIN_BEATS = 3
+PLAIN_HEADER = ("數位分身團隊 — 離線示範（精簡版，給同仁看）\n"
+                "下面的回覆是預錄的示範文字，不是 AI 模型的回答；它只示範流程：分身先請你說，再補資料，決定永遠是你做。\n"
+                "完整版（含防線測試與稽核紀錄）：python3 infra/chat-gateway/demo.py\n")
+_CRON_ECHO = re.compile(r"\(cron\) post --twin \S+ --capability \S+ --channel (\S+)")
 
 
 class FixedClock:
@@ -87,17 +94,46 @@ def refusal_checks(out: TextIO, roster_path: Path) -> None:
     attempt("slack adapter 但未設 HMAC 金鑰", lambda: config_from_env({}, adapter="slack"))
 
 
-def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
+def plain_script() -> list[dict]:
+    """demo.jsonl up to the first note of beat PLAIN_BEATS + 1."""
+    out = []
+    for line in DEMO_SCRIPT.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        obj = json.loads(line)
+        if obj.get("type") == "note" and int(obj.get("beat", 0)) > PLAIN_BEATS:
+            break
+        out.append(obj)
+    return out
+
+
+def plain_text(text: str) -> str:
+    """--plain: drop audit / token lines and the `稽核 #n` tag; say 排程貼文 for the cron echo."""
+    keep = []
+    for line in text.splitlines(True):
+        if line.lstrip().startswith(("audit:", "≈ tokens")):
+            continue
+        line = _CRON_ECHO.sub(lambda m: f"（排程貼文，頻道 #{m.group(1)}）", line)
+        keep.append(re.sub(r" · 稽核 #\d+|（#\d+）", "", line).replace("【gateway】", "【系統】"))
+    return "".join(keep)
+
+
+def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0, plain: bool = False) -> int:
     clock, hexgen = FixedClock(START_TS), DetHex()
     roster = load_roster(roster_path)
     shown = roster_path.relative_to(REPO) if roster_path.is_relative_to(REPO) else roster_path.name
-    out.write("digital-twin team — offline chat-gateway demo (v0.2.0-alpha)\n")
-    out.write("DEMO KEYS — public demo HMAC keys · mock adapter + mock driver · no network, no credentials\n")
-    out.write("replies are canned: the mock driver matches keywords in fixtures/mock_driver.json, it is not a model\n")
-    out.write(f"roster: {shown} (synthetic) · clock fixed at 2026-10-05 07:50 +08:00\n")
+    beats = PLAIN_BEATS if plain else BEATS
+    if plain:
+        out.write(PLAIN_HEADER)
+    else:
+        out.write("digital-twin team — offline chat-gateway demo (v0.2.0-alpha)\n")
+        out.write("DEMO KEYS — public demo HMAC keys · mock adapter + mock driver · no network, no credentials\n")
+        out.write("replies are canned: the mock driver matches keywords in fixtures/mock_driver.json, it is not a model\n")
+        out.write(f"roster: {shown} (synthetic) · clock fixed at 2026-10-05 07:50 +08:00\n")
     if not (roster.get("_identities") or {}).get("users"):
         roster["_identities"] = json.loads(DEMO_IDENTITIES.read_text(encoding="utf-8"))
-        out.write(f"identities: {DEMO_IDENTITIES.relative_to(REPO)} (synthetic mock users)\n")
+        if not plain:
+            out.write(f"identities: {DEMO_IDENTITIES.relative_to(REPO)} (synthetic mock users)\n")
     usages: list[dict] = []
     with tempfile.TemporaryDirectory(prefix="mfg-team-demo-") as tmp:
         records: list[dict] = []
@@ -111,15 +147,18 @@ def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
                 adapter.compact = bool(note["compact"])
             if note.get("sub"):
                 out.write(f"  ({note['title'].strip('()')})\n")
+            elif plain:
+                out.write(f"\n━━ 第 {note['beat']}/{beats} 段 · {note.get('plain', note['title'])}\n")
             else:
                 out.write(f"\n━━ Beat {note['beat']}/{BEATS} · {note['title']}\n")
             if note.get("refusal_checks"):
                 refusal_checks(out, roster_path)
 
-        adapter = MockAdapter(script=DEMO_SCRIPT, out=out, on_note=on_note, clock=clock)
+        adapter = MockAdapter(script=plain_script() if plain else DEMO_SCRIPT, out=out, on_note=on_note, clock=clock)
         gw = Gateway(roster, adapter, driver, audit, clock, token_hex=hexgen,
                      approvals=ApprovalBook(DEMO_APPROVAL_KEY, clock=clock, token_hex=hexgen))
-        out.write(f"gateway up: audit #{records[-1]['seq']} {records[-1]['action']}\n")
+        if not plain:
+            out.write(f"gateway up: audit #{records[-1]['seq']} {records[-1]['action']}\n")
         for ev in adapter.events():
             clock.t = adapter.last_ts
             records.clear()
@@ -137,6 +176,9 @@ def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
             if pace:
                 time.sleep(pace)
         ok, n = verify(Path(tmp) / "audit", DEMO_AUDIT_KEY)
+    if plain:
+        out.write("\n分身的回答只是參考：不同意就回「我不同意」，判斷和簽字的人是你。\n")
+        return 0 if ok else 1
     out.write(f"\naudit verify: {'OK' if ok else 'FAILED'} ({n})\n")
     if usages:
         k = len(usages)
@@ -158,14 +200,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", metavar="GOLDEN", help="compare the transcript with a golden file")
     ap.add_argument("--pace", type=float, default=0.0, help="seconds to sleep between events")
     ap.add_argument("--roster", type=Path, default=DEMO_ROSTER)
+    ap.add_argument("--plain", action="store_true",
+                    help="beats 1-3 only, zh-TW, no token or audit lines (for front-line colleagues)")
     args = ap.parse_args(argv)
     buf = io.StringIO()
     try:
-        rc = run_demo(buf, args.roster.resolve(), args.pace)
+        rc = run_demo(buf, args.roster.resolve(), args.pace, plain=args.plain)
     except ConfigRefused as exc:
         print(f"demo: refused to start (exit {exc.exit}): {exc}", file=sys.stderr)
         return exc.exit
-    text = buf.getvalue()
+    text = plain_text(buf.getvalue()) if args.plain else buf.getvalue()
     if args.check:
         golden = Path(args.check).read_text(encoding="utf-8")
         if golden != text:

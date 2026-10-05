@@ -23,7 +23,7 @@ from .adapters import load_adapter_class
 from .adapters.base import ScheduledPost
 from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
-from .audit import AuditLog, check_anchor, heads, heads_document, verify_report, write_heads
+from .audit import AuditLog, check_anchor, counts, heads, heads_document, verify_report, write_heads
 from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, FREEZE_FILE, STATE_DIR_VAR, GatewayConfig, config_from_env,
                      ensure_state_dir, resolve_state_dir, stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
@@ -139,6 +139,10 @@ def print_verify(path: str, key: bytes, heads_out: str | None = None, anchor: st
             print(f"    {tier}: count={h['count']} seq={h['seq']} head={h['head']}")
     if ok and anchor_doc is not None:
         print(f"  anchor: OK — no tier went backwards since {anchor_doc.get('created')} (seq {anchor_doc.get('seq')})")
+    # Output is per tier and per channel/capability only, never per user (team README "給主管").
+    for action, by_where in sorted((counts(path, key) if ok else {}).items()):
+        shown = ", ".join(f"{w}={n}" for w, n in sorted(by_where.items()))
+        print(f"  {action} (count only, no per-person breakdown): {shown}")
     if ok and heads_out:
         doc = heads_document(path, key)
         if doc is None:

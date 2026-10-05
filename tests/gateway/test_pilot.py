@@ -22,7 +22,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_gateway import (FIXTURES, GW_DIR, KEY, REPO_ROOT, Harness, HarnessCase,  # noqa: E402
-                          run_cli)
+                          chan, run_cli)
 
 from chat_gateway import ConfigRefused, sanitize  # noqa: E402
 from chat_gateway.adapters.base import ApprovalClick, ScheduledPost  # noqa: E402
@@ -170,6 +170,27 @@ class TestFreeze(HarnessCase):
         [r] = h.msg("@品保 spc-watch")
         self.assertNotIn(FROZEN_REPLY, r.text)
         self.assertEqual(len(h.driver.calls), 2)
+
+    def test_freeze_wins_over_count_only_and_twin_free_day(self):
+        # Merge of #15 (front-line count-only turns) and #38 (kill switch): frozen is checked first,
+        # so 「我不同意」 and a twin-free-day ask are answered 「分身暫停服務中」 and counted as `frozen` only.
+        def free_today(r):
+            r["policy"]["timezone"] = "Asia/Taipei"
+            chan(r, "qa-floor")["twinFreeDays"] = [5]
+        flag = tmpdir(self, "flag-") / FREEZE_FILE
+        flag.write_text("{}", encoding="utf-8")
+        h = self.make(frozen_flag=flag, mutate=free_today)
+        [r] = h.msg("@品保 我不同意")
+        self.assertIn(FROZEN_REPLY, r.text)
+        h.clock.t += 61
+        [r] = h.msg("@品保 NCR-EX-012 嚴重度？")
+        self.assertIn(FROZEN_REPLY, r.text)
+        self.assertEqual(h.gw.handle(ScheduledPost("qa-manager", "spc-watch", "qa-floor")), [])
+        acts = h.actions()
+        for count_only in ("human_override", "practice_checkin", "twin_free_day"):
+            self.assertNotIn(count_only, acts)
+        self.assertEqual(acts.count("frozen"), 3)
+        self.assertEqual(h.driver.calls, [])
 
     def test_unreadable_flag_counts_as_frozen(self):
         h, flag = self.frozen_harness()
