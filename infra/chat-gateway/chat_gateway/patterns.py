@@ -25,6 +25,23 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("private-key", _P("-----" + r"BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY" + "-----")),
 ]
 
+# Data-root scan (datascan, S10/P-07): every SECRET_PATTERNS shape plus any PEM/PGP private key
+# header and a generic `api_key: <value>` line. A hit is treated as T3 (the root is refused).
+DATA_SECRET_PATTERNS: list[tuple[str, re.Pattern]] = SECRET_PATTERNS + [
+    ("private-key-block", _P("-----" + r"BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?" + "-----")),
+    ("aws-key-id-any", _P(r"AKIA[0-9A-Z]{16}")),
+    ("slack-token-any", _P(r"xox[bp]-[0-9A-Za-z-]{6,}")),
+    ("anthropic-key-any", _P(r"sk-ant-[A-Za-z0-9_-]{6,}")),
+    ("github-token-any", _P(r"ghp_[A-Za-z0-9]{16,}")),
+    ("api-key-assignment", _P(r"(?i)\bapi[_-]?key\b[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9_\-/+=.]{8,}")),
+]
+
+
+def find_data_secrets(text: str) -> list[str]:
+    """Names of DATA_SECRET_PATTERNS that match `text` (data-root files only)."""
+    return [name for name, pat in DATA_SECRET_PATTERNS if pat.search(text)]
+
+
 # Generic `secret=...` assignment; teamctl applies it only to team/** and
 # infra/chat-gateway/**, the gateway applies it to its own output.
 GENERIC_SECRET: tuple[str, re.Pattern] = (

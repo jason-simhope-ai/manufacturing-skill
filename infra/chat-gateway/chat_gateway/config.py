@@ -18,8 +18,11 @@ DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
 DEFAULT_DENYLIST = "team/local/names.denylist"
 STATE_DIR_VAR = "MFG_TEAM_STATE_DIR"
 # All the gateway (and the claude-code driver) ever writes there.
-STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home", "frozen", "data-scan.json"})
+STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home", "frozen", "frozen.last",
+                           "data-scan.json"})
 FREEZE_FILE = "frozen"            # kill switch flag (`chat_gateway freeze` / `unfreeze`)
+FREEZE_LAST = "frozen.last"       # `unfreeze` renames the flag here; its mtime = start of the last freeze
+NO_DENYLIST_VAR = "MFG_TEAM_NO_DENYLIST"   # "1": a non-mock adapter may run without a local denylist
 DENYLIST_VAR = "MFG_TEAM_DENYLIST"
 AUDIT_KEY_VAR = "MFG_TEAM_AUDIT_HMAC_KEY"
 APPROVAL_KEY_VAR = "MFG_TEAM_APPROVAL_HMAC_KEY"
@@ -42,20 +45,26 @@ def resolve_state_dir(env: Mapping[str, str]) -> Path:
     return state
 
 
-def ensure_state_dir(state: Path) -> Path:
+def ensure_state_dir(state: Path, *, create: bool = True) -> Path:
     """EXT-05: the state dir holds the audit log, rate-limit state, the driver's temp prompts and
     the model process's private HOME. Create it 0700 when missing; refuse a symlink, a
     non-directory, another owner, or a group/other-writable mode (a shared or world-writable dir
-    such as /tmp would let another account plant or swap files)."""
+    such as /tmp would let another account plant or swap files). With `create=False` (freeze /
+    unfreeze, P-05) a missing directory is refused instead of created."""
     if not state.is_absolute():
         raise ConfigRefused(f"{STATE_DIR_VAR} must be an absolute path")
-    try:
-        state.mkdir(parents=True, mode=0o700)
-        os.chmod(state, 0o700)
-    except FileExistsError:
-        pass
-    except OSError as exc:
-        raise ConfigRefused(f"cannot create the state directory {state} ({type(exc).__name__})") from None
+    if not create:
+        if not os.path.lexists(state):
+            raise ConfigRefused(f"state directory {state} does not exist; set {STATE_DIR_VAR} to the state "
+                                "directory of the running service (and run as its user)")
+    else:
+        try:
+            state.mkdir(parents=True, mode=0o700)
+            os.chmod(state, 0o700)
+        except FileExistsError:
+            pass
+        except OSError as exc:
+            raise ConfigRefused(f"cannot create the state directory {state} ({type(exc).__name__})") from None
     st = os.lstat(state)
     if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
         raise ConfigRefused(f"state directory {state} is not a plain directory (symlink or file)")
@@ -66,16 +75,21 @@ def ensure_state_dir(state: Path) -> Path:
     return state
 
 
-def stale_state_help(state_dir: Path, env: Mapping[str, str]) -> str:
-    """What to do when the audit log in `state_dir` does not verify (printed with the refusal)."""
+def stale_state_help(state_dir: Path, env: Mapping[str, str], *, foreign_key: bool = False) -> str:
+    """What to do when the audit log in `state_dir` does not verify (printed with the refusal).
+    `foreign_key`: nothing verifies under the configured key (I04), so the last line says archive
+    and start a new chain instead of suggesting tampering."""
     origin = "the default" if not env.get(STATE_DIR_VAR) else f"set by {STATE_DIR_VAR}"
+    last = ("\n  On a real deployment: archive this chain and start a new one (docs/audit-operations.md §3, "
+            "steps 3–5); a chain started under another key is a setup mistake, not evidence of tampering."
+            if foreign_key else
+            "\n  On a real deployment do not reset: run `audit-verify`, the log may have been tampered with.")
     return (
         f"\n  State directory: {state_dir} ({origin}); the audit log is in {state_dir / 'audit'}."
         "\n  A log left by an earlier run (another key, or the public demo key) cannot be resumed."
         "\n  On a dev machine you can move it aside (nothing is deleted):"
         "\n      python3 team/tools/teamctl.py state-reset --confirm"
-        f"\n  Or keep it and start with a different directory: {STATE_DIR_VAR}=/absolute/other/dir"
-        "\n  On a real deployment do not reset: run `audit-verify`, the log may have been tampered with.")
+        f"\n  Or keep it and start with a different directory: {STATE_DIR_VAR}=/absolute/other/dir" + last)
 
 
 def move_state_aside(state_dir: Path, now: float | None = None) -> Path | None:
@@ -112,7 +126,8 @@ class GatewayConfig:
     daily_budget_usd: float | None
     max_budget_usd: float
     timeout_s: int
-    denylist: Path | None = None       # optional local denylist (inbound DLP + output filter)
+    denylist: Path | None = None       # local denylist (inbound DLP + output filter + data scan)
+    no_denylist: bool = False          # MFG_TEAM_NO_DENYLIST=1: running without one was chosen explicitly
 
 
 def _num(env: Mapping[str, str], name: str, default: float | None, cast=float, *,
@@ -153,6 +168,7 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
     if deny_raw and not Path(deny_raw).expanduser().is_file():
         raise ConfigRefused(f"{DENYLIST_VAR} is set but is not a file")
     deny = Path(deny_raw or DEFAULT_DENYLIST).expanduser()
+    no_denylist = env.get(NO_DENYLIST_VAR) == "1"     # enforced in __main__.build_gateway (I05)
     return GatewayConfig(
         roster=Path(roster or env.get("MFG_TEAM_ROSTER") or DEFAULT_ROSTER),
         adapter=adapter, driver=driver, state_dir=state.resolve(),
@@ -163,4 +179,5 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
         max_budget_usd=_num(env, "MFG_TEAM_MAX_BUDGET_USD", 0.10, high=MAX_CALL_BUDGET_USD),
         timeout_s=int(_num(env, "MFG_TEAM_TIMEOUT_S", 60, int, low=TIMEOUT_RANGE_S[0], high=TIMEOUT_RANGE_S[1])),
         denylist=deny if deny.is_file() else None,
+        no_denylist=no_denylist,
     )

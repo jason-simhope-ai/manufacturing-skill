@@ -13,16 +13,30 @@
 - token、API key 或 HMAC 金鑰可能外流（貼進聊天、commit、截圖、工作站遺失）。
 - 廠商條款變更、或主管要求暫停。
 
-## 0. 先凍結（1 分鐘內，任何持有服務帳號 shell 的人）
+## 0. 先凍結（1 分鐘內，任何有 sudo 的管理員）
+
+用**和部署單元相同**的那一種（DEPLOY.md 第 3 節；預設是固定帳號）：
+
+```bash
+# 預設單元（User=mfg-twin）
+sudo -u mfg-twin env MFG_TEAM_STATE_DIR=/var/lib/mfg-twin/state \
+    PYTHONPATH=/opt/mfg-twin/current/infra/chat-gateway python3 -m chat_gateway freeze
+
+# 替代單元（DynamicUser=yes，主機上沒有 mfg-twin 帳號）：root 直接建立旗標檔
+sudo touch /var/lib/mfg-twin/state/frozen
+```
+
+- 確認輸出印的路徑就是單元的 `MFG_TEAM_STATE_DIR`。`freeze` 不會建立不存在的 state dir：路徑、帳號或權限不對時 exit 78 並印出路徑，**不要**以為已經凍結。
+- 效果：在 state dir 寫入旗標檔 `frozen`。gateway 在**每個事件前**檢查它，而且在貼出回覆前、執行已核准的動作前**再檢查一次**：不呼叫模型、不排程貼文、不執行核准；凍結當下正在產生的回覆會被丟棄（稽核 `frozen`／`frozen_in_flight`）；所有尚未決定的核准卡立即失效（稽核 `approval_expired`／`frozen`），解凍後也不會恢復，要重新申請。被 @ 或在凍結中按核准卡的人收到「分身暫停服務中」（每人每頻道每分鐘最多一則），每個事件記一筆稽核 `frozen`。
+- 凍結是**軟停**：程式仍連著 Slack。確定要切斷時接著做步驟 1–2。
+- 解除（只有在處置結束、負責人同意後），一樣用對應單元的那一行：
 
 ```bash
 sudo -u mfg-twin env MFG_TEAM_STATE_DIR=/var/lib/mfg-twin/state \
-    PYTHONPATH=/opt/mfg-twin/infra/chat-gateway python3 -m chat_gateway freeze
+    PYTHONPATH=/opt/mfg-twin/current/infra/chat-gateway python3 -m chat_gateway unfreeze
+# DynamicUser：用 mv 保留凍結時間（不要 rm）
+sudo mv /var/lib/mfg-twin/state/frozen /var/lib/mfg-twin/state/frozen.last
 ```
-
-- 效果：在 state dir 寫入旗標檔 `frozen`。gateway 在**每個事件前**檢查它：不呼叫模型、不排程貼文、不處理核准點擊；被 @ 的人收到「分身暫停服務中」（每人每頻道每分鐘最多一則），每個事件記一筆稽核 `frozen`。
-- 凍結是**軟停**：程式仍連著 Slack。確定要切斷時接著做步驟 1–2。
-- 解除：`python3 -m chat_gateway unfreeze`（只有在處置結束、負責人同意後）。
 - 在 Slack 的 `/team freeze` 只是說明這個指令；聊天文字本身**不能**凍結或解凍任何東西。
 
 ## 1. 停服務（5 分鐘內，IT）
@@ -48,7 +62,7 @@ sudo systemctl list-timers | grep mfg-twin           # 有排程貼文 timer／c
 
 只有在金鑰可能外流、或保管人異動時做。**先封存舊鏈，再換金鑰**，不要直接覆蓋：
 
-1. 用**舊**金鑰跑一次 `teamctl audit-verify <state>/audit --heads-out heads-final.json`，把輸出與 `heads-final.json` 交給簽收人。
+1. 用**舊**金鑰跑一次 `python3 -m chat_gateway audit-verify <state>/audit --anchor <主機外最近一份 heads> --heads-out heads-final.json`，把輸出與 `heads-final.json` 交給簽收人。
 2. 停服務，把整個 `<state>/audit/` 打包成 `audit-<日期>-<舊金鑰代號>.tar`，計算 SHA-256，連同 `heads-final.json` 存到主機外的唯讀／WORM 位置（保存 ≥ 1 年）。
 3. 從 state dir 移走 `audit/`（`teamctl state-reset --confirm` 只在開發機用；正式環境用 `mv` 改名並記錄）。
 4. 產生新金鑰（各 ≥ 32 字元隨機值）寫入 `EnvironmentFile`，啟動服務；新鏈從 seq 1 開始。

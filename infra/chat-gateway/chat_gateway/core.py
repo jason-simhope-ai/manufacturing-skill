@@ -31,6 +31,7 @@ from .adapters.base import (ApprovalCard, ApprovalClick, ChatAdapter, Event, Inb
                             Reply, ScheduledPost)
 from .approvals import ApprovalBook, Executor, NoopExecutor, args_hash
 from .audit import AuditLog
+from .config import FREEZE_LAST
 from .drivers.base import DriverError, DriverPolicyDenied, HarnessDriver, TwinInvocation, TwinResult
 from .formatter import format_reply, notice
 from .patterns import find_secrets
@@ -302,7 +303,7 @@ class Gateway:
                  executor: Executor | None = None, token_hex: Callable[[int], str] = secrets.token_hex,
                  read_roots: tuple[str, ...] = (), daily_budget_usd: float | None = None,
                  extra_dlp: Iterable[tuple[str, re.Pattern]] = (), max_budget_usd: float = 0.10,
-                 timeout_s: int = 60, frozen_flag: str | Path | None = None):
+                 timeout_s: int = 60, frozen_flag: str | Path | None = None, config_info: dict | None = None):
         self.roster, self.adapter, self.driver, self.audit, self.clock = roster, adapter, driver, audit, clock
         self.policy = roster["policy"]
         self.twins = {t["id"]: t for t in roster["twins"]}
@@ -337,6 +338,9 @@ class Gateway:
         self.last_deny: tuple[str, str, int] | None = None
         self.frozen_flag = Path(frozen_flag) if frozen_flag else None
         self._frozen_noticed: dict[tuple[str, str], float] = {}
+        self._frozen_notice_seqs: set[int] = set()            # replies that may still be posted while frozen
+        self._card_issued_ns: dict[str, int] = {}               # approval id -> wall-clock issue time (P-04)
+        self.config_info = dict(config_info or {})
         self.tz = self._timezone()
         self._startup_checks()
 
@@ -384,10 +388,13 @@ class Gateway:
         self._audit("config_loaded", None, decision="allow", **self._driver_info())
 
     def _driver_info(self) -> dict:
-        """S12: what the driver reports about itself (CLI version, flag check, data-root scan)."""
+        """S12: what the driver reports about itself (CLI version, flag check, data-root scan), plus the
+        gateway's own configuration facts (I05: denylist path and entry count)."""
         describe = getattr(self.driver, "describe", None)
         info = describe() if callable(describe) else None
-        return {"driver_info": info} if isinstance(info, dict) and info else {}
+        info = dict(info) if isinstance(info, dict) else {}
+        info.update(self.config_info)
+        return {"driver_info": info} if info else {}
 
     # ── kill switch (S03) ──
     def frozen(self) -> bool:
@@ -402,9 +409,48 @@ class Gateway:
             return True
         return True
 
+    def _last_freeze_ns(self) -> int | None:
+        """Start of the current or last freeze (mtime of `frozen`, else of `frozen.last`), wall clock ns."""
+        if self.frozen_flag is None:
+            return None
+        for path in (self.frozen_flag, self.frozen_flag.with_name(FREEZE_LAST)):
+            try:
+                return path.lstat().st_mtime_ns
+            except OSError:
+                continue
+        return None
+
+    def _void_pending_approvals(self, ctx: _Ctx | None = None, only_before_ns: int | None = None) -> None:
+        """P-04: a freeze voids every pending approval card (audit `approval_expired`, reason `frozen`).
+        With `only_before_ns`, only cards issued before that wall-clock time (a freeze that began and
+        ended between two events)."""
+        for aid, rec in self.approvals.pending():
+            issued = self._card_issued_ns.get(aid)
+            if only_before_ns is not None and (issued is None or issued > only_before_ns):
+                continue
+            self.approvals.void(aid)
+            cid = next((c for c, ref in self._ref_by_chan.items() if ref == rec.channel_ref), None)
+            if cid is None and rec.channel_ref in self.channels:
+                cid = rec.channel_ref
+            rctx = _Ctx(event_id=ctx.event_id if ctx else None, platform=self.adapter.name, channel_id=cid,
+                        channel_ref=rec.channel_ref, tier=rec.tier, thread=rec.thread_ref)
+            self._audit("approval_expired", rctx, decision="deny", deny_reason="frozen", approval_id=aid,
+                        args_hash=rec.args_hash, twin=rec.twin_id or None)
+
+    def _frozen_notice(self, ctx: _Ctx, cid: str | None, user_key: str, now: float) -> list[Reply]:
+        """「分身暫停服務中」 at most once per user and channel per minute (FROZEN_NOTICE_S)."""
+        key = (cid or "", user_key)
+        if cid is None or now - self._frozen_noticed.get(key, -1e18) < self.FROZEN_NOTICE_S:
+            return []
+        self._frozen_noticed[key] = now
+        reply = self._notice(ctx, "", FROZEN_REPLY, decision="deny")
+        self._frozen_notice_seqs.add(reply.audit_seq)
+        return [reply]
+
     def _on_frozen(self, event: Event) -> list[Reply | ApprovalCard]:
-        """Every event while frozen: audit `frozen`, call nothing. A bound, @-mentioned message from
-        a person gets 「分身暫停服務中」 (at most once per user and channel per minute)."""
+        """Every event while frozen: audit `frozen`, call nothing, void pending approval cards. A bound,
+        @-mentioned message from a person, or a click on a card in its own channel, gets
+        「分身暫停服務中」 (at most once per user and channel per minute)."""
         now = self.clock()
         if isinstance(event, InboundMessage):
             ctx = _Ctx(event_id=event.event_id, platform=event.platform, thread=event.thread_ref or event.event_id,
@@ -413,23 +459,30 @@ class Gateway:
             if cid is not None:
                 ctx.channel_id, ctx.channel_ref, ctx.tier = cid, event.channel_ref, self.channels[cid]["tier"]
             self._deny(ctx, "frozen", action="frozen")
+            self._void_pending_approvals(ctx)
             person = not (event.author_is_bot or event.is_dm or event.external_shared)
-            key = (cid or "", f"{event.platform}:{event.user_ref}")
-            if cid is None or not event.mentions_bot or not person or \
-                    now - self._frozen_noticed.get(key, -1e18) < self.FROZEN_NOTICE_S:
+            if not event.mentions_bot or not person:
                 return []
-            self._frozen_noticed[key] = now
-            return [self._notice(ctx, "", FROZEN_REPLY, decision="deny")]
+            return self._frozen_notice(ctx, cid, f"{event.platform}:{event.user_ref}", now)
         if isinstance(event, ApprovalClick):
-            self._deny(_Ctx(event_id=event.event_id, platform=event.platform), "frozen", action="frozen",
-                       approval_id=event.approval_id)
-            return []
+            rec = self.approvals.get(event.approval_id)
+            ctx = _Ctx(event_id=event.event_id, platform=event.platform, tier=rec.tier if rec else None,
+                       channel_ref=rec.channel_ref if rec else None, thread=rec.thread_ref if rec else None,
+                       operator_ref=self.audit.operator_ref(event.platform, event.user_ref))
+            cid = self._channel_for(event.platform, rec.channel_ref) if rec else None
+            ctx.channel_id = cid
+            self._deny(ctx, "frozen", action="frozen", approval_id=event.approval_id)
+            self._void_pending_approvals(ctx)
+            if rec is None or event.channel_ref != rec.channel_ref:
+                return []
+            return self._frozen_notice(ctx, cid, f"{event.platform}:{event.user_ref}", now)
         if isinstance(event, ScheduledPost):
             channel = self.channels.get(event.channel_id)
             ctx = _Ctx(event_id=f"post:{event.twin_id}:{event.capability_id}", platform=self.adapter.name,
                        operator="role:scheduler", channel_id=event.channel_id if channel else None,
                        tier=channel["tier"] if channel else None)
             self._deny(ctx, "frozen", action="frozen", twin=event.twin_id if event.twin_id in self.twins else None)
+            self._void_pending_approvals(ctx)
             return []
         raise TypeError(f"unknown event type {type(event).__name__}")
 
@@ -556,6 +609,23 @@ class Gateway:
             self._audit("post_failed", ctx, decision="deny", deny_reason=type(exc).__name__, **extra)
             return False
 
+    def _held_by_freeze(self, out: Reply | ApprovalCard) -> bool:
+        """P-03: re-check the flag just before posting. While frozen only the 「分身暫停服務中」 notices
+        go out; anything else produced before the flag appeared is dropped (audit `frozen`,
+        `frozen_in_flight`), and a card's approval is voided."""
+        if not self.frozen() or (isinstance(out, Reply) and out.audit_seq in self._frozen_notice_seqs):
+            return False
+        cid = self._chan_by_ref.get((self.adapter.name, out.channel_ref))
+        if cid is None and out.channel_ref in self.channels:
+            cid = out.channel_ref
+        ctx = _Ctx(platform=self.adapter.name, channel_id=cid, channel_ref=out.channel_ref,
+                   tier=self.channels[cid]["tier"] if cid else None, thread=out.thread_ref)
+        extra = ({"approval_id": out.approval_id} if isinstance(out, ApprovalCard)
+                 else {"twin": out.twin_id or None, "content_sha256": self.audit.content_tag(out.text)})
+        self._deny(ctx, "frozen_in_flight", action="frozen", **extra)
+        self._void_pending_approvals(ctx)
+        return True
+
     def _audit_overflow(self) -> None:
         """EXT-12: an adapter with a bounded inbox (SaaS) drops what arrives while it is full and
         counts it; the drops are audited here as `policy_denied` / `overflow:<count>`."""
@@ -575,6 +645,8 @@ class Gateway:
                 self.last_deny = None
                 outs = self.handle(ev)
                 for out in outs:
+                    if self._held_by_freeze(out):
+                        continue
                     self.deliver(out)
                 dropped = getattr(self.adapter, "notice_dropped", None)   # mock REPL only: never silent
                 if not outs and self.last_deny and callable(dropped):
@@ -753,6 +825,14 @@ class Gateway:
             return [self._notice(ctx, tid, "暫時無法回應", decision="deny")]
         latency = int((time.perf_counter() - started) * 1000)
         self._failures[tid] = 0
+        if self.frozen():                             # P-03: frozen while the model ran: drop the reply
+            usage = dict(result.usage) if isinstance(result.usage, dict) else {}
+            self._spend[(tid, day)] = self._spend.get((tid, day), 0.0) + float(usage.get("cost_usd", 0.0) or 0.0)
+            self._deny(ctx, "frozen_in_flight", action="frozen", usage=usage, latency_ms=latency, **common)
+            self._void_pending_approvals(ctx)
+            if not ctx.user_ref:                      # scheduled post: nobody to tell
+                return []
+            return self._frozen_notice(ctx, ctx.channel_id, f"{ctx.platform}:{ctx.user_ref}", self.clock())
         result, fixes = self._validate(ctx, result, common)
         add_generic = autonomy_rank(level) >= autonomy_rank("suggest") and not result.decision_points
         if add_generic:
@@ -831,8 +911,16 @@ class Gateway:
             self._deny(ctx, "tainted_turn", action="tool_denied", twin=twin_id or None,
                        args_hash=args_hash(action.get("args", {})))
             return None
+        if self.frozen():                             # P-04: no new cards while frozen
+            self._deny(ctx, "frozen", action="frozen", twin=twin_id or None,
+                       args_hash=args_hash(action.get("args", {})))
+            return None
         card = self.approvals.create(action, requester_ref, ctx.channel_ref, channel.get("approvers", []),
                                      tier=channel["tier"], twin_id=twin_id, thread_ref=thread_ref)
+        self._card_issued_ns[card.approval_id] = time.time_ns()
+        if len(self._card_issued_ns) > self.CLICK_NOTICE_CAP:
+            live = {aid for aid, _ in self.approvals.pending()}
+            self._card_issued_ns = {a: t for a, t in self._card_issued_ns.items() if a in live}
         self._audit("approval_requested", ctx, twin=twin_id or None, args_hash=card.args_hash,
                     approval_id=card.approval_id)
         return card
@@ -845,11 +933,22 @@ class Gateway:
         if self._is_replay(ev.event_id, now):
             return self._deny(ctx, "duplicate_event", action="replay_rejected", approval_id=ev.approval_id)
         self._identify(ctx, ev.platform, ev.user_ref, now)
+        last_freeze = self._last_freeze_ns()
+        if last_freeze is not None:                   # P-04: a freeze between issue and click voids the card
+            self._void_pending_approvals(ctx, only_before_ns=last_freeze)
         wrong_channel = rec is not None and ev.channel_ref != rec.channel_ref     # EXT-03
-        status = "mismatch" if wrong_channel else self.approvals.resolve(ev, self.executor, roles=ctx.positions)
+        status = "mismatch" if wrong_channel else self.approvals.resolve(
+            ev, self.executor, roles=ctx.positions, may_execute=lambda: not self.frozen())
+        if status == "frozen":                        # P-03: the flag appeared just before execution
+            self._deny(ctx, "frozen_in_flight", action="frozen", approval_id=ev.approval_id,
+                       args_hash=rec.args_hash if rec else None)
+            self._void_pending_approvals(ctx)
+            ctx.channel_id = self._channel_for(ev.platform, ev.channel_ref)
+            return self._frozen_notice(ctx, ctx.channel_id, f"{ev.platform}:{ev.user_ref}", now)
         action, decision, reason = {
             "granted": ("approval_granted", "allow", None), "denied": ("approval_denied", "deny", "approver_denied"),
             "expired": ("approval_expired", "deny", "ttl"), "replay": ("replay_rejected", "deny", "single_use"),
+            "void": ("approval_expired", "deny", "frozen"),
             "mismatch": ("policy_denied", "deny", "approval_mismatch"),
             "forbidden": ("policy_denied", "deny", "approval_forbidden"),
         }[status]
@@ -867,5 +966,5 @@ class Gateway:
         if len(self._click_notices) >= self.CLICK_NOTICE_CAP:
             self._click_notices.clear()
         self._click_notices.add(key)
-        return [self._notice(ctx, rec.twin_id if rec.twin_id in self.twins else "", f"核准結果：{status}",
-                             decision=decision)]
+        text = "核准卡已因凍結（kill switch）失效，請重新申請" if status == "void" else f"核准結果：{status}"
+        return [self._notice(ctx, rec.twin_id if rec.twin_id in self.twins else "", text, decision=decision)]

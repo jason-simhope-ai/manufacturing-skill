@@ -17,6 +17,7 @@
 | v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
 | v2.2    | 2026-10-05 | 前線情境模擬（R7）修訂：§5.3 capability 加 `affectedRoles`、`doerAckedOn`，`E038` 改用 `REVIEW_ONLY_WORDS` 並涵蓋 `create`、逐職位行判斷，新增 `E061`–`E063`、`W009`；§5.1 position twin 加 `vacancyApprovedBy`／`vacancyApprovedOn`（`E064`），channel 加 `learners`、`predictFirstDefault`、`twinFreeDays`；§5.4 roster.json 的 `policy.timezone` 與上述 channel 欄位；§5.5 專業參考只供對照、不出判定；§9.4 回覆標頭改中文、固定「這是參考，不是指示」行、「結論」改「分身的看法」；gateway 新增 `human_override`／`practice_checkin`／`twin_free_day` 匿名計數與學習模式。 |
 | v2.3    | 2026-10-05 | Pilot 準備（IT／資安審查 SCENARIO-SIM-R6 的 P1 項目）：§9.2／§11.3 Slack scope 與 README 一致（不給 `users:read`、`reactions:write`），啟動時檢查實際授予的 scope；§9.5 資料夾內容掃描、資料夾不得在 `~/.claude` 或家目錄的隱藏目錄下、`config_loaded` 記錄 CLI 版本與旗標檢查；§9.6 稽核新增 `frozen` 動作與 `driver_info` 欄位、`audit-verify --heads-out／--anchor`；§11.1 denylist `T3:` 前綴與 starter 清單；§11.6／§13.4 G1 pilot 前置條件（部署檢核表、kill switch、runbook、稽核作業、廠商檢查表、首日驗收）；§14 kill switch 移出延後清單，新增 pilot 後續項目。 |
+| v2.4    | 2026-10-05 | PR #38 審查與 IT 首日演練（R9）修訂：§9.5 資料夾掃描讀不了的檔案（PDF、Office、圖片、無 BOM 的 UTF-16、> 2 MB）預設拒絕（`data_root:unscanned`，`MFG_TEAM_DATA_ALLOW_UNSCANNED=1` 明示放行）、FIFO／裝置檔拒絕且不開啟（`data_root:special_file`）、secret 形狀視同 T3；§9.6 凍結時貼文與執行核准前再檢查、凍結使所有待決核准卡失效、`freeze`／`unfreeze` 不建立 state dir、`--anchor` 拒絕比磁碟上已有 heads 舊的錨點、`audit-verify` 印全分級 deny 計數；非 mock adapter 必須載入 denylist（exit 64，`MFG_TEAM_NO_DENYLIST=1` 明示例外）；不同金鑰開的稽核鏈與竄改分開提示；§14 新增殘餘風險。 |
 
 ## 0. TL;DR
 
@@ -599,6 +600,9 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 | 可關閉 T1 稽核的 `content_len`；文件化事故調查時向 Slack 取證的程序（S17） | 取捨待 pilot 回饋 |
 | 頻道登記簿範本（用途、成員、標示、覆核日）與 `teamctl roster` 簽核輸出（S19） | pilot 只有 1–2 個頻道，先人工登記 |
 | 程式審查其餘項目：state dir 每次呼叫以 realpath 檢查（R-03）、state dir 上層目錄權限（R-04）、SaaS inbox 只計原始事件且丟最新（R-06）、禁用檔名大小寫與 hard link（R-07）等 | 低於 pilot 門檻；資料夾 symlink 的每次呼叫重掃（R-05）已隨 S10 交付 |
+| 資料夾掃描與模型讀檔之間的時間差（P-08）：掃描後、呼叫期間（最多 `timeout_s`）新增或改寫的檔案不會再掃描。長期做法是每次呼叫給模型一份已掃描、原子換入的唯讀快照 | **殘餘風險**，pilot 期間以「資料夾只給資料窗口寫入」控制（DEPLOY.md 第 2 節、SECURITY.md） |
+| 主機上的錨點可與日誌一起回滾（P-09）：`--anchor` 已拒絕比同目錄有效 heads 舊的錨點，但 root 連 heads 一起還原時只有主機外副本能發現 | **殘餘風險**，每週主機外副本為必要步驟（docs/audit-operations.md §1–2）；非對稱簽章見上一列 S09 |
+| `data-scan.json` 快取未簽章（P-14）、粗時間戳檔案系統上的同大小改寫（P-15）、資料夾的總位元組與目錄數上限（P-16）、凍結通知的每頻道上限與未登錄使用者（P-10）、凍結切換本身入稽核（P-11）、denylist 前綴大小寫與 ReDoS lint（P-12）、hook 檔名掃描（P-13） | PR #38 審查 P3 項，低於 pilot 門檻 |
 | 設備接單設計（ETO）profile | v0.3 需求 |
 
 ## 15. Known gaps in existing repo（D15/D16；只記錄，除標註外不在本版修正）

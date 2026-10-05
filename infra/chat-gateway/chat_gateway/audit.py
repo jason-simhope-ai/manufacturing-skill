@@ -366,3 +366,91 @@ def check_anchor(path: str | os.PathLike, key: bytes, anchor: object) -> list[st
             problems.append(f"{tier}: the anchored head (record {n}, seq {want.get('seq')}) is not on the current "
                             "chain: the log was rewritten or rolled back")
     return problems
+
+
+def foreign_key_chain(root: str | os.PathLike, key: bytes) -> bool:
+    """I04: True when the log at `root` exists and *nothing* in it verifies under `key`: the checkpoint
+    signature fails and the first record of every tier file fails its MAC. That is a chain started
+    under another key (e.g. a mock rehearsal with the public demo key), not an edit made under this
+    key, which would leave the checkpoint or the earlier records verifying."""
+    r = Path(root)
+    files = [r / k / "audit.jsonl" for k in _FILE_KEYS if (r / k / "audit.jsonl").is_file()]
+    if not files and not (r / CHECKPOINT).exists():
+        return False
+    if (r / CHECKPOINT).exists():
+        ckpt, _ = _load_checkpoint(r, key)
+        if ckpt is not None:
+            return False
+    for f in files:
+        recs, _ = _read_records(f)
+        if not recs:
+            continue
+        first = recs[0]
+        got = first.get("hash")
+        if isinstance(got, str) and hmac.compare_digest(got, record_mac(key, f.parent.name, first)):
+            return False
+    return True
+
+
+def newer_heads(dirs: list[Path], key: bytes, anchor: object, exclude: list[Path] = ()) -> list[str]:
+    """P-09: problems when a heads document in `dirs` (validly signed under `key`, not one of `exclude`)
+    has a higher global seq than `anchor`: the anchor in use is older than the newest heads already
+    written, so it was replayed or rolled back together with the log. Unsigned or foreign files are
+    ignored (a rotated key starts a new series)."""
+    if not isinstance(anchor, dict):
+        return []
+    try:
+        a_seq = int(anchor.get("seq") or 0)
+    except (TypeError, ValueError):
+        return []
+    skip = {os.path.realpath(p) for p in exclude}
+    seen: set[str] = set()
+    problems: list[str] = []
+    for d in dirs:
+        try:
+            names = sorted(Path(d).glob("*.json"))
+        except OSError:
+            continue
+        for f in names:
+            real = os.path.realpath(f)
+            if real in skip or real in seen or not f.is_file():
+                continue
+            seen.add(real)
+            try:
+                doc = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(doc, dict) or doc.get("kind") != HEADS_KIND or not isinstance(doc.get("mac"), str):
+                continue
+            body = {k: v for k, v in doc.items() if k != "mac"}
+            if not hmac.compare_digest(doc["mac"], _anchor_mac(key, body)):
+                continue
+            try:
+                seq = int(doc.get("seq") or 0)
+            except (TypeError, ValueError):
+                continue
+            if seq > a_seq:
+                problems.append(f"anchor (seq {a_seq}, {anchor.get('created')}) is older than {f.name} (seq {seq}, "
+                                f"{doc.get('created')}): use the newest heads from the off-host store as --anchor")
+    return problems
+
+
+DENY_ACTIONS = ("dlp_blocked", "policy_denied", "frozen", "config_refused")
+
+
+def action_totals(path: str | os.PathLike, key: bytes, actions: tuple[str, ...] = DENY_ACTIONS) -> dict[str, int]:
+    """I06: how many records of each of `actions` the verified log holds, summed over every tier file
+    (the weekly sign-off's deny counts; `policy_denied` and `config_refused` are mostly in `sys`).
+    Empty when the log does not verify. Counts only, no per-person breakdown."""
+    ok, _n, _problems = verify_report(path, key)
+    if not ok:
+        return {}
+    p = Path(path)
+    files = [p] if p.is_file() else [p / k / "audit.jsonl" for k in _FILE_KEYS if (p / k / "audit.jsonl").is_file()]
+    out = {a: 0 for a in actions}
+    for f in files:
+        recs, _ = _read_records(f)
+        for rec in recs:
+            if rec.get("action") in out:
+                out[rec["action"]] += 1
+    return out

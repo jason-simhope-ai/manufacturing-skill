@@ -200,6 +200,12 @@ class TestFreeze(HarnessCase):
     def test_cli_freeze_unfreeze_and_run(self):
         tmp = tmpdir(self, "gw-freeze-")
         env = {"MFG_TEAM_STATE_DIR": str(tmp / "state")}
+        p = run_cli(["-m", "chat_gateway", "freeze"], env)              # P-05: never creates the state dir
+        self.assertEqual(p.returncode, 78, p.stderr)
+        self.assertIn(str(tmp / "state"), p.stderr)
+        self.assertFalse((tmp / "state").exists())
+        p = run_cli(["-m", "chat_gateway", "self-check", "--roster", str(FIXTURES / "roster.json")], env)
+        self.assertEqual(p.returncode, 0, p.stderr)                      # the gateway creates it on its first run
         p = run_cli(["-m", "chat_gateway", "freeze"], env)
         self.assertEqual(p.returncode, 0, p.stderr)
         flag = tmp / "state" / FREEZE_FILE
@@ -221,12 +227,14 @@ class TestFreeze(HarnessCase):
         p = run_cli(["-m", "chat_gateway", "unfreeze"], env)
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertFalse(flag.exists())
+        self.assertTrue((tmp / "state" / "frozen.last").is_file())      # P-04: when the last freeze began
         p = run_cli(["-m", "chat_gateway", "run", "--roster", str(FIXTURES / "roster.json"), "--script", str(script)],
                     env)
         self.assertIn("【品保部主管分身】", p.stdout)
         p = run_cli(["-m", "chat_gateway", "audit-verify", str(tmp / "state" / "audit")], env)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn(FREEZE_FILE, STATE_ENTRIES)                     # state-reset may move a frozen dir aside
+        self.assertIn("frozen.last", STATE_ENTRIES)
 
     def test_freeze_refuses_a_symlinked_state_dir(self):
         tmp = tmpdir(self, "gw-freeze-")
@@ -235,6 +243,346 @@ class TestFreeze(HarnessCase):
         p = run_cli(["-m", "chat_gateway", "freeze"], {"MFG_TEAM_STATE_DIR": str(tmp / "link")})
         self.assertEqual(p.returncode, 78, p.stderr)
         self.assertFalse((tmp / "real" / FREEZE_FILE).exists())
+
+
+
+ACTION = {"name": "erp.update_wo", "args": {"wo": "WO-EX-0412", "qty": 5}}
+
+
+def with_approvers(r):
+    chan(r, "qa-floor")["approvers"] = ["qa-manager"]
+
+
+class TestFreezeInFlightAndApprovals(HarnessCase):
+    """P-03 (reply in flight when the flag appears), P-04 (freeze voids pending approvals)."""
+
+    def harness(self, **kw):
+        flag = tmpdir(self, "flag-") / FREEZE_FILE
+        return self.make(frozen_flag=flag, **kw), flag
+
+    def click(self, h, card, eid, user="mock-qa-lead", channel=None):
+        return ApprovalClick(eid, "mock", card.approval_id, card.nonce, user, "approve", h.clock(),
+                             channel or card.channel_ref)
+
+    # P-03
+    def test_reply_in_flight_when_frozen_is_dropped(self):
+        h, flag = self.harness()
+        orig = h.driver.run
+
+        def run(inv):
+            flag.write_text("{}", encoding="utf-8")       # the operator freezes while the model runs
+            return orig(inv)
+        h.driver.run = run
+        [r] = h.msg("@品保 spc-watch")
+        self.assertIn(FROZEN_REPLY, r.text)
+        self.assertNotIn("【品保部主管分身】", r.text)
+        rec = next(x for x in h.records if x["action"] == "frozen")
+        self.assertEqual(rec["deny_reason"], "frozen_in_flight")
+        self.assertEqual(rec["twin"], "qa-manager")
+        self.assertEqual([x["action"] for x in h.records].count("msg_out"), 1)    # only the notice
+        h.clock.t += 61
+        self.assertEqual(len(h.msg("@品保 again")), 1)                  # still frozen, a notice
+        self.assertEqual(len(h.driver.calls), 1)
+
+    def test_scheduled_post_in_flight_is_dropped_silently(self):
+        h, flag = self.harness()
+        orig = h.driver.run
+        h.driver.run = lambda inv: (flag.write_text("{}", encoding="utf-8"), orig(inv))[1]
+        self.assertEqual(h.gw.handle(ScheduledPost("qa-manager", "spc-watch", "qa-floor")), [])
+        self.assertEqual(h.records[-1]["deny_reason"], "frozen_in_flight")
+
+    def test_run_rechecks_the_flag_before_each_post(self):
+        h, flag = self.harness()
+        h.adapter.script = [{"type": "message", "id": "m1", "channel": "qa-floor", "user": "mock-qa-lead",
+                             "text": "@品保 spc-watch", "ts": h.clock()}]
+        orig = h.gw.handle
+
+        def handle(ev):
+            outs = orig(ev)
+            flag.write_text("{}", encoding="utf-8")       # frozen after the reply was built, before posting
+            return outs
+        h.gw.handle = handle
+        h.gw.run()
+        self.assertEqual(h.adapter.posted, [])
+        self.assertEqual(h.records[-1]["action"], "frozen")
+        self.assertEqual(h.records[-1]["deny_reason"], "frozen_in_flight")
+        self.assertTrue(h.records[-1]["content_sha256"])
+
+    def test_frozen_notice_itself_is_posted_by_run(self):
+        h, flag = self.harness()
+        flag.write_text("{}", encoding="utf-8")
+        h.adapter.script = [{"type": "message", "id": "m1", "channel": "qa-floor", "user": "mock-qa-lead",
+                             "text": "@品保 spc-watch", "ts": h.clock()}]
+        h.gw.run()
+        [posted] = h.adapter.posted
+        self.assertIn(FROZEN_REPLY, posted.text)
+
+    def test_approved_action_is_not_executed_when_frozen_just_before(self):
+        h, flag = self.harness(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        real_frozen = h.gw.frozen
+        calls = {"n": 0}
+
+        def frozen():                                    # unfrozen at handle(), frozen at execution time
+            calls["n"] += 1
+            return calls["n"] > 1 or real_frozen()
+        h.gw.frozen = frozen
+        [r] = h.gw.handle(self.click(h, card, "k1"))
+        self.assertIn(FROZEN_REPLY, r.text)
+        self.assertEqual(h.executor.calls, [])
+        self.assertIn("frozen_in_flight", h.reasons())
+        h.gw.frozen = real_frozen
+        h.clock.t += 61
+        [r] = h.gw.handle(self.click(h, card, "k2"))
+        self.assertIn("失效", r.text)
+        self.assertEqual(h.executor.calls, [])
+
+    # P-04
+    def test_click_during_freeze_gets_the_notice_and_voids_the_card(self):
+        h, flag = self.harness(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        other = h.gw.request_approval("qa-floor", "mock-prod-lead", {"name": "x", "args": {}}, twin_id="qa-manager")
+        flag.write_text("{}", encoding="utf-8")
+        [r] = h.gw.handle(self.click(h, card, "k1"))
+        self.assertIn(FROZEN_REPLY, r.text)
+        expired = [x for x in h.records if x["action"] == "approval_expired"]
+        self.assertEqual(sorted(x["approval_id"] for x in expired), sorted([card.approval_id, other.approval_id]))
+        self.assertTrue(all(x["deny_reason"] == "frozen" for x in expired))
+        self.assertEqual(h.gw.handle(self.click(h, card, "k2")), [])     # rate-limited like messages
+        self.assertEqual(h.gw.handle(self.click(h, card, "k3", channel="elsewhere")), [])   # not its channel
+        self.assertIsNone(h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION))   # no new cards
+        flag.unlink()
+        h.clock.t += 60
+        [r] = h.gw.handle(self.click(h, card, "k4"))
+        self.assertIn("失效", r.text)
+        self.assertEqual(h.records[-2]["action"], "approval_expired")
+        self.assertEqual(h.records[-2]["deny_reason"], "frozen")
+        self.assertEqual(h.executor.calls, [])
+        fresh = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        [r] = h.gw.handle(self.click(h, fresh, "k5"))                    # a card issued after unfreeze works
+        self.assertIn("granted", r.text)
+        self.assertEqual(h.executor.calls, [ACTION])
+
+    def test_any_frozen_event_voids_pending_cards(self):
+        h, flag = self.harness(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        flag.write_text("{}", encoding="utf-8")
+        h.msg("@品保 hi")
+        flag.unlink()
+        [r] = h.gw.handle(self.click(h, card, "k1"))
+        self.assertIn("失效", r.text)
+        self.assertEqual(h.executor.calls, [])
+
+    def test_freeze_and_unfreeze_with_no_event_between_still_voids(self):
+        h, flag = self.harness(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        flag.write_text("{}", encoding="utf-8")
+        os.replace(flag, flag.with_name("frozen.last"))    # what `unfreeze` does; no event while frozen
+        [r] = h.gw.handle(self.click(h, card, "k1"))
+        self.assertIn("失效", r.text)
+        self.assertEqual(h.executor.calls, [])
+        self.assertIn("frozen", [x["deny_reason"] for x in h.records if x["action"] == "approval_expired"])
+        fresh = h.gw.request_approval("qa-floor", "mock-prod-lead", ACTION, twin_id="qa-manager")
+        [r] = h.gw.handle(self.click(h, fresh, "k2"))
+        self.assertIn("granted", r.text)
+
+
+# ── P-05: freeze / unfreeze never create the state dir ────────────────
+class TestFreezeStateDir(unittest.TestCase):
+    def test_missing_dir_or_no_audit_dir_refuses(self):
+        tmp = tmpdir(self, "gw-freeze-")
+        for cmd in ("freeze", "unfreeze"):
+            with self.subTest(cmd=cmd):
+                p = run_cli(["-m", "chat_gateway", cmd], {"MFG_TEAM_STATE_DIR": str(tmp / "typo" / "state")})
+                self.assertEqual(p.returncode, 78, p.stderr)
+                self.assertIn(str(tmp / "typo" / "state"), p.stderr)
+                self.assertFalse((tmp / "typo").exists())
+        (tmp / "empty").mkdir(mode=0o700)
+        p = run_cli(["-m", "chat_gateway", "freeze"], {"MFG_TEAM_STATE_DIR": str(tmp / "empty")})
+        self.assertEqual(p.returncode, 78, p.stderr)
+        self.assertIn("no audit/", p.stderr)
+        self.assertFalse((tmp / "empty" / FREEZE_FILE).exists())
+        (tmp / "open").mkdir()
+        (tmp / "open" / "audit").mkdir()
+        os.chmod(tmp / "open", 0o777)
+        p = run_cli(["-m", "chat_gateway", "freeze"], {"MFG_TEAM_STATE_DIR": str(tmp / "open")})
+        self.assertEqual(p.returncode, 78, p.stderr)
+        self.assertIn("world-writable", p.stderr)
+        self.assertEqual(os.stat(tmp / "open").st_mode & 0o777, 0o777)     # never chmod-ed on the way
+
+
+# ── P-09: an anchor older than heads already on disk is refused ──────
+class TestAnchorReplay(unittest.TestCase):
+    def test_older_anchor_refused_when_newer_heads_exist(self):
+        from chat_gateway.__main__ import print_verify
+        from chat_gateway.audit import newer_heads, write_heads
+        tmp = tmpdir(self, "gw-replay-")
+        root, hdir = tmp / "audit", tmp / "heads"
+        hdir.mkdir()
+        log = AuditLog(root, KEY)
+        for i in range(3):
+            log.append(action="msg_in", channel_tier="T1", event_id=f"a{i}")
+        old = heads_document(root, KEY)
+        write_heads(old, hdir / "heads-2026-W40.json")
+        snap = tmp / "snap"
+        shutil.copytree(root, snap)
+        for i in range(5):
+            log.append(action="msg_in", channel_tier="T1", event_id=f"b{i}")
+        write_heads(heads_document(root, KEY), hdir / "heads-2026-W41.json")
+        shutil.copyfile(hdir / "heads-2026-W40.json", hdir / "latest.json")   # latest.json rolled back too
+        shutil.rmtree(root)
+        shutil.copytree(snap, root)                                         # log + checkpoint rolled back
+        self.assertEqual(check_anchor(root, KEY, old), [])                  # the replay alone passes
+        probs = newer_heads([hdir], KEY, old, exclude=[hdir / "latest.json"])
+        self.assertTrue(any("heads-2026-W41.json" in p for p in probs), probs)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ok = print_verify(str(root), KEY, heads_out=str(hdir / "heads-2026-W42.json"),
+                              anchor=str(hdir / "latest.json"))
+        self.assertFalse(ok)
+        self.assertIn("older than heads-2026-W41.json", out.getvalue())
+        self.assertFalse((hdir / "heads-2026-W42.json").exists())
+        forged = dict(json.loads((hdir / "heads-2026-W41.json").read_text()), seq=999)
+        (hdir / "heads-2026-W41.json").write_text(json.dumps(forged))      # unsigned / edited: ignored
+        self.assertEqual(newer_heads([hdir], KEY, old, exclude=[hdir / "latest.json"]), [])
+        self.assertEqual(newer_heads([hdir], b"other-key-0123456789", old), [])
+
+    def test_deny_counts_cover_every_tier_file(self):
+        from chat_gateway.__main__ import print_verify
+        root = tmpdir(self, "gw-deny-count-") / "audit"
+        log = AuditLog(root, KEY)
+        log.append(action="dlp_blocked", channel_tier="T1", event_id="a")
+        log.append(action="policy_denied", event_id="b")                       # sys tier
+        log.append(action="policy_denied", channel_tier="T0", event_id="c")
+        log.append(action="config_refused")
+        log.append(action="msg_in", channel_tier="T1", event_id="d")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertTrue(print_verify(str(root), KEY))
+        self.assertIn("deny events (all tier files, for the weekly sign-off): dlp_blocked=1 policy_denied=2 "
+                      "frozen=0 config_refused=1", out.getvalue())
+
+    def test_normal_weekly_sequence_passes(self):
+        from chat_gateway.__main__ import print_verify
+        from chat_gateway.audit import write_heads
+        tmp = tmpdir(self, "gw-weekly-")
+        root, hdir = tmp / "audit", tmp / "heads"
+        hdir.mkdir()
+        log = AuditLog(root, KEY)
+        log.append(action="msg_in", channel_tier="T1", event_id="a")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(print_verify(str(root), KEY, heads_out=str(hdir / "heads-W1.json")))   # week one
+        shutil.copyfile(hdir / "heads-W1.json", hdir / "latest.json")
+        log.append(action="msg_in", channel_tier="T1", event_id="b")
+        for week in ("W2", "W2"):                                           # a re-run in the same week too
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertTrue(print_verify(str(root), KEY, heads_out=str(hdir / f"heads-{week}.json"),
+                                             anchor=str(hdir / "latest.json")))
+        shutil.copyfile(hdir / "heads-W2.json", hdir / "latest.json")
+        write_heads(json.loads((hdir / "heads-W2.json").read_text()), hdir / "heads-W2.json")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(print_verify(str(root), KEY, heads_out=str(hdir / "heads-W3.json"),
+                                         anchor=str(hdir / "latest.json")))
+
+
+# ── I04: a chain started under another key is told apart from tampering ──
+class TestForeignKeyChain(unittest.TestCase):
+    def run_self_check(self, state, key):
+        import chat_gateway.__main__ as cli  # noqa: PLC0415
+        env = {"MFG_TEAM_STATE_DIR": str(state), "MFG_TEAM_AUDIT_HMAC_KEY": key, "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20}
+        err, out = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
+            rc = cli.main(["self-check", "--roster", str(FIXTURES / "roster.json")], env=env)
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_demo_rehearsal_then_real_key(self):
+        import chat_gateway.__main__ as cli  # noqa: PLC0415
+        from chat_gateway.audit import foreign_key_chain
+        state = tmpdir(self, "gw-demo-") / "state"
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["self-check", "--roster", str(FIXTURES / "roster.json")],
+                                      env={"MFG_TEAM_STATE_DIR": str(state)}), 0)
+        self.assertIn("DEMO KEYS wrote to", err.getvalue())                 # warned at the rehearsal
+        rc, _, err = self.run_self_check(state, "k" * 32)
+        self.assertEqual(rc, 78)
+        self.assertIn("started under the public demo key", err)
+        self.assertIn("archive", err)
+        self.assertIn("not by itself a sign of tampering", err)
+        self.assertNotIn("may have been tampered", err)
+        self.assertTrue(foreign_key_chain(state / "audit", b"k" * 32))
+
+    def test_other_key_and_genuine_tamper_are_told_apart(self):
+        from chat_gateway.audit import foreign_key_chain
+        state = tmpdir(self, "gw-key-") / "state"
+        rc, _, _ = self.run_self_check(state, "k" * 32)
+        self.assertEqual(rc, 0)
+        rc, _, err = self.run_self_check(state, "k" * 32)
+        self.assertEqual(rc, 0)
+        self.assertIn("already held an audit chain", err)
+        rc, _, err = self.run_self_check(state, "x" * 32)
+        self.assertEqual((rc, "started under a different key" in err), (78, True))
+        f = state / "audit" / "sys" / "audit.jsonl"
+        lines = f.read_text(encoding="utf-8").splitlines()
+        rec = json.loads(lines[-1])
+        rec["deny_reason"] = "edited"
+        f.write_text("\n".join(lines[:-1] + [json.dumps(rec)]) + "\n", encoding="utf-8")
+        self.assertFalse(foreign_key_chain(state / "audit", b"k" * 32))
+        rc, _, err = self.run_self_check(state, "k" * 32)
+        self.assertEqual(rc, 78)
+        self.assertIn("may have been tampered", err)
+        self.assertNotIn("different key", err)
+
+
+# ── I05: a real chat adapter needs a denylist (or an explicit opt-out) ──
+class TestDenylistRequired(unittest.TestCase):
+    def setUp(self):
+        self.state = tmpdir(self, "gw-deny-") / "state"
+        self.env = {"MFG_TEAM_STATE_DIR": str(self.state), "MFG_TEAM_AUDIT_HMAC_KEY": "k" * 20,
+                    "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20, "MFG_TEAM_ADAPTER": "slack",
+                    "MFG_TEAM_DENYLIST": ""}
+
+    def run_main(self, env):
+        import chat_gateway.__main__ as cli  # noqa: PLC0415
+        from chat_gateway.adapters.mock import MockAdapter  # noqa: PLC0415
+        err, out = io.StringIO(), io.StringIO()
+        fake = lambda cfg, roster, script: MockAdapter(script=[], out=io.StringIO())   # noqa: E731 - no SDK
+        with mock.patch.object(cli, "_make_adapter", side_effect=fake), \
+                contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
+            rc = cli.main(["self-check", "--roster", str(FIXTURES / "roster.json")], env=env)
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_missing_denylist_refuses_with_64(self):
+        with mock.patch("chat_gateway.config.DEFAULT_DENYLIST", str(self.state.parent / "absent.denylist")):
+            rc, _, err = self.run_main(self.env)
+        self.assertEqual(rc, 64, err)
+        self.assertIn("MFG_TEAM_DENYLIST", err)
+        self.assertIn("MFG_TEAM_NO_DENYLIST=1", err)
+        empty = self.state.parent / "empty.denylist"
+        empty.write_text("# nothing yet\n", encoding="utf-8")
+        rc, _, err = self.run_main({**self.env, "MFG_TEAM_DENYLIST": str(empty)})
+        self.assertEqual(rc, 64, err)
+        self.assertIn("has no entries", err)
+
+    def test_explicit_opt_out_runs_and_says_so(self):
+        with mock.patch("chat_gateway.config.DEFAULT_DENYLIST", str(self.state.parent / "absent.denylist")):
+            rc, out, err = self.run_main({**self.env, "MFG_TEAM_NO_DENYLIST": "1"})
+        self.assertEqual(rc, 0, err)
+        self.assertIn("denylist: NOT LOADED", out)
+
+    def test_loaded_denylist_is_printed_and_audited(self):
+        rc, out, err = self.run_main({**self.env, "MFG_TEAM_DENYLIST": str(STARTER)})
+        self.assertEqual(rc, 0, err)
+        n = len(sanitize.load_denylist(STARTER))
+        self.assertIn(f"denylist: {STARTER} ({n} entries)", out)
+        last = json.loads((self.state / "audit" / "sys" / "audit.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(last["action"], "config_loaded")
+        self.assertEqual(last["driver_info"]["denylist"], {"path": str(STARTER), "entries": n})
+
+    def test_mock_adapter_needs_no_denylist(self):
+        with mock.patch("chat_gateway.config.DEFAULT_DENYLIST", str(self.state.parent / "absent.denylist")):
+            rc, out, err = self.run_main({**self.env, "MFG_TEAM_ADAPTER": "mock"})
+        self.assertEqual(rc, 0, err)
 
 
 # ── S05: symlinked state dir refused before resolve() ────────────────

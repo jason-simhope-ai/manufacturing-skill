@@ -20,10 +20,14 @@ Pinned argv (never widened, never built from chat text):
   be or sit inside `~/.claude` or any dot-directory directly under $HOME (`~/.ssh`, `~/.aws`,
   `~/.config` …), checked against both the `HOME` variable and the account's home (R-01).
 * Data-root content (S10, `chat_gateway.datascan`): at startup and before every call the tree is
-  walked; a symlink, a roster/identity/binding/prompt file or more than 5,000 files refuses, and
-  text files ≤ 2 MB that changed since the last scan are run through DLP_PATTERNS + the local
-  denylist. A T3 hit refuses to start (exit 3) or refuses the call (`DriverPolicyDenied`, audited
-  `policy_denied`); a T2 hit is a warning on stderr (the data root is T1).
+  walked; a symlink, a FIFO/socket/device, a roster/identity/binding/prompt file or more than
+  5,000 files refuses, and text files ≤ 2 MB that changed since the last scan are run through
+  DLP_PATTERNS + the local denylist + the secret shapes. A T3 or secret hit refuses to start
+  (exit 3) or refuses the call (`DriverPolicyDenied`, audited `policy_denied`); a T2 hit is a
+  warning on stderr (the data root is T1). A file the scan cannot read as text (PDF, Office,
+  image, other binary, UTF-16 without a BOM, over 2 MB) also refuses (exit 3 / reason
+  `data_root:unscanned`) unless `MFG_TEAM_DATA_ALLOW_UNSCANNED=1` is set, in which case it is a
+  warning and the model may read that file unchecked (the operator's documented risk).
 * The state dir must not be group/other-writable; `driver-tmp/` and `driver-home/` under it are
   0700, owned by the gateway user and never symlinks (checked on every call).
 * The child runs in its own process group, which is killed on every exit path. Stdout is
@@ -104,6 +108,7 @@ REQUIRED_FLAGS: tuple[tuple[str, tuple[str, ...]], ...] = (
 KEY_VARS = ("ANTHROPIC_API_KEY", "MFG_TEAM_ANTHROPIC_API_KEY")
 # Forwarded only with MFG_TEAM_PASS_PROXY_ENV=1 (behind a corporate proxy / TLS-inspecting CA).
 PASS_PROXY_VAR = "MFG_TEAM_PASS_PROXY_ENV"
+ALLOW_UNSCANNED_VAR = "MFG_TEAM_DATA_ALLOW_UNSCANNED"   # "1": unscannable data files only warn (P-01)
 PROXY_VARS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy",
               "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS")
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -376,14 +381,19 @@ class ClaudeCodeDriver:
         state = Path(os.path.realpath(self.state_dir))
         return state / CACHE_NAME if state.is_dir() else None
 
-    def _scan_data_roots(self, only_fresh_t2: bool = False) -> tuple[list[str], list[str], list[str]]:
-        """EXT-05 + S10: walk each data root (symlinks, forbidden files, entry cap) and DLP-scan the
-        text files that changed since the last scan. Returns (problems, t3_messages, t2_messages);
-        messages name files and pattern names, never content. With `only_fresh_t2`, T2 messages
-        cover only files read in this scan (a warning per change, not per call)."""
+    def _allow_unscanned(self) -> bool:
+        return self._env.get(ALLOW_UNSCANNED_VAR) == "1"
+
+    def _scan_data_roots(self, only_fresh_t2: bool = False) -> tuple[list[str], list[str], list[str], list[str]]:
+        """EXT-05 + S10: walk each data root (symlinks, special files, forbidden files, entry cap) and
+        DLP + secret-scan the text files that changed since the last scan. Returns (problems,
+        t3_messages, t2_messages, unscanned_messages); messages name files and pattern names, never
+        content. Unscanned files are refusals unless `MFG_TEAM_DATA_ALLOW_UNSCANNED=1`, then T2-style
+        warnings. With `only_fresh_t2`, warnings cover only files read in this scan (one per change)."""
         problems: list[str] = []
         t3: list[str] = []
         t2: list[str] = []
+        unscanned: list[str] = []
         for var, real in self._data_roots():
             if not os.path.isdir(real):
                 continue
@@ -392,6 +402,8 @@ class ClaudeCodeDriver:
             for kind, detail in res.problems:
                 problems.append({
                     "symlink": f"{var} contains a symlink ({detail}); copy the data in instead",
+                    "special_file": f"{var} contains a FIFO, socket or device ({detail}); only regular files "
+                                    "and directories are allowed (it was not opened)",
                     "forbidden": f"{var} contains roster, identity, binding or prompt files ({detail})",
                     "too_many_files": f"{var} holds more than {MAX_FILES:,} files; refused (the data scan is capped: "
                                       "keep only the de-identified exports the twins need)",
@@ -404,12 +416,20 @@ class ClaudeCodeDriver:
                     shown = "; ".join(f"{rel} ({', '.join(res.hits[rel][1][:3])})" for rel in files[:5])
                     more = f" and {len(files) - 5} more" if len(files) > 5 else ""
                     out.append(f"{var}: {len(files)} file(s) carry {tier} markers: {shown}{more}")
-            if res.unscanned and res.fresh & set(res.unscanned):
+            allow = self._allow_unscanned()
+            if res.unscanned and (not allow or not only_fresh_t2 or res.fresh & set(res.unscanned)):
                 n_bin = sum(v == "binary" for v in res.unscanned.values())
                 n_big = len(res.unscanned) - n_bin
-                t2.append(f"{var}: not scanned: {n_bin} binary file(s) and {n_big} file(s) over 2 MB "
-                          "(the model may still read them; keep only checked text exports there)")
-        return problems, t3, t2
+                names = sorted(res.unscanned)
+                shown = "; ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
+                what = f"{n_bin} binary/document file(s) and {n_big} file(s) over 2 MB ({shown})"
+                if allow:
+                    t2.append(f"{var}: not scanned: {what}; {ALLOW_UNSCANNED_VAR}=1, so the model may read them "
+                              "unchecked")
+                else:
+                    unscanned.append(f"{var}: cannot be scanned: {what}. Convert them to UTF-8 text exports "
+                                     f"(≤ 2 MB), move them out, or accept the risk with {ALLOW_UNSCANNED_VAR}=1")
+        return problems, t3, t2, unscanned
 
     def _private_dirs(self) -> tuple[Path, Path]:
         """(driver-tmp, driver-home) under the state dir, created 0700 and verified on each call."""
@@ -459,13 +479,18 @@ class ClaudeCodeDriver:
                 self.flag_check = "exec_failed"
         problems += self._path_problems()
         if not any("MFG_TEAM_DATA_T1" in p for p in problems):     # never walk a root already refused
-            scan_problems, t3, t2 = self._scan_data_roots()
+            scan_problems, t3, t2, unscanned = self._scan_data_roots()
             problems += scan_problems
             for line in t2:
                 print(f"claude-code: warning: {line}", file=sys.stderr)
-            if t3:
-                raise ConfigRefused("; ".join(t3) + "; T3 content must not be in a data root a cloud model reads. "
-                                    "Remove those files, then start again", exit=EXIT_T3)
+            if t3 or unscanned:
+                tail = []
+                if t3:
+                    tail.append("T3 content and secrets must not be in a data root a cloud model reads")
+                if unscanned:
+                    tail.append("files the scan cannot read are refused by default")
+                raise ConfigRefused("; ".join(t3 + unscanned + tail) + ". Remove those files, then start again",
+                                    exit=EXIT_T3)
         if self._key_var() is None:
             problems.append("ANTHROPIC_API_KEY (or MFG_TEAM_ANTHROPIC_API_KEY) is not set")
         return problems
@@ -480,12 +505,15 @@ class ClaudeCodeDriver:
     def _check_data_root_for_call(self) -> None:
         """S10 + R-05: before a call that gets `--add-dir`, rescan (only changed files are re-read).
         Anything wrong refuses this call as policy, without running the model."""
-        problems, t3, t2 = self._scan_data_roots(only_fresh_t2=True)
+        problems, t3, t2, unscanned = self._scan_data_roots(only_fresh_t2=True)
         for line in t2:
             print(f"claude-code: warning: {line}", file=sys.stderr)
         if t3:
             print(f"claude-code: refused a call: {'; '.join(t3)}", file=sys.stderr)
             raise DriverPolicyDenied("data_root:T3")
+        if unscanned:
+            print(f"claude-code: refused a call: {'; '.join(unscanned)}", file=sys.stderr)
+            raise DriverPolicyDenied("data_root:unscanned")
         if problems:
             print(f"claude-code: refused a call: {problems[0]}", file=sys.stderr)
             kinds = [k for k, _ in self.last_scan.problems] if self.last_scan else []
