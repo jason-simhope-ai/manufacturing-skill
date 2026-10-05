@@ -66,6 +66,7 @@ Instead, this directory defines the **interface contract** — the tools your ER
 
 注意遮罩的範圍：
 
+- **遮罩是遞迴的**：`project_fields()` 會從巢狀 dict、list 裡的 dict（UDF 欄位區塊、單據明細行）一路移除被遮罩的欄位，key 不分大小寫與標點（`Unit_Price`、`unitPrice` 都算 `unit_price`）；巢狀被藏的欄位以路徑列在 `masked_fields`（如 `lines[].unit_price`）。
 - **只遮「值」**。有哪些紀錄（客戶 id / 名稱清單、料號清單）本身不受遮罩；若某角色連清單都不該看到，請在你的 connector 依 `ctx.role` 直接拒絕該 list 工具。
 - list 結果的 `masked_fields` 是**所有 row 的聯集**（這次查詢藏了哪些欄位），不是逐列標記。
 - 自家客製欄位要歸入群組，覆寫 `sensitive_groups`（與 `role_grants` 一樣是 class attribute）：
@@ -95,12 +96,12 @@ class MyConnector(ErpConnector):
 每個寫入工具：
 
 - 必帶 **keyword-only `idempotency_key`**（1–128 個可列印字元）。同一個 key + 相同參數 → 回傳同一筆結果（`status="replayed"`），**不會重複建單**；同 key 但參數不同 → 拒絕 `idempotency_key_conflict`。
-- 必須先呼叫 `authorize_write()`（內部呼叫你實作的 `verify_approval(token, action_hash)`），通過才可動 ERP。檢查順序：角色是否可用此工具 → 有無 token → token 驗證 → token 帶 `approval_id` → 核准人 ≠ 請求人（雙人核准）→ **核准人的角色可核准此工具**（`approver_roles[tool]`，預設 `DEFAULT_APPROVER_ROLES`，deny by default）。
-- **一次核准只授權一筆寫入**：`authorize_write()` 是無狀態的，所以寫入路徑在查完冪等紀錄之後，若這個 `approval_id` 已經用另一個 key 寫過 → 拒絕 `approval_already_used`；第一次成功寫入時把 `approval_id` 記成已使用（跟冪等紀錄放在同一筆持久化資料，`approval_id` 加唯一索引）。同一個 key 重送仍是 `replayed`；驗證失敗、被拒絕的呼叫**不會**消耗核准。
+- 必須先呼叫 `authorize_write()`（內部呼叫你實作的 `verify_approval(token, action_hash)`），通過才可動 ERP。檢查順序：角色是否可用此工具 → 有無 token → token 驗證 → token 帶 `approval_id` → token 綁定的請求人 = 本次呼叫的 `ctx.operator_id` → 核准人 ≠ 請求人（雙人核准）→ **核准人的角色可核准此工具**（`approver_roles[tool]`，預設 `DEFAULT_APPROVER_ROLES`，deny by default）。
+- **一次核准只授權一筆寫入**：`authorize_write()` 是無狀態的，所以寫入路徑在查完冪等紀錄之後，若這個 `approval_id` 已經用另一個 key 寫過 → 拒絕 `approval_already_used`；寫入前把 `approval_id` 記成已使用（跟冪等紀錄放在同一筆持久化資料，`approval_id` 加唯一索引）。這份「已使用」紀錄一定要**持久化**：契約提供 `ApprovalStore` 協定（`is_consumed(id)` / `mark_consumed(id)`）、記憶體版 `InMemoryApprovalStore`（測試用，重啟即失）與檔案版 `JsonFileApprovalStore(path)`（路徑由營運者提供，原子寫入；檔案損毀時丟錯誤而不是當成空的）。mock 接受 `approval_store=`，預設記憶體；正式 connector 請用資料庫唯一索引實作同一個協定，否則 TTL（900 秒）內的 token 在重啟後可以再用一次。標記發生在驗證通過、提交之前，中途當機會燒掉該核准（fail closed），不會留下可重用的 token。同一個 key 重送仍是 `replayed`；驗證失敗、被拒絕的呼叫**不會**消耗核准。
 - 回傳 `WriteResult`（不再是裸 `str` / `bool`）：`status` 為 `committed` / `replayed` / `refused`，`record_id` 為 SO / PR / 異動單號，並帶 audit 欄位（`operator_id`、`role`、`channel`、`request_id`、`classification`、`approver_id`、`approver_role`、`approval_id`、`action_hash`、`idempotency_key`、`timestamp`、`reason`）。`WriteResult.audit_record()` 產出可直接寫入 audit log 的 dict。
 - 數量與金額用 `Decimal`（不要 `float`）；時間一律帶時區。
 
-拒絕原因（`reason`，常數在 `contract.py` 的 `REASON_*`）：`role_not_permitted`、`approval_required`、`approval_malformed`、`approval_signature_invalid`、`approval_expired`、`self_approval`、`approver_role_not_permitted`、`approval_already_used`、`idempotency_key_conflict`，以及 connector 自己的 `validation:<原因>`。
+拒絕原因（`reason`，常數在 `contract.py` 的 `REASON_*`）：`role_not_permitted`、`approval_required`、`approval_malformed`、`approval_misconfigured`（核准密鑰不是 bytes 或短於 32 bytes）、`approval_signature_invalid`、`approval_expired`、`approval_requester_mismatch`（token 是替別的請求人核准的）、`self_approval`、`approver_role_not_permitted`、`approval_already_used`、`idempotency_key_conflict`，以及 connector 自己的 `validation:<原因>`。
 
 ### 核准 token（`verify_approval`）
 
@@ -133,17 +134,31 @@ action_hash = "sha256:" + hex( sha256( utf8( json.dumps(
 
 Golden 向量（`tests/mcp/test_erp_contract.py` 的 `test_golden_vector`）：`create_sales_order`、`{"customer_id": "C-A001", "items": [{"part_no": "BR-12345", "qty": Decimal("10.00")}], "delivery_date": 2026-05-20 08:00 Asia/Taipei, "po_reference": "PO-客戶-1"}` → `sha256:89dd2d286dd6ab1c90eac72608f640379a5820295bde8ac1233ebc36c3be71a5`。
 
-**Token 格式（canonical，v1）**
+**核准人角色（approver roles）**
+
+核准 token 內的 `approver_role` 必須是**團隊 roster 的職位 id**（`team/roster.example.yaml` 的 `positions[].id`），核准服務與 roster 才會講同一套名稱。每個 id 都要符合 team linter 的職位 id 格式：小寫 kebab-case，`^[a-z][a-z0-9-]{1,40}$`（`contract.APPROVER_ROLE_ID_RE`，有測試把關）。預設值（`DEFAULT_APPROVER_ROLES`，deny by default，沒列出的工具與角色一律拒絕）：
+
+| Tool                        | 預設可核准的 roster 職位 id |
+| --------------------------- | --------------------------- |
+| `create_sales_order`        | `sales-manager`             |
+| `create_purchase_request`   | `production-manager`        |
+| `update_inventory_movement` | `production-manager`        |
+| `close_sales_order`         | `sales-manager`             |
+
+這些只是範例 roster 的預設；各公司在 connector 設定覆寫 `approver_roles`，填入**自己 roster 的職位 id**（例如 `{"create_purchase_request": {"purchasing-manager"}}`，前提是 roster 真有這個職位）。不要使用 roster 沒有的 id（例如自創的 `plant-manager`），否則核准人永遠對不上而一律被拒（`approver_role_not_permitted`）。
+
+**Token 格式（canonical，v2）**
 
 ```text
-token = "v1|<approver_id>|<approver_role>|<approval_id>|<expiry>|<mac>"
-mac   = hex( HMAC-SHA256(secret, utf8("v1|<approver_id>|<approver_role>|<approval_id>|<expiry>|<action_hash>")) )
+token = "v2|<approver_id>|<approver_role>|<approval_id>|<expiry>|<requester_id>|<mac>"
+mac   = hex( HMAC-SHA256(secret, utf8("v2|<approver_id>|<approver_role>|<approval_id>|<expiry>|<requester_id>|<action_hash>")) )
 ```
 
-`expiry` 為整數 Unix 秒；`approval_id` 每次核准唯一；欄位不得含 `|`。驗證條件：
+`expiry` 為整數 Unix 秒；`approval_id` 每次核准唯一；`requester_id` 是提出這筆寫入的人（`CallContext.operator_id`）；欄位不得含 `|`。**密鑰 `secret` 必須是 `bytes` 且至少 32 bytes**：`issue_approval_token` 與 `MockErpConnector` 對空的、太短的、`str` 密鑰丟 `ValueError`；`verify_approval_token` 不丟例外，一律回拒絕 `approval_misconfigured`（環境變數沒設而讀到空字串時不會變成「誰都能核准」）。驗證條件：
 
 - 簽章 / MAC 正確（常數時間比對）；
 - **綁定這個 `action_hash`**（核准 10 件，就不能拿去下 10000 件）；
+- **綁定請求人**：MAC 涵蓋 `requester_id`，`authorize_write()` 再比對它與 `ctx.operator_id`，別的有寫入角色的人拿到 token 也用不了（`approval_requester_mismatch`）；
 - 未過期（`DEFAULT_APPROVAL_TTL_SECONDS` = 900）；
 - 帶有核准人 ID、核准人角色、`approval_id`。
 
@@ -170,12 +185,14 @@ print(json.dumps(to_jsonable(result), ensure_ascii=False))
 
 ### 用 conformance suite 驗收你自己的 connector
 
-[`tests/mcp/test_erp_contract.py`](../../../tests/mcp/test_erp_contract.py) 的 `ConformanceSuite` 是 mixin，只用 `ErpConnector` 的公開 API（不讀 mock 內部的 `.sales_orders`、`.audit_log`，audit 是包住 `record_audit` 攔下來的）。你只要實作 `make_connector(clock)`：
+[`tests/mcp/test_erp_contract.py`](../../../tests/mcp/test_erp_contract.py) 的 `ConformanceSuite` 是 mixin，只用 `ErpConnector` 的公開 API（不讀 mock 內部的 `.sales_orders`、`.audit_log`，audit 是包住 `record_audit` 攔下來的）。你要實作三個 hook：`make_connector(clock)`、`make_restarted_connector(previous, clock)`、`written_count(tool)`：
 
 - 讀取端要提供合成 fixture `mock-data/erp_mock.json` 的資料（例如灌進測試 DB / view）；
 - token 到期與「最近 N 天」要用傳進來的 `clock`；
 - token 用 canonical 格式（`verify_approval_token`）；若你的核准服務不同，覆寫 `issue_token`。
-- 可選：覆寫 `written_count(tool)` / `assert_written(tool, record_id)`，讓 suite 也檢查你後端實際寫了幾筆。
+- `written_count(tool)`（**必填**）：回傳 ERP 後端實際由該工具建立的筆數（四個寫入工具都要回整數；`close_sales_order` 回已結案的單數）。每個測試結束時 suite 都會檢查「ERP 裡的筆數 = connector 回報 committed 的筆數」，所以先寫 ERP 再驗核准的 connector 會被抓到；沒實作會直接報錯。
+- `make_restarted_connector(previous, clock)`（**必填**）：回傳一個接在**同一份持久化後端**（ERP 資料與 `ApprovalStore`）上的新 connector，模擬行程重啟；suite 用它確認重啟後已用過的核准仍被拒（`approval_already_used`）。
+- 可選：覆寫 `assert_written(tool, record_id)` 檢查單號存在。
 
 ```python
 # tests/test_my_erp.py
@@ -187,6 +204,12 @@ class MyErpConformance(erp.ConformanceSuite, unittest.TestCase):
     def make_connector(self, clock):
         return MyErpConnector(approval_secret=erp.SECRET, clock=clock,
                               read_db=load_fixture_into_test_db(erp.FIXTURE_PATH))
+
+    def make_restarted_connector(self, previous, clock):   # 同一份後端、全新行程
+        return self.make_connector(clock)
+
+    def written_count(self, tool):                          # 數 ERP 裡實際的單據
+        return count_erp_documents(tool)
 
 if __name__ == "__main__":
     unittest.main()
@@ -207,9 +230,10 @@ if __name__ == "__main__":
 - [ ] **每個工具都收 `ctx: CallContext`**；不要從模型或使用者的自由文字取得操作人
 - [ ] **讀取可走唯讀 view / read-only replica**，用唯讀服務帳號；**寫入一律走 ERP 官方 API 或單據介面**（REST / OData / 單據匯入），**絕不直接 INSERT / UPDATE 單據表**（會繞過 ERP 的商業邏輯、編號與簽核）。寫入服務帳號只給 connector，不給 agent / twin
 - [ ] 每個寫入工具：驗 `idempotency_key` → `authorize_write()` → 查冪等紀錄（replay / conflict）→ 檢查 `approval_id` 未被使用 → 寫入 ERP → 標記完成並消耗 `approval_id` → 回傳 `WriteResult`
+- [ ] 已使用的 `approval_id` 走 `ApprovalStore`（或同等的資料庫唯一索引），不是放記憶體；核准密鑰是 `bytes`、至少 32 bytes
 - [ ] 冪等紀錄（含 `approval_id`）要**持久化**，不是放記憶體；connector 重啟後重送同 key 仍不能重複建單
 - [ ] 本地冪等表與 ERP API **不可能在同一個交易裡**，請用「先預留、帶外部單號寫入、再標完成」（見下方）
-- [ ] `verify_approval` 驗簽、綁 `action_hash`、檢查到期，回傳 `approver_id`、`approver_role`、`approval_id`；token 不得出現在 log
+- [ ] `verify_approval` 驗簽、綁 `action_hash`、檢查到期，回傳 `approver_id`、`approver_role`、`approval_id`、`requester_id`（缺少 `requester_id` 會被 `authorize_write()` 拒絕）；token 不得出現在 log
 - [ ] 所有 list 工具套用 `clamp_max_rows()` 與 `project_fields()`；SQL 端也要 `LIMIT`，不要先撈全表再截
 - [ ] 欄位遮罩依 `ctx.role`；自家客製欄位（特殊報價、客戶聯絡人、成本）用 `sensitive_groups` 歸入 `price` / `customer_contact` 群組或新增群組（範例見上方）
 - [ ] **每次呼叫**（讀、寫、被拒）都用 `ctx` 寫 audit。預設 `record_audit` 把每筆事件以一行 JSON 寫到 **stderr**（不會被默默丟掉）；正式環境請覆寫成 append-only 儲存

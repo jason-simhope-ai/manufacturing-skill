@@ -13,8 +13,10 @@ What it demonstrates
 - ``max_rows`` default 200 / hard cap 1000, and the ``fields`` allowlist;
 - idempotent writes (same key + same arguments -> same record, no duplicate);
 - refusal without a valid approval token (role check, token bound to the
-  action hash, expiry, approver != requester, approver role allowed);
-- single-use approvals: one approval_id commits at most one write;
+  action hash and to the requester, expiry, approver != requester, approver
+  role allowed);
+- single-use approvals: one approval_id commits at most one write, kept in
+  an ``ApprovalStore`` (in-memory by default, JSON file to survive restarts);
 - an audit event for every call, in ``self.audit_log``.
 
 Tokens use the canonical format defined in ``contract.py``
@@ -35,16 +37,19 @@ from contract import (
     REASON_APPROVAL_ALREADY_USED,
     REASON_IDEMPOTENCY_KEY_CONFLICT,
     ApprovalDecision,
+    ApprovalStore,
     CallContext,
     CreditStatus,
     CustomerMaster,
     ErpConnector,
+    InMemoryApprovalStore,
     InventorySnapshot,
     ListResult,
     MachineRate,
     PartMaster,
     PurchasePrice,
     WriteResult,
+    check_approval_secret,
     clamp_max_rows,
     issue_approval_token,
     project_fields,
@@ -70,10 +75,13 @@ class MockErpConnector(ErpConnector):
         approval_secret: bytes,
         data: dict | None = None,
         clock: Callable[[], datetime] | None = None,
+        approval_store: ApprovalStore | None = None,
     ) -> None:
-        if not approval_secret:
-            raise ValueError("approval_secret must be non-empty")
+        check_approval_secret(approval_secret)  # bytes, >= 32 bytes
         self._secret = approval_secret
+        # Consumed approval ids. In-memory by default; pass a
+        # JsonFileApprovalStore(path) to make single use survive a restart.
+        self.approval_store: ApprovalStore = approval_store or InMemoryApprovalStore()
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         if data is None:
             data = json.loads(DEFAULT_DATA_PATH.read_text(encoding="utf-8"))
@@ -87,8 +95,6 @@ class MockErpConnector(ErpConnector):
         self.purchase_requests: dict[str, dict] = {}
         self.movements: list[dict] = []
         self._idem: dict[tuple[str, str], tuple[str, str]] = {}
-        # approval_id -> (tool, idempotency_key) of the write it authorised
-        self._approvals_used: dict[str, tuple[str, str]] = {}
         self._lock = threading.Lock()
         self._seq = 0
         # Every call, allowed or refused (see ErpConnector.record_audit)
@@ -436,7 +442,7 @@ class MockErpConnector(ErpConnector):
                     ctx, tool, key, action_hash, decision, status="replayed",
                     record_id=record_id, timestamp=self._clock(),
                 )
-            if decision.approval_id in self._approvals_used:
+            if self.approval_store.is_consumed(decision.approval_id):
                 # One approval, one write: a new key cannot reuse the token.
                 return self.make_write_result(
                     ctx, tool, key, action_hash, decision, status="refused",
@@ -448,9 +454,11 @@ class MockErpConnector(ErpConnector):
                     ctx, tool, key, action_hash, decision, status="refused",
                     reason=f"validation:{problem}", timestamp=self._clock(),
                 )
+            # Consume before committing: a crash in between burns the approval
+            # (fail closed) instead of leaving it spendable again.
+            self.approval_store.mark_consumed(decision.approval_id)
             record_id = commit()
             self._idem[(tool, key)] = (action_hash, record_id)
-            self._approvals_used[decision.approval_id] = (tool, key)
         return self.make_write_result(
             ctx, tool, key, action_hash, decision, status="committed",
             record_id=record_id, timestamp=self._clock(),

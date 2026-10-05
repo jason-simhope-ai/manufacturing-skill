@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `max_rows` (default 200, hard cap 1000) and `fields` (allowlist) on the new list tools `list_customers`, `list_parts`, `list_inventory`; default masking of `price` and `customer_contact` field groups unless the role is granted them (deny by default).
 - `infra/mcp-servers/erp-connector/mock_connector.py` and `mock-data/erp_mock.json` — reference `MockErpConnector` over synthetic data demonstrating masking, row caps, idempotent writes and refusal without a valid approval token.
 - `tests/mcp/test_erp_contract.py` (stdlib `unittest`) with a reusable `ConformanceSuite` mixin to run against your own connector, and a CI step "erp-connector — contract tests".
+- ERP contract hardening: `DEFAULT_APPROVER_ROLES` now use team roster position ids (`sales-manager`, `production-manager`; `APPROVER_ROLE_ID_RE` = the team linter's position-id pattern); approval token is `v2` and binds the requester (`approval_requester_mismatch`); approval secrets must be `bytes` of at least 32 bytes (`approval_misconfigured` on verify); `ApprovalStore` / `InMemoryApprovalStore` / `JsonFileApprovalStore` make single use survive restarts; `project_fields()` masks recursively and case-insensitively; `ConformanceSuite` now requires `written_count` and `make_restarted_connector` and checks ERP writes after every test. **Breaking for token issuers and connector test subclasses.**
 
 ## [0.1.5] — 2026-05-09
 

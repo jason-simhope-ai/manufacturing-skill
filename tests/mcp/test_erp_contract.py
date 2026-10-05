@@ -32,6 +32,12 @@ given for token expiry and "last N days" queries::
             return MyConnector(approval_secret=self.APPROVAL_SECRET,
                                clock=clock, ...)  # seeded with erp.FIXTURE_PATH
 
+        def make_restarted_connector(self, previous, clock):
+            ...  # new process, same durable ERP data and ApprovalStore
+
+        def written_count(self, tool):
+            ...  # records the ERP really holds for that write tool (int)
+
     if __name__ == "__main__":
         unittest.main()
 """
@@ -43,7 +49,9 @@ import hashlib
 import inspect
 import io
 import json
+import hmac
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -55,8 +63,17 @@ FIXTURE_PATH = ERP_DIR / "mock-data" / "erp_mock.json"
 sys.path.insert(0, str(ERP_DIR))
 
 from contract import (  # noqa: E402
+    APPROVER_ROLE_ID_RE,
+    ApprovalStore,
+    InMemoryApprovalStore,
+    JsonFileApprovalStore,
+    project_fields,
+    check_approval_secret,
+    DEFAULT_APPROVER_ROLES,
     REASON_APPROVAL_ALREADY_USED,
+    REASON_APPROVAL_MISCONFIGURED,
     REASON_APPROVER_ROLE_NOT_PERMITTED,
+    REASON_REQUESTER_MISMATCH,
     SENSITIVE_GROUPS,
     CallContext,
     CanonicalArgsError,
@@ -79,11 +96,17 @@ from contract import (  # noqa: E402
 )
 from mock_connector import MockErpConnector  # noqa: E402
 
-SECRET = b"unit-test-secret-not-real"
+SECRET = b"unit-test-secret-not-real-0123456789"  # >= 32 bytes (contract minimum)
 NOW = datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc)
 FUTURE = datetime(2026, 5, 20, tzinfo=timezone.utc)
 ITEMS = [{"part_no": "BR-12345", "qty": 10}]
-APPROVER_ROLE = "plant-manager"  # in DEFAULT_APPROVER_ROLES for every write tool
+
+
+def approver_role_for(tool):
+    """A role that DEFAULT_APPROVER_ROLES lets approve ``tool`` (a roster position id)."""
+    return sorted(DEFAULT_APPROVER_ROLES[tool])[0]
+
+
 WRITE_TOOLS = (
     "create_sales_order",
     "create_purchase_request",
@@ -114,10 +137,12 @@ def so_args(items=ITEMS):
             "delivery_date": FUTURE, "po_reference": "PO-1"}
 
 
-def token_for(tool, args, approver="u-approver", approver_role=APPROVER_ROLE, **kw):
+def token_for(tool, args, approver="u-approver", approver_role=None,
+              requester="u-requester", **kw):
     kw.setdefault("now", NOW)
+    approver_role = approver_role or approver_role_for(tool)
     return issue_approval_token(SECRET, approver, compute_action_hash(tool, args),
-                                approver_role=approver_role, **kw)
+                                approver_role=approver_role, requester_id=requester, **kw)
 
 
 def approved_so(c, key="k-1", items=ITEMS):
@@ -130,7 +155,113 @@ def approved_so(c, key="k-1", items=ITEMS):
 # ─── The contract module ────────────────────────────────────
 
 
+def forge_token(secret, requester="u-requester", tool="create_sales_order"):
+    """A token MAC'd by hand with ``secret`` (whatever its type or length)."""
+    h = compute_action_hash(tool, so_args())
+    exp = int(NOW.timestamp()) + 600
+    fields = f"v2|u-approver|{approver_role_for(tool)}|ap-forged|{exp}|{requester}"
+    key = secret if isinstance(secret, bytes) else str(secret).encode()
+    mac = hmac.new(key, f"{fields}|{h}".encode(), "sha256").hexdigest()
+    return h, f"{fields}|{mac}"
+
+
+class SecretAndStore(unittest.TestCase):
+    BAD_SECRETS = (b"", b"x", b"k" * 31, "k" * 40, bytearray(b"k" * 40), None, 123)
+
+    def test_issue_and_mock_refuse_weak_secrets(self):
+        h = compute_action_hash("create_sales_order", so_args())
+        for bad in self.BAD_SECRETS:
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                issue_approval_token(bad, "a", h, approver_role="r", requester_id="u")
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                MockErpConnector(bad)
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                check_approval_secret(bad)
+        with self.assertRaisesRegex(ValueError, "bytes, not str"):
+            check_approval_secret("k" * 40)
+        check_approval_secret(b"k" * 32)  # the minimum is accepted
+
+    def test_verify_refuses_forged_token_under_weak_secret(self):
+        # An unset env secret (b"") must not turn into "anyone can approve".
+        for bad in self.BAD_SECRETS:
+            h, tok = forge_token(b"" if bad is None else bad)
+            d = verify_approval_token(bad, tok, h, now=NOW)  # never raises
+            self.assertFalse(d.valid, repr(bad))
+            self.assertEqual(d.reason, REASON_APPROVAL_MISCONFIGURED, repr(bad))
+        h, tok = forge_token(b"k" * 32)  # a well-formed key still verifies
+        self.assertTrue(verify_approval_token(b"k" * 32, tok, h, now=NOW).valid)
+
+    def test_approval_store_implementations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "nested-free.json"
+            for store in (InMemoryApprovalStore(), JsonFileApprovalStore(path)):
+                self.assertIsInstance(store, ApprovalStore)
+                self.assertFalse(store.is_consumed("ap-1"))
+                store.mark_consumed("ap-1")
+                store.mark_consumed("ap-1")  # idempotent
+                self.assertTrue(store.is_consumed("ap-1"))
+                self.assertFalse(store.is_consumed("ap-2"))
+            again = JsonFileApprovalStore(path)  # "restart": a new instance, same file
+            self.assertTrue(again.is_consumed("ap-1"))
+            path.write_text("{not json", encoding="utf-8")
+            with self.assertRaises(ValueError):  # corrupt: fail closed, not "empty"
+                again.is_consumed("ap-1")
+
+    def test_mock_consumes_in_the_store_it_is_given(self):
+        store = InMemoryApprovalStore()
+        a, b = (MockErpConnector(SECRET, clock=lambda: NOW, approval_store=store)
+                for _ in range(2))
+        tok = token_for("create_sales_order", so_args(), approval_id="ap-shared")
+        self.assertTrue(a.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
+                                             idempotency_key="k-1").ok)
+        self.assertTrue(store.is_consumed("ap-shared"))
+        res = b.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
+                                   idempotency_key="k-2")
+        self.assertEqual(res.reason, REASON_APPROVAL_ALREADY_USED)
+
+
+class NestedMasking(unittest.TestCase):
+    MASKED = frozenset({"unit_price", "contact_phone"})
+
+    def test_nested_dicts_and_lists_are_masked(self):
+        rec = {"id": 1,
+               "udf": {"unit_price": Decimal("9.9"), "contact_phone": "0912", "note": "ok"},
+               "lines": [{"part_no": "A", "unit_price": 5}, {"part_no": "B"}],
+               "deep": ({"x": [{"unit_price": 1, "y": 2}]},)}
+        row, hidden = project_fields(rec, None, self.MASKED)
+        self.assertEqual(row["udf"], {"note": "ok"})
+        self.assertEqual(row["lines"], [{"part_no": "A"}, {"part_no": "B"}])
+        self.assertEqual(row["deep"], ({"x": [{"y": 2}]},))
+        self.assertEqual(hidden, ("deep[].x[].unit_price", "lines[].unit_price",
+                                  "udf.contact_phone", "udf.unit_price"))
+        self.assertIn("unit_price", rec["udf"])  # the source record is not mutated
+
+    def test_case_and_punctuation_variants_are_masked(self):
+        rec = {"Unit_Price": 1, "unitPrice": 2, "UNIT-PRICE": 3, "nested": {"Contact Phone": "x"},
+               "keep": 4}
+        row, hidden = project_fields(rec, None, self.MASKED)
+        self.assertEqual(row, {"nested": {}, "keep": 4})
+        self.assertEqual(set(hidden), {"Unit_Price", "unitPrice", "UNIT-PRICE",
+                                       "nested.Contact Phone"})
+
+    def test_fields_allowlist_still_masks_nested(self):
+        rec = {"id": 1, "lines": [{"unit_price": 5, "qty": 2}]}
+        row, hidden = project_fields(rec, ["lines"], self.MASKED)
+        self.assertEqual(row, {"lines": [{"qty": 2}]})
+        self.assertEqual(hidden, ("lines[].unit_price",))
+
+
 class ContractSurface(unittest.TestCase):
+    def test_default_approver_roles_are_roster_position_ids(self):
+        # Same pattern as the team linter's position ids (team/tools/teamlib/schema.py
+        # _ID_RE, ^[a-z][a-z0-9-]{1,40}$); the ids must also exist in team/roster.example.yaml.
+        self.assertEqual(set(DEFAULT_APPROVER_ROLES), set(WRITE_TOOLS))
+        for tool, roles in DEFAULT_APPROVER_ROLES.items():
+            self.assertTrue(roles, tool)
+            for role in roles:
+                self.assertRegex(role, r"^[a-z][a-z0-9-]{1,40}$", f"{tool}: {role!r}")
+                self.assertTrue(APPROVER_ROLE_ID_RE.fullmatch(role), f"{tool}: {role!r}")
+
     def test_abstract_tools_take_callcontext(self):
         names = sorted(ErpConnector.__abstractmethods__)
         self.assertIn("create_sales_order", names)
@@ -274,21 +405,29 @@ class WireFormat(unittest.TestCase):
     def test_token_format_and_verification(self):
         h = compute_action_hash("create_sales_order", so_args())
         tok = issue_approval_token(SECRET, "u-approver", h, approver_role="sales-manager",
-                                   now=NOW, approval_id="ap-1")
+                                   requester_id="u-requester", now=NOW, approval_id="ap-1")
         parts = tok.split("|")
-        self.assertEqual(parts[:4], ["v1", "u-approver", "sales-manager", "ap-1"])
-        self.assertEqual(len(parts), 6)
+        self.assertEqual(parts[:4], ["v2", "u-approver", "sales-manager", "ap-1"])
+        self.assertEqual(parts[5], "u-requester")
+        self.assertEqual(len(parts), 7)
         d = verify_approval_token(SECRET, tok, h, now=NOW)
-        self.assertEqual((d.valid, d.approver_id, d.approver_role, d.approval_id),
-                         (True, "u-approver", "sales-manager", "ap-1"))
-        promoted = tok.replace("|sales-manager|", "|plant-manager|")
+        self.assertEqual((d.valid, d.approver_id, d.approver_role, d.approval_id, d.requester_id),
+                         (True, "u-approver", "sales-manager", "ap-1", "u-requester"))
+        # The MAC covers the requester: swapping it invalidates the token.
+        swapped = tok.replace("|u-requester|", "|u-someone-else|")
+        self.assertEqual(verify_approval_token(SECRET, swapped, h, now=NOW).reason,
+                         "approval_signature_invalid")
+        promoted = tok.replace("|sales-manager|", "|production-manager|")
         self.assertEqual(verify_approval_token(SECRET, promoted, h, now=NOW).reason,
                          "approval_signature_invalid")
         self.assertEqual(verify_approval_token(SECRET, tok, h, now=NOW + timedelta(hours=1)).reason,
                          "approval_expired")
         with self.assertRaises(ValueError):
-            issue_approval_token(SECRET, "a|b", h, approver_role="r")
-        for junk in (None, 123, "v1|a|r|b|1|é", "v1|a|r|b|-1|x", "v1|a||b|1|x"):
+            issue_approval_token(SECRET, "a|b", h, approver_role="r", requester_id="u")
+        with self.assertRaises(ValueError):
+            issue_approval_token(SECRET, "a", h, approver_role="r", requester_id="u|v")
+        for junk in (None, 123, "v2|a|r|b|1|u|é", "v2|a|r|b|-1|u|x", "v2|a||b|1|u|x",
+                     "v1|a|r|b|1|x"):
             self.assertFalse(verify_approval_token(SECRET, junk, h, now=NOW).valid, repr(junk))
 
     def test_to_jsonable_round_trip(self):
@@ -356,11 +495,14 @@ class ConformanceSuite:
     """Contract tests that use only the public ``ErpConnector`` API.
 
     Mix into a ``unittest.TestCase`` and implement ``make_connector(clock)``.
-    Optional hooks let a subclass add backend-specific checks
-    (``written_count``, ``assert_written``); token minting can be replaced
-    via ``issue_token`` if your approval service is not the canonical HMAC
-    token. Audit events are captured by wrapping ``record_audit`` on the
-    instance, so connectors need no ``audit_log`` attribute.
+    Mandatory hooks: ``make_connector``, ``make_restarted_connector`` and
+    ``written_count`` (the suite must SEE ERP writes: after every test it
+    asserts that nothing was written beyond the committed audit events, so a
+    connector that touches the ERP before checking the approval fails).
+    Optional: ``assert_written``; token minting can be replaced via
+    ``issue_token`` if your approval service is not the canonical HMAC token.
+    Audit events are captured by wrapping ``record_audit`` on the instance,
+    so connectors need no ``audit_log`` attribute.
     """
 
     APPROVAL_SECRET = SECRET
@@ -371,15 +513,32 @@ class ConformanceSuite:
         """Return a fresh connector serving FIXTURE_PATH and using ``clock``."""
         raise NotImplementedError
 
+    def make_restarted_connector(self, previous, clock):
+        """Return a NEW connector over the same durable backend as ``previous``.
+
+        Models a process restart: the ERP data and the approval store
+        (``ApprovalStore``) persist, every in-memory object is gone. A token
+        spent before the restart must still be refused afterwards.
+        """
+        raise NotImplementedError
+
     def issue_token(self, tool, args, *, approver="u-approver",
-                    approver_role=APPROVER_ROLE, ttl_seconds=900, secret=None):
+                    approver_role=None, requester="u-requester", ttl_seconds=900,
+                    secret=None):
+        approver_role = approver_role or approver_role_for(tool)
         return issue_approval_token(
             secret or self.APPROVAL_SECRET, approver, compute_action_hash(tool, args),
-            approver_role=approver_role, ttl_seconds=ttl_seconds, now=NOW)
+            approver_role=approver_role, requester_id=requester,
+            ttl_seconds=ttl_seconds, now=NOW)
 
     def written_count(self, tool):
-        """Records your backend holds for ``tool``; None = not observable."""
-        return None
+        """Number of records your ERP backend holds that ``tool`` created.
+
+        Return an int for each of the four write tools (``WRITE_TOOLS``);
+        for ``close_sales_order`` count the closed orders. Count in the ERP
+        itself, not in the connector's own bookkeeping.
+        """
+        raise NotImplementedError("ConformanceSuite needs written_count(tool) -> int")
 
     def assert_written(self, tool, record_id):
         """Assert ``record_id`` exists in your backend (optional)."""
@@ -387,10 +546,24 @@ class ConformanceSuite:
     # --- plumbing ----------------------------------------------------------
 
     def setUp(self):
+        self._tracked = {}
         self.c = self.connect()
 
-    def connect(self, clock=None):
-        c = self.make_connector(clock or (lambda: NOW))
+    def tearDown(self):
+        # Writes seen in the ERP == writes the connector reported as committed.
+        # A write that happened before / without approval shows up as an extra.
+        if self.c is None or id(self.c) not in self._tracked:
+            return
+        baseline, events = self._tracked[id(self.c)]
+        committed = {t: 0 for t in WRITE_TOOLS}
+        for e in events:
+            if e.get("access") == "write" and e.get("status") == "committed":
+                committed[e["tool"]] += 1
+        for tool in WRITE_TOOLS:
+            self.assertEqual(self.written_count(tool), baseline[tool] + committed[tool],
+                             f"{tool}: ERP holds writes the connector did not commit")
+
+    def attach(self, c):
         events = []
         original = c.record_audit
 
@@ -400,7 +573,19 @@ class ConformanceSuite:
 
         c.record_audit = capture
         self.audit_events = events
+        baseline = {t: self.written_count_of(c, t) for t in WRITE_TOOLS}
+        self._tracked[id(c)] = (baseline, events)
         return c
+
+    def written_count_of(self, c, tool):
+        previous, self.c = getattr(self, "c", None), c
+        try:
+            return self.written_count(tool)
+        finally:
+            self.c = previous
+
+    def connect(self, clock=None):
+        return self.attach(self.make_connector(clock or (lambda: NOW)))
 
     def approved_so(self, key="k-1", items=ITEMS):
         tok = self.issue_token("create_sales_order", so_args(items))
@@ -409,9 +594,8 @@ class ConformanceSuite:
             idempotency_key=key)
 
     def assertWrittenCount(self, tool, n):
-        got = self.written_count(tool)
-        if got is not None:
-            self.assertEqual(got, n, tool)
+        baseline, _ = self._tracked[id(self.c)]
+        self.assertEqual(self.written_count(tool) - baseline[tool], n, tool)
 
     def assertRefused(self, res, reason):
         self.assertFalse(res.ok)
@@ -533,8 +717,8 @@ class ConformanceSuite:
         self.assertRefused(res, "approval_required")
 
     def test_garbage_and_forged_token(self):
-        for tok in ("garbage", "v1|a|b|9999999999|deadbeef", "v1|a|b|notint|x",
-                    "v1|a|plant-manager|b|9999999999|deadbeef"):
+        for tok in ("garbage", "v2|a|b|9999999999|deadbeef", "v2|a|b|notint|u|x",
+                    "v2|a|production-manager|b|9999999999|u-requester|deadbeef"):
             res = self.c.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE,
                                             "PO-1", idempotency_key="k")
             self.assertFalse(res.ok, tok)
@@ -542,7 +726,7 @@ class ConformanceSuite:
         self.assertWrittenCount("create_sales_order", 0)
 
     def test_token_signed_with_wrong_secret(self):
-        tok = self.issue_token("create_sales_order", so_args(), secret=b"other-secret")
+        tok = self.issue_token("create_sales_order", so_args(), secret=b"other-secret-0123456789-0123456789")
         res = self.c.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
                                         idempotency_key="k")
         self.assertRefused(res, "approval_signature_invalid")
@@ -596,7 +780,7 @@ class ConformanceSuite:
         self.assertTrue(res.ok)
         self.assertEqual(res.status, "committed")
         self.assertEqual(res.approver_id, "u-approver")
-        self.assertEqual(res.approver_role, APPROVER_ROLE)
+        self.assertEqual(res.approver_role, approver_role_for("create_sales_order"))
         self.assertTrue(res.record_id)
         self.assert_written("create_sales_order", res.record_id)
 
@@ -618,7 +802,7 @@ class ConformanceSuite:
         self.assertEqual(c.get_inventory(ctx(), "BR-12345").on_hand, Decimal("420"))
 
     def test_verify_approval_never_raises_on_junk(self):
-        for tok in (None, "", "x", "v1|||", "v1|a|b|c|d|e", 123, "v1|a|r|b|1|é"):
+        for tok in (None, "", "x", "v2|||", "v2|a|b|c|d|e|f", 123, "v2|a|r|b|1|u|é"):
             d = self.c.verify_approval(tok, "sha256:00")
             self.assertFalse(d.valid)
 
@@ -645,6 +829,26 @@ class ConformanceSuite:
         retry = call("k-1")  # the same write, retried: still fine
         self.assertEqual((retry.status, retry.record_id), ("replayed", first.record_id))
         self.assertWrittenCount("create_sales_order", 1)
+
+    def test_token_is_bound_to_the_requester(self):
+        tok = self.issue_token("create_sales_order", so_args())  # approved for u-requester
+        stolen = self.c.create_sales_order(
+            ctx(token=tok, operator="u-someone-else"), "C-A001", ITEMS, FUTURE, "PO-1",
+            idempotency_key="k-x")
+        self.assertRefused(stolen, REASON_REQUESTER_MISMATCH)
+        mine = self.c.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
+                                         idempotency_key="k-1")
+        self.assertEqual(mine.status, "committed")  # the real requester still can
+
+    def test_single_use_survives_a_restart(self):
+        tok = self.issue_token("create_sales_order", so_args())
+        first = self.c.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
+                                          idempotency_key="k-1")
+        self.assertEqual(first.status, "committed")
+        self.c = self.attach(self.make_restarted_connector(self.c, lambda: NOW))
+        again = self.c.create_sales_order(ctx(token=tok), "C-A001", ITEMS, FUTURE, "PO-1",
+                                          idempotency_key="k-after-restart")
+        self.assertRefused(again, REASON_APPROVAL_ALREADY_USED)
 
     # --- idempotency -------------------------------------------------------
 
@@ -720,7 +924,8 @@ class ConformanceSuite:
             self.assertIsNotNone(res.timestamp.tzinfo)
         self.assertEqual(ok.audit_record()["decision"], "allow")
         self.assertEqual(ok.audit_record()["approver"], "u-approver")
-        self.assertEqual(ok.audit_record()["approver_role"], APPROVER_ROLE)
+        self.assertEqual(ok.audit_record()["approver_role"],
+                         approver_role_for("create_sales_order"))
         self.assertEqual(refused.audit_record()["decision"], "deny")
         self.assertEqual(refused.audit_record()["deny_reason"], "approval_required")
 
@@ -741,20 +946,119 @@ class ConformanceSuite:
 
 
 class MockConformance(ConformanceSuite, unittest.TestCase):
+    """The mock over a file-backed approval store, so "restart" is real."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.store_path = Path(tmp.name) / "approvals.json"
+        super().setUp()
+
     def make_connector(self, clock):
-        return MockErpConnector(SECRET, clock=clock)
+        return MockErpConnector(SECRET, clock=clock,
+                                approval_store=JsonFileApprovalStore(self.store_path))
+
+    def make_restarted_connector(self, previous, clock):
+        return MockErpConnector(SECRET, clock=clock,
+                                approval_store=JsonFileApprovalStore(self.store_path))
 
     def written_count(self, tool):
-        stores = {"create_sales_order": self.c.sales_orders,
-                  "create_purchase_request": self.c.purchase_requests,
-                  "update_inventory_movement": self.c.movements}
-        return len(stores[tool]) if tool in stores else None
+        c = self.c
+        if tool == "close_sales_order":
+            return sum(1 for so in c.sales_orders.values() if so["status"] == "closed")
+        stores = {"create_sales_order": c.sales_orders,
+                  "create_purchase_request": c.purchase_requests,
+                  "update_inventory_movement": c.movements}
+        return len(stores[tool])
 
     def assert_written(self, tool, record_id):
         stores = {"create_sales_order": self.c.sales_orders,
                   "create_purchase_request": self.c.purchase_requests}
         if tool in stores:
             self.assertIn(record_id, stores[tool])
+
+
+def run_conformance(make_connector, make_restarted_connector, written_count):
+    """Run ConformanceSuite against a connector built from the three hooks."""
+    class Probe(ConformanceSuite, unittest.TestCase):
+        pass
+
+    Probe.make_connector = lambda self, clock: make_connector(self, clock)
+    Probe.make_restarted_connector = (
+        lambda self, prev, clock: make_restarted_connector(self, prev, clock))
+    if written_count is not None:
+        Probe.written_count = lambda self, tool: written_count(self, tool)
+    result = unittest.TestResult()
+    unittest.TestLoader().loadTestsFromTestCase(Probe).run(result)
+    return result
+
+
+class SuiteCatchesBadConnectors(unittest.TestCase):
+    """The suite must FAIL connectors that break the write-safety rules."""
+
+    @staticmethod
+    def counts(self, tool):  # the mock's own stores (good for non-writes-first cases)
+        return MockConformance.written_count(self, tool)
+
+    def failed_tests(self, result):
+        return {t.id().rsplit(".", 1)[-1] for t, _ in result.failures + result.errors}
+
+    def test_connector_that_writes_before_approval_fails(self):
+        class WritesFirst(MockErpConnector):
+            def __init__(self, *a, **k):
+                super().__init__(*a, **k)
+                self.erp_ledger = []  # "the ERP": an entry per call that reached it
+
+            def create_sales_order(self, ctx, *a, **k):
+                self.erp_ledger.append(ctx.request_id)  # side effect BEFORE any check
+                return super().create_sales_order(ctx, *a, **k)
+
+        def count(self, tool):
+            return (len(self.c.erp_ledger) if tool == "create_sales_order"
+                    else MockConformance.written_count(self, tool))
+
+        def make(self, clock):
+            return WritesFirst(SECRET, clock=clock)
+
+        result = run_conformance(make, lambda self, prev, clock: WritesFirst(SECRET, clock=clock),
+                                 count)
+        self.assertFalse(result.wasSuccessful())
+        self.assertIn("test_no_token", self.failed_tests(result))
+
+    def test_connector_that_forgets_consumed_approvals_fails(self):
+        class Forgetful:
+            def is_consumed(self, approval_id):
+                return False
+
+            def mark_consumed(self, approval_id):
+                pass
+
+        def make(self, clock):
+            return MockErpConnector(SECRET, clock=clock, approval_store=Forgetful())
+
+        result = run_conformance(make, lambda self, prev, clock: make(self, clock),
+                                 self.counts)
+        failed = self.failed_tests(result)
+        self.assertIn("test_single_use_survives_a_restart", failed)
+        self.assertIn("test_one_approval_authorises_exactly_one_write", failed)
+
+    def test_suite_requires_written_count(self):
+        result = run_conformance(
+            lambda self, clock: MockErpConnector(SECRET, clock=clock),
+            lambda self, prev, clock: MockErpConnector(SECRET, clock=clock), None)
+        self.assertFalse(result.wasSuccessful())
+        self.assertTrue(any("written_count" in tb for _, tb in result.errors))
+
+    def test_suite_requires_restart_hook(self):
+        class NoRestart(ConformanceSuite, unittest.TestCase):
+            def make_connector(self, clock):
+                return MockErpConnector(SECRET, clock=clock)
+
+            written_count = MockConformance.written_count
+
+        result = unittest.TestResult()
+        unittest.TestLoader().loadTestsFromTestCase(NoRestart).run(result)
+        self.assertIn("test_single_use_survives_a_restart", self.failed_tests(result))
 
 
 # ─── Mock-specific (needs MockErpConnector internals) ───────
@@ -812,13 +1116,14 @@ class MockSpecific(unittest.TestCase):
     def test_validation_refusal_is_not_cached(self):
         args = {"part_no": "BR-12345", "qty": Decimal("100000"), "direction": "out",
                 "reference": "WO-1"}
-        c = ctx("inventory-manager", token=token_for("update_inventory_movement", args))
+        c = ctx("inventory-manager",
+                token=token_for("update_inventory_movement", args, approval_id="ap-refused"))
         r = self.c.update_inventory_movement(c, "BR-12345", Decimal("100000"), "out",
                                              "WO-1", idempotency_key="mv-9")
         self.assertEqual(r.reason, "validation:insufficient_stock")
         self.assertEqual(self.c.movements, [])
         # A refused write does not consume the approval.
-        self.assertEqual(self.c._approvals_used, {})
+        self.assertFalse(self.c.approval_store.is_consumed("ap-refused"))
 
     def test_create_then_close_sales_order(self):
         so = approved_so(self.c, "k-1").record_id

@@ -54,9 +54,13 @@ will adopt when execution lands:
   the wire rules: numbers (int, Decimal) -> normalised decimal string,
   datetime -> UTC ISO-8601 with ``Z``, float rejected.
 - ``issue_approval_token`` / ``verify_approval_token`` define the token
-  ``v1|approver_id|approver_role|approval_id|expiry|mac`` with
-  ``mac = HMAC-SHA256(secret, "v1|approver_id|approver_role|approval_id|
-  expiry|action_hash")`` in lowercase hex.
+  ``v2|approver_id|approver_role|approval_id|expiry|requester_id|mac`` with
+  ``mac = HMAC-SHA256(secret, "v2|approver_id|approver_role|approval_id|
+  expiry|requester_id|action_hash")`` in lowercase hex. The secret must be
+  ``bytes`` of at least 32 bytes.
+- ``ApprovalStore`` (``is_consumed`` / ``mark_consumed``) is the persistence
+  hook for single-use approvals; ``InMemoryApprovalStore`` and
+  ``JsonFileApprovalStore`` are provided.
 """
 
 from __future__ import annotations
@@ -65,14 +69,17 @@ import dataclasses
 import hashlib
 import hmac
 import json
+import re
 import sys
+import threading
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from decimal import Decimal
 from enum import Enum, IntEnum
-from typing import Any, Iterable, Mapping
+import os
+from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 from zoneinfo import ZoneInfo
 
 # ─── Limits & masking policy ────────────────────────────────
@@ -124,13 +131,22 @@ DEFAULT_WRITE_ROLES: Mapping[str, frozenset[str]] = {
 # Default roles allowed to APPROVE each write tool (the ``approver_role``
 # bound into the approval token). Deny by default: a tool not listed here, or
 # an approver whose role is not listed, is refused even with a valid MAC.
-# Align these names with the positions your approval service assigns.
+# These ids MUST be position ids from the team roster (``positions[].id`` in
+# ``team/roster.example.yaml``), so the approval service and the roster speak
+# the same names; every id must also match the roster linter's position-id
+# pattern (``APPROVER_ROLE_ID_RE`` below; a test enforces it). A deployment
+# overrides them in its connector config (``approver_roles``) with the position
+# ids of its own roster.
 DEFAULT_APPROVER_ROLES: Mapping[str, frozenset[str]] = {
-    "create_sales_order": frozenset({"sales-manager", "plant-manager"}),
-    "create_purchase_request": frozenset({"purchasing-manager", "plant-manager"}),
-    "update_inventory_movement": frozenset({"inventory-manager", "plant-manager"}),
-    "close_sales_order": frozenset({"sales-manager", "plant-manager"}),
+    "create_sales_order": frozenset({"sales-manager"}),
+    "create_purchase_request": frozenset({"production-manager"}),
+    "update_inventory_movement": frozenset({"production-manager"}),
+    "close_sales_order": frozenset({"sales-manager"}),
 }
+
+# Same pattern as the team linter's position ids (team/tools/teamlib/schema.py
+# ``_ID_RE``): lowercase kebab-case, 2-41 characters, starting with a letter.
+APPROVER_ROLE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 
 
 def clamp_max_rows(max_rows: int | None) -> int:
@@ -168,6 +184,30 @@ def masked_field_names(
     return frozenset(hidden)
 
 
+def _norm_key(name: Any) -> str:
+    """Case/punctuation-insensitive key: ``Unit_Price`` == ``unitPrice``."""
+    return re.sub(r"[^a-z0-9]", "", str(name).casefold())
+
+
+def _strip_masked(
+    value: Any, masked_norm: frozenset[str], path: str, hidden: list[str]
+) -> Any:
+    """Copy of ``value`` with every masked key removed at any depth."""
+    if isinstance(value, Mapping):
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            where = f"{path}.{k}"
+            if _norm_key(k) in masked_norm:
+                hidden.append(where)
+            else:
+                out[k] = _strip_masked(v, masked_norm, where, hidden)
+        return out
+    if isinstance(value, (list, tuple)):
+        items = [_strip_masked(v, masked_norm, f"{path}[]", hidden) for v in value]
+        return tuple(items) if isinstance(value, tuple) else items
+    return value
+
+
 def project_fields(
     record: Mapping[str, Any],
     fields: Iterable[str] | None,
@@ -178,7 +218,13 @@ def project_fields(
     ``fields=None`` returns every non-masked field. A requested field that is
     masked is dropped (and reported), never returned. A requested field that
     does not exist raises ValueError, so typos are not silently ignored.
-    Returns (row, names_of_fields_that_were_hidden).
+
+    Masking is recursive and key-insensitive to case and punctuation: a
+    masked name is removed from nested dicts and from dicts inside lists
+    (UDF blocks, order lines), and ``Unit_Price`` / ``unitPrice`` count as
+    ``unit_price``. Returns (row, hidden) where ``hidden`` lists the removed
+    top-level names and the paths of nested ones (``udf.unit_price``,
+    ``lines[].unit_price``).
     """
     if fields is None:
         wanted = list(record)
@@ -189,9 +235,15 @@ def project_fields(
         unknown = [f for f in wanted if f not in record]
         if unknown:
             raise ValueError(f"unknown fields: {sorted(unknown)}")
-    row = {f: record[f] for f in wanted if f not in masked}
-    hidden = tuple(sorted(f for f in wanted if f in masked))
-    return row, hidden
+    masked_norm = frozenset(n for n in map(_norm_key, masked) if n)
+    row: dict[str, Any] = {}
+    hidden: list[str] = []
+    for f in wanted:
+        if _norm_key(f) in masked_norm:
+            hidden.append(f)
+        else:
+            row[f] = _strip_masked(record[f], masked_norm, f, hidden)
+    return row, tuple(sorted(set(hidden)))
 
 
 def canonical_json(obj: Any) -> str:
@@ -371,19 +423,42 @@ def _require_aware(owner: str, name: str, value: Any, *, optional: bool = False)
 
 # ─── Approval token (canonical format) ──────────────────────
 
-APPROVAL_TOKEN_VERSION = "v1"
+APPROVAL_TOKEN_VERSION = "v2"
+MIN_SECRET_BYTES = 32
 DEFAULT_APPROVAL_TTL_SECONDS = 900
 
 # Refusal reasons (``WriteResult.reason`` / ``ApprovalDecision.reason``).
 REASON_ROLE_NOT_PERMITTED = "role_not_permitted"
 REASON_APPROVAL_REQUIRED = "approval_required"
 REASON_APPROVAL_MALFORMED = "approval_malformed"
+REASON_APPROVAL_MISCONFIGURED = "approval_misconfigured"
+REASON_REQUESTER_MISMATCH = "approval_requester_mismatch"
 REASON_APPROVAL_SIGNATURE_INVALID = "approval_signature_invalid"
 REASON_APPROVAL_EXPIRED = "approval_expired"
 REASON_SELF_APPROVAL = "self_approval"
 REASON_APPROVER_ROLE_NOT_PERMITTED = "approver_role_not_permitted"
 REASON_APPROVAL_ALREADY_USED = "approval_already_used"
 REASON_IDEMPOTENCY_KEY_CONFLICT = "idempotency_key_conflict"
+
+
+def check_approval_secret(secret: Any) -> None:
+    """Raise ValueError unless ``secret`` is ``bytes`` of >= 32 bytes.
+
+    A ``str`` is refused on purpose (encode and manage the key explicitly),
+    as is an empty or short key (an unset env var must not fail open).
+    """
+    if isinstance(secret, str):
+        raise ValueError(
+            "approval secret must be bytes, not str: encode it explicitly "
+            "(e.g. bytes.fromhex(...) of a random 32-byte key)"
+        )
+    if not isinstance(secret, bytes):
+        raise ValueError("approval secret must be bytes")
+    if len(secret) < MIN_SECRET_BYTES:
+        raise ValueError(
+            f"approval secret must be at least {MIN_SECRET_BYTES} bytes "
+            f"(got {len(secret)})"
+        )
 
 
 def _token_field_ok(value: Any) -> bool:
@@ -401,11 +476,12 @@ def _token_mac(
     approver_role: str,
     approval_id: str,
     expiry: int,
+    requester_id: str,
     action_hash: str,
 ) -> str:
     msg = (
         f"{APPROVAL_TOKEN_VERSION}|{approver_id}|{approver_role}|{approval_id}"
-        f"|{expiry}|{action_hash}"
+        f"|{expiry}|{requester_id}|{action_hash}"
     ).encode("utf-8")
     return hmac.new(secret, msg, hashlib.sha256).hexdigest()
 
@@ -416,24 +492,28 @@ def issue_approval_token(
     action_hash: str,
     *,
     approver_role: str,
+    requester_id: str,
     ttl_seconds: int = DEFAULT_APPROVAL_TTL_SECONDS,
     now: datetime | None = None,
     approval_id: str | None = None,
 ) -> str:
-    """Mint ``v1|approver_id|approver_role|approval_id|expiry|mac``.
+    """Mint ``v2|approver_id|approver_role|approval_id|expiry|requester_id|mac``.
 
     Called by the approval service after a human approves (the chat gateway
     will call this when its execute path lands; until then only tests and
     the mock use it). ``expiry`` is integer Unix seconds; ``approval_id`` is
     unique per approval and is what the connector consumes on commit.
+    ``requester_id`` is the ``CallContext.operator_id`` who asked for the
+    write: the token only works for that caller. ``secret`` must be bytes of
+    at least 32 bytes (``ValueError`` otherwise, a ``str`` included).
     """
-    if not secret:
-        raise ValueError("secret must be non-empty")
+    check_approval_secret(secret)
     approval_id = approval_id or uuid.uuid4().hex
     for name, value in (
         ("approver_id", approver_id),
         ("approver_role", approver_role),
         ("approval_id", approval_id),
+        ("requester_id", requester_id),
     ):
         if not _token_field_ok(value):
             raise ValueError(f"{name} must be a printable string without '|'")
@@ -441,10 +521,12 @@ def issue_approval_token(
         raise ValueError("action_hash must come from compute_action_hash()")
     now = now or datetime.now(timezone.utc)
     expiry = int((now + timedelta(seconds=ttl_seconds)).timestamp())
-    mac = _token_mac(secret, approver_id, approver_role, approval_id, expiry, action_hash)
+    mac = _token_mac(
+        secret, approver_id, approver_role, approval_id, expiry, requester_id, action_hash
+    )
     return (
         f"{APPROVAL_TOKEN_VERSION}|{approver_id}|{approver_role}|{approval_id}"
-        f"|{expiry}|{mac}"
+        f"|{expiry}|{requester_id}|{mac}"
     )
 
 
@@ -453,23 +535,32 @@ def verify_approval_token(
 ) -> "ApprovalDecision":
     """Reference ``verify_approval`` for the canonical token. Never raises.
 
-    Checks shape, HMAC (constant time, bound to ``action_hash``) and expiry
-    against ``now``. Single use and approver role are checked by
-    ``authorize_write`` and the write path, not here.
+    Checks shape, HMAC (constant time, bound to ``action_hash`` and to the
+    requester named in the token) and expiry against ``now``. A secret that
+    is not ``bytes`` of >= 32 bytes is a refusal
+    (``approval_misconfigured``), never an accept and never an exception.
+    The requester match against the caller, approver role and single use are
+    checked by ``authorize_write`` and the write path, not here.
     """
+    try:
+        check_approval_secret(secret)
+    except ValueError:
+        return ApprovalDecision(False, reason=REASON_APPROVAL_MISCONFIGURED)
     if not token or not isinstance(token, str):
         return ApprovalDecision(False, reason=REASON_APPROVAL_REQUIRED)
     parts = token.split("|")
-    if len(parts) != 6 or parts[0] != APPROVAL_TOKEN_VERSION:
+    if len(parts) != 7 or parts[0] != APPROVAL_TOKEN_VERSION:
         return ApprovalDecision(False, reason=REASON_APPROVAL_MALFORMED)
-    _, approver_id, approver_role, approval_id, expiry_s, mac = parts
-    if not all(_token_field_ok(v) for v in (approver_id, approver_role, approval_id)):
+    _, approver_id, approver_role, approval_id, expiry_s, requester_id, mac = parts
+    if not all(
+        _token_field_ok(v) for v in (approver_id, approver_role, approval_id, requester_id)
+    ):
         return ApprovalDecision(False, reason=REASON_APPROVAL_MALFORMED)
     if not expiry_s.isdigit() or not expiry_s.isascii():
         return ApprovalDecision(False, reason=REASON_APPROVAL_MALFORMED)
     expiry = int(expiry_s)
     expected = _token_mac(
-        secret, approver_id, approver_role, approval_id, expiry, action_hash
+        secret, approver_id, approver_role, approval_id, expiry, requester_id, action_hash
     )
     if not hmac.compare_digest(mac.encode("utf-8"), expected.encode("utf-8")):
         # Wrong secret, tampered token, or token for a different action.
@@ -481,7 +572,84 @@ def verify_approval_token(
         approver_id=approver_id,
         approval_id=approval_id,
         approver_role=approver_role,
+        requester_id=requester_id,
     )
+
+
+# ─── Approval store (single-use persistence) ────────────────
+
+
+@runtime_checkable
+class ApprovalStore(Protocol):
+    """Where consumed ``approval_id`` s are remembered.
+
+    Single use must survive a restart: a token still inside its TTL must not
+    commit a second write after the process (or the connector) restarts. The
+    write path calls ``is_consumed`` before committing and ``mark_consumed``
+    once the write is validated and about to commit (so a crash between the
+    two fails closed, never open). Back it with the same durable store as
+    your idempotency records; ``approval_id`` needs a uniqueness guarantee.
+    """
+
+    def is_consumed(self, approval_id: str) -> bool: ...
+
+    def mark_consumed(self, approval_id: str) -> None: ...
+
+
+class InMemoryApprovalStore:
+    """Process-local store. Fine for tests and demos; lost on restart."""
+
+    def __init__(self) -> None:
+        self._ids: set[str] = set()
+        self._lock = threading.Lock()
+
+    def is_consumed(self, approval_id: str) -> bool:
+        with self._lock:
+            return approval_id in self._ids
+
+    def mark_consumed(self, approval_id: str) -> None:
+        with self._lock:
+            self._ids.add(approval_id)
+
+
+class JsonFileApprovalStore:
+    """JSON-file store at an operator-supplied ``path`` (survives restarts).
+
+    Re-reads the file on every call, so a second instance over the same path
+    sees earlier writes. Writes are atomic (temp file + ``os.replace``) and a
+    corrupt file raises instead of reading as "nothing consumed". Safe for
+    threads in one process; use a database with a unique index when several
+    processes write.
+    """
+
+    def __init__(self, path: str | os.PathLike[str]) -> None:
+        self._path = os.fspath(path)
+        self._lock = threading.Lock()
+
+    def _load(self) -> set[str]:
+        try:
+            with open(self._path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except FileNotFoundError:
+            return set()
+        if not isinstance(data, list) or not all(isinstance(i, str) for i in data):
+            raise ValueError(f"approval store {self._path!r} is corrupt")
+        return set(data)
+
+    def is_consumed(self, approval_id: str) -> bool:
+        with self._lock:
+            return approval_id in self._load()
+
+    def mark_consumed(self, approval_id: str) -> None:
+        with self._lock:
+            ids = self._load()
+            ids.add(approval_id)
+            tmp = f"{self._path}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(sorted(ids), fh)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self._path)
 
 
 # ─── Call context ───────────────────────────────────────────
@@ -681,6 +849,7 @@ class ApprovalDecision:
     approval_id: str | None = None  # consumed on the first committed write
     reason: str | None = None  # machine-readable, set when not valid
     approver_role: str | None = None  # checked against ``approver_roles``
+    requester_id: str | None = None  # must equal ``ctx.operator_id``
 
 
 @dataclass
@@ -776,7 +945,10 @@ class ErpConnector(ABC):
           different action, which prevents TOCTOU swaps);
         - it has not expired;
         - it names an approver (``approver_id``), the approver's role
-          (``approver_role``) and a unique ``approval_id``.
+          (``approver_role``), a unique ``approval_id`` and the
+          ``requester_id`` it was approved for (returned in the decision;
+          ``authorize_write`` compares it with the caller);
+        - the secret is ``bytes`` of at least 32 bytes; otherwise refuse.
 
         Must never raise for a bad token; return ``ApprovalDecision(False,
         reason=...)`` instead. Anything not verifiable is a refusal.
@@ -825,16 +997,18 @@ class ErpConnector(ABC):
         """Gate for every write tool. Returns (decision, action_hash).
 
         Order: role allowed for this tool -> token present -> verify_approval
-        -> token names an approval_id -> approver differs from requester
+        -> token names an approval_id -> token's requester is the caller
+        (``decision.requester_id == ctx.operator_id``) -> approver differs from requester
         (dual control) -> approver's role may approve this tool. Call this
         first in every write; if ``decision.valid`` is False, return a
         refused ``WriteResult`` and do not touch the ERP.
 
         This check is stateless. The write path must also enforce single
         use: after the idempotency lookup (same key -> replay), refuse with
-        ``REASON_APPROVAL_ALREADY_USED`` if ``decision.approval_id`` already
-        committed a write under another key, and record the approval_id as
-        consumed in the same persistent record as the idempotency key.
+        ``REASON_APPROVAL_ALREADY_USED`` if an ``ApprovalStore`` says
+        ``decision.approval_id`` is consumed, and ``mark_consumed`` it before
+        the write commits. The store must be durable (a restart must not
+        make a token spendable again).
 
         Raises CanonicalArgsError if ``args`` has no wire form (e.g. float).
         """
@@ -850,6 +1024,9 @@ class ErpConnector(ABC):
             return ApprovalDecision(False, reason=reason), action_hash
         if not decision.approval_id:
             return ApprovalDecision(False, reason=REASON_APPROVAL_MALFORMED), action_hash
+        if decision.requester_id != ctx.operator_id:
+            # The token was approved for someone else (or names no requester).
+            return ApprovalDecision(False, reason=REASON_REQUESTER_MISMATCH), action_hash
         if not decision.approver_id or decision.approver_id == ctx.operator_id:
             return ApprovalDecision(False, reason=REASON_SELF_APPROVAL), action_hash
         if decision.approver_role not in set(self.approver_roles.get(tool, ())):
