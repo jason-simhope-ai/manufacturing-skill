@@ -13,13 +13,14 @@ argument-hint: "<profile> 或 <p1>,<p2>,..."
 
 ## 可用 profile
 
-| profile             | 狀態     | 說明                    |
-| ------------------- | -------- | ----------------------- |
-| `cnc-machining`     | ✅ 完整  | CNC 精密加工（v1 預設） |
-| `injection-molding` | 🧪 alpha | 塑膠射出成型            |
-| `pcb-assembly`      | 🧪 alpha | PCB 組裝（SMT / EMS）   |
-| `food-processing`   | 🧪 alpha | 食品加工（HACCP）       |
-| `pharma`            | 🧪 alpha | 製藥 / 醫材（GMP）      |
+| profile             | 狀態     | 說明                         |
+| ------------------- | -------- | ---------------------------- |
+| `cnc-machining`     | ✅ 完整  | CNC 精密加工（v1 預設）      |
+| `injection-molding` | 🧪 alpha | 塑膠射出成型                 |
+| `pcb-assembly`      | 🧪 alpha | PCB 組裝（SMT / EMS）        |
+| `food-processing`   | 🧪 alpha | 食品加工（HACCP）            |
+| `pharma`            | 🧪 alpha | 製藥 / 醫材（GMP）           |
+| `machinery-eto`     | 🧪 alpha | 機械設備製造（ETO 接單設計） |
 
 ## 使用範例
 
