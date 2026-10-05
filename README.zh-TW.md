@@ -167,6 +167,8 @@ bash adapters/claude-code/install.sh
 /manufacturing init     # ← 第一次用打這個，AI 會引導 4 個問題
 ```
 
+install.sh 把 plugin 裝到 `~/.claude/plugins/manufacturing-skill/`，再用 symlink 連進 `~/.claude/skills/` 讓 Claude Code 載入；裝完請重新啟動 Claude Code 或執行 `/reload-plugins`（用 `claude plugin list` 確認）。
+
 或者直接 skip 引導：
 
 ```bash

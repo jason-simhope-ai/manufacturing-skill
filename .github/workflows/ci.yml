@@ -338,6 +338,124 @@ jobs:
           echo "ok  .installed is valid JSON (no-python fallback) with quote/space/backslash in repo path and HOME"
 
       # ---------------------------------------------------------------
+      # Step 6c: the installed tree is something Claude Code loads:
+      # .claude-plugin/plugin.json (whitelisted fields), skills as
+      # skills/<name>/SKILL.md, ~/.claude/skills/<plugin> symlink, and
+      # command bodies rewritten to installed paths (python + no-python)
+      # ---------------------------------------------------------------
+      - name: install.sh — Claude Code layout (manifest, SKILL.md dirs, symlink)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          target="$HOME/.claude/plugins/manufacturing-skill"
+          link="$HOME/.claude/skills/manufacturing-skill"
+          check_layout() {   # $1 = label, $2.. = active profiles ("" for core-only)
+            python3 - "$target" "$@" <<'PY'
+          import glob, json, os, re, sys
+          t, label, profs = sys.argv[1], sys.argv[2], [p for p in sys.argv[3:] if p]
+          def fail(msg):
+              print(f"::error::[{label}] {msg}"); sys.exit(1)
+          mpath = os.path.join(t, ".claude-plugin", "plugin.json")
+          if not os.path.isfile(mpath): fail(".claude-plugin/plugin.json missing")
+          m = json.load(open(mpath, encoding="utf-8"))
+          allowed = {"name", "displayName", "version", "description", "author",
+                     "homepage", "repository", "license", "keywords"}
+          if set(m) - allowed: fail(f"manifest has non-whitelisted fields {sorted(set(m) - allowed)}")
+          for k in ("name", "version", "description"):
+              if not m.get(k): fail(f"manifest missing {k}")
+          if m["name"] != "manufacturing-skill": fail(f"manifest name {m['name']!r}")
+          if not isinstance(m.get("repository", ""), str): fail("manifest repository is not a string")
+          root = json.load(open(os.path.join(t, "plugin.json"), encoding="utf-8"))
+          if "available" not in root.get("profiles", {}): fail("root plugin.json not copied as-is")
+          flat = glob.glob(os.path.join(t, "skills", "*.md"))
+          if flat: fail(f"flat skills/*.md left: {flat}")
+          def fm_name(path):
+              txt = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+              mm = re.match(r"---\n(.*?)\n---", txt, re.S)
+              nm = mm and re.search(r"^name:\s*(\S.*?)\s*$", mm.group(1), re.M)
+              return nm.group(1).strip("\"'") if nm else os.path.basename(path)[:-3]
+          srcs = glob.glob("core/skills/*.md")
+          for p in profs:
+              srcs += [f for f in glob.glob(f"profiles/{p}/skills/*.md") if not os.path.basename(f).startswith("_")]
+          want = {fm_name(f) for f in srcs}
+          have = {os.path.basename(d) for d in glob.glob(os.path.join(t, "skills", "*")) if os.path.isdir(d)}
+          if want != have: fail(f"skill dirs {sorted(have)} != expected {sorted(want)}")
+          for d in have:
+              if not os.path.isfile(os.path.join(t, "skills", d, "SKILL.md")): fail(f"skills/{d}/SKILL.md missing")
+          pat = re.compile(r"(?<![A-Za-z0-9_./-])core/(skills|agents|hooks|know-how)/\S*\.md")
+          for f in glob.glob(os.path.join(t, "commands", "*.md")):
+              hits = pat.findall(open(f, encoding="utf-8").read())
+              if hits: fail(f"{os.path.basename(f)} still cites core/ paths")
+          q = open(os.path.join(t, "commands", "quote.md"), encoding="utf-8").read()
+          if "skills/01-quote/SKILL.md" not in q: fail("commands/quote.md not rewritten to skills/01-quote/SKILL.md")
+          print(f"ok  [{label}] manifest, {len(have)} skills/<name>/SKILL.md, no core/ paths in commands")
+          PY
+            if [ ! -L "$link" ] || [ "$(readlink "$link")" != "../plugins/manufacturing-skill" ]; then
+              echo "::error::[$1] $link is not a symlink to ../plugins/manufacturing-skill"
+              exit 1
+            fi
+            if [ ! -f "$link/.claude-plugin/plugin.json" ]; then
+              echo "::error::[$1] $link does not resolve to the install"
+              exit 1
+            fi
+            if command -v claude >/dev/null 2>&1; then
+              claude plugin validate "$target"
+            else
+              echo "::notice::claude CLI not on PATH — skipped 'claude plugin validate' for [$1]"
+            fi
+          }
+
+          for args in "cnc-machining" "--core-only" "cnc-machining,injection-molding"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh "$args" </dev/null >/dev/null
+            case "$args" in --core-only) profs="";; *) profs="$(printf '%s' "$args" | tr ',' ' ')";; esac
+            # shellcheck disable=SC2086
+            check_layout "$args" $profs
+          done
+
+          # Re-install keeps the link and the layout
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "re-install" cnc-machining
+
+          # No python: same skill dirs and rewrites (sed fallback), minimal manifest
+          nopy="$(mktemp -d)"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          PATH="$nopy:$PATH" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "no-python" cnc-machining
+
+          # A real directory where the link goes is left alone (warning, exit 0)
+          rm -rf "$HOME/.claude"; mkdir -p "$link"; echo keep > "$link/keep"
+          out="$(bash adapters/claude-code/install.sh --core-only </dev/null 2>&1)"
+          if [ -L "$link" ] || [ "$(cat "$link/keep")" != "keep" ] || ! printf '%s\n' "$out" | grep -qF 'is not a symlink'; then
+            echo "::error::a real directory at $link was not left alone with a warning"
+            exit 1
+          fi
+          echo "ok  real directory at the link path left alone, with a warning"
+
+          # Two skills mapping to one name: fail before the swap, install untouched
+          dup="$(mktemp -d)/repo"; mkdir -p "$dup"
+          tar --exclude=.git -cf - . | tar -xf - -C "$dup"
+          printf -- '---\nname: 01-quote\ndescription: dup\n---\n' > "$dup/profiles/cnc-machining/skills/dup-quote.md"
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          before="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if out="$(bash "$dup/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"; then
+            echo "::error::duplicate skill name installed without error"
+            exit 1
+          fi
+          after="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if [ "$before" != "$after" ] || ! printf '%s\n' "$out" | grep -qF 'both have name: 01-quote'; then
+            echo "::error::duplicate skill name did not fail cleanly before the swap"
+            printf '%s\n' "$out"
+            exit 1
+          fi
+          echo "ok  duplicate skill name fails before the swap; install untouched"
+
+      # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
       # must declare the fields install.sh + adapters expect to read
       # ---------------------------------------------------------------
