@@ -152,7 +152,7 @@ case "${ARG}" in
     for p in "${PLUGIN_ROOT}/profiles/"*/; do
       name="$(basename "${p}")"
       if [[ -f "${p}/profile.json" ]]; then
-        status="$(grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "${p}/profile.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+        status="$({ grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "${p}/profile.json" || true; } | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
         if [[ -z "${status}" ]]; then status="complete"; fi
         case "${status}" in
           complete) icon="✅";;
@@ -183,7 +183,7 @@ case "${ARG}" in
       for p in "${PLUGIN_ROOT}/profiles/"*/; do
         name="$(basename "${p}")"
         if [[ -f "${p}/profile.json" ]]; then
-          status="$(grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "${p}/profile.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+          status="$({ grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "${p}/profile.json" || true; } | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
           if [[ -z "${status}" ]]; then status="complete"; fi
           case "${status}" in
             complete) icon="✅";;
