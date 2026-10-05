@@ -93,7 +93,7 @@ Claude Code 預期 plugin 內：
 │   ├── lean-5s.md
 │   ├── oee.md
 │   ├── mrp-basics.md
-│   ├── iatf-16949.md             # profile
+│   ├── iatf-16949.md
 │   ├── 刀具壽命管理.md            # profile
 │   ├── 切削參數查表.md            # profile
 │   └── 開發工廠-vs-量產.md         # profile

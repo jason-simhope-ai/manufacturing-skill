@@ -100,11 +100,12 @@ INVENTORY.md              ← 這份
 | [8d-report-writing](core/skills/8d-report-writing.md)                   | 8D 八步驟 + customer-deliverable template     |
 | [engineering-change-process](core/skills/engineering-change-process.md) | ECN/ECO 5 步驟 SOP + 13-item impact checklist |
 
-#### `core/know-how/` — 7 份普世知識
+#### `core/know-how/` — 9 份普世知識
 
 | 檔                                        | 內容                                            |
 | ----------------------------------------- | ----------------------------------------------- |
 | [iso-9001](core/know-how/iso-9001.md)     | 品質管理體系 7 原則 + PDCA                      |
+| [iatf-16949](core/know-how/iatf-16949.md) | IATF 16949 + PPAP 18 要素 / 5 級 + 各製程差異   |
 | [lean-5s](core/know-how/lean-5s.md)       | 5S + 7 大浪費 + JIT                             |
 | [oee](core/know-how/oee.md)               | 設備總效率公式 + 改善方向                       |
 | [mrp-basics](core/know-how/mrp-basics.md) | MRP / Lead time / ABC 分類                      |
@@ -133,7 +134,7 @@ INVENTORY.md              ← 這份
 | Manifest     | [profile.json](profiles/cnc-machining/profile.json) + [manufacturing.md](profiles/cnc-machining/manufacturing.md)                                                                                                                                                                                       |
 | Agents (4)   | [cnc-programmer](profiles/cnc-machining/agents/cnc-programmer.md) · [tool-life-engineer](profiles/cnc-machining/agents/tool-life-engineer.md) · [fixture-designer](profiles/cnc-machining/agents/fixture-designer.md) · [prototype-coordinator](profiles/cnc-machining/agents/prototype-coordinator.md) |
 | Skills (3)   | [g-code-review](profiles/cnc-machining/skills/g-code-review.md) · [cutting-parameter-calc](profiles/cnc-machining/skills/cutting-parameter-calc.md) · [fixture-design-patterns](profiles/cnc-machining/skills/fixture-design-patterns.md)                                                               |
-| Know-how (4) | [iatf-16949](profiles/cnc-machining/know-how/iatf-16949.md) · [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
+| Know-how (3) | [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
 | Hooks (1)    | [pre-cnc-program-checkin](profiles/cnc-machining/hooks/pre-cnc-program-checkin.md)                                                                                                                                                                                                                      |
 
 #### `profiles/injection-molding/` — 🧪 v0.1.1 alpha profile
@@ -255,9 +256,9 @@ INVENTORY.md              ← 這份
 core/  agents           : 6
 core/  commands         : 9
 core/  skills           : 11
-core/  know-how         : 8
+core/  know-how         : 9
 core/  hooks            : 4
-CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
+CNC profile (complete)  : 4 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
 Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
 Explainers (HTML)       : 4 + 4 PNG snapshots

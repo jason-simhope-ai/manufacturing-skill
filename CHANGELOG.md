@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **IATF 16949 / PPAP know-how promoted from the CNC profile to core** (`core/know-how/iatf-16949.md`) so injection-molding and every other profile get it; generalised for any automotive-supplier process with a new per-process section (machining / injection / die-casting / stamping / EMS). The CNC profile manifest drops `iatf-16949` (3 know-how left); profile-level counts, INVENTORY, architecture docs and the explainer were updated.
+- **PPAP table corrected**: Level 1 is PSW-only, Level 5 is review at the supplier's site (was "internal audit"), the 18 elements are retained for every level (the level only decides what is submitted), and the claim that ISO 9001 requires Cpk ≥ 1.33 was removed (1.67 / 1.33 are PPAP initial-study readings, not ISO 9001 requirements; details still flagged 需驗證 for IATF-auditor review).
 
 ## [0.1.5] — 2026-05-09
 

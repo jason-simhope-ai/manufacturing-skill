@@ -62,8 +62,8 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 採用「**core + profile overlay**」架構：
 
-- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
+- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
 
@@ -115,7 +115,7 @@ sequenceDiagram
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / IATF / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
 
@@ -224,7 +224,7 @@ manufacturing-skill/
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
 │   ├── agents/               # 5 隻 universal persona
 │   ├── skills/               # 6 段流程 + 通用 skill
-│   ├── know-how/             # ISO 9001、Lean、OEE、MRP
+│   ├── know-how/             # ISO 9001、IATF 16949、Lean、OEE、MRP …
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/                 # 產業包
 │   ├── cnc-machining/        # ★ v1 唯一完整產業包
