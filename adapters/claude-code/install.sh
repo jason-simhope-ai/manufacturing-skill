@@ -330,6 +330,10 @@ cp -r "${PLUGIN_ROOT}/core/skills"   "${TARGET_DIR}/skills"
 cp -r "${PLUGIN_ROOT}/core/hooks"    "${TARGET_DIR}/hooks"
 cp -r "${PLUGIN_ROOT}/core/know-how" "${TARGET_DIR}/know-how"
 
+# Stage 1b: team tier
+if [[ -d "${PLUGIN_ROOT}/team" ]]; then cp -r "${PLUGIN_ROOT}/team" "${TARGET_DIR}/team"; rm -rf "${TARGET_DIR}/team/.build" "${TARGET_DIR}/team/local"; fi
+if [[ -f "${PLUGIN_ROOT}/TEAM.md" ]]; then cp "${PLUGIN_ROOT}/TEAM.md" "${TARGET_DIR}/TEAM.md"; fi
+
 # Stage 2: overlay each active profile in order. The conflict scan
 # above guarantees no file collisions between profiles, so order
 # within Stage 2 doesn't affect the final state.
@@ -400,7 +404,8 @@ cat > "${TARGET_DIR}/.installed" <<EOF
   "pluginVersion": "${PLUGIN_VERSION}",
   "activeProfile": "${ACTIVE_PROFILE_FIRST}",
   "activeProfiles": ${ACTIVE_PROFILES_JSON},
-  "source": "${PLUGIN_ROOT}"
+  "source": "${PLUGIN_ROOT}",
+  "team": true
 }
 EOF
 

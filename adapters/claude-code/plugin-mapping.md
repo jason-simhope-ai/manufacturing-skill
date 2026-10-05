@@ -19,6 +19,8 @@ profiles/<active>/know-how/*.md ────►   know-how/*.md     ┘
 core/hooks/*.md               ────►     hooks/*.md        ┐
 profiles/<active>/hooks/*.md  ────►     hooks/*.md        ┘
 plugin.json                   ────►     plugin.json
+team/                         ────►     team/             ← 數位分身團隊（預設安裝；不含 .build/、local/）
+TEAM.md                       ────►     TEAM.md
 profiles/<active>/profile.json ────►    active-profile.json
 ```
 
@@ -57,7 +59,9 @@ Claude Code 預期 plugin 內：
 ~/.claude/plugins/manufacturing-skill/
 ├── plugin.json              # plugin 元資訊
 ├── active-profile.json      # 目前 active profile manifest
-├── .installed               # 安裝紀錄（時間、版本、profile）
+├── .installed               # 安裝紀錄（時間、版本、profile、team: true）
+├── team/                    # 數位分身團隊（資料、policies、tools；/team 指令使用）
+├── TEAM.md                  # agent 啟動檔
 ├── commands/
 │   ├── quote.md
 │   ├── order-status.md
