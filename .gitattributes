@@ -1,0 +1,5 @@
+# Keep the installer and tools LF on every platform: a CRLF checkout turns
+# "---" into "---\r" and breaks bash/awk parsing (see CONTRIBUTING.md).
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf

@@ -21,7 +21,7 @@ argument-hint: "<profile 名稱>"
 
 1. 讀 `~/.claude/plugins/manufacturing-skill/.installed` 拿到目前的 `activeProfiles` 陣列
 2. 把新 profile append 進去（若已在 list 內，warn 不重做）
-3. 跑 `bash install.sh <list,with,new>` — 若有 conflict 會在這一步擋下，現有 install 不受影響（M5 atomicity）
+3. 跑 `bash install.sh <list,with,new>` — 若有 conflict（或 profile 名稱、python3 等前置檢查失敗）會在這一步擋下，現有 install 不受影響（M5 atomicity：所有檢查在動到現有 install 前完成；新版在暫存目錄組好後才用 `mv` 換上，換上失敗自動還原）
 
 ## 與 conflict 互動
 

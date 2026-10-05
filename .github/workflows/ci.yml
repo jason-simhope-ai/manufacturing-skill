@@ -170,6 +170,183 @@ jobs:
           echo "ok  install.sh stays bash 3.2-compatible"
 
       # ---------------------------------------------------------------
+      # Step 6b: install.sh smoke — --list, --core-only, single profile
+      # (guards against pipefail aborts on profiles without "status"),
+      # plus preflight-before-touch, atomic swap/rollback, backup count,
+      # stub-profile warning and non-TTY exit code
+      # ---------------------------------------------------------------
+      - name: install.sh — smoke (--list, --core-only, single profile, preflight, atomic swap)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          out="$(bash adapters/claude-code/install.sh --list)"
+          for d in profiles/*/; do
+            n="$(basename "$d")"
+            if ! printf '%s\n' "$out" | grep -q "$n"; then
+              echo "::error::--list output is missing profile '$n'"
+              exit 1
+            fi
+          done
+          echo "ok  --list shows every profile"
+          marker="$HOME/.claude/plugins/manufacturing-skill/.installed"
+          for args in "--core-only" "cnc-machining"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh $args </dev/null >/dev/null
+            if [ ! -f "$marker" ]; then
+              echo "::error::install.sh $args did not write $marker"
+              exit 1
+            fi
+            echo "ok  install.sh $args"
+          done
+
+          plugins="$HOME/.claude/plugins"
+          tree_hash() {
+            ( cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort ) | sha256sum
+          }
+
+          # Re-install over an existing install: succeeds, exactly one backup,
+          # no staging dir left behind
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          nbak="$(find "$plugins" -maxdepth 1 -name 'manufacturing-skill.bak.*' | wc -l | tr -d ' ')"
+          if [ "$nbak" != "1" ]; then
+            echo "::error::expected exactly 1 backup after a re-install, found $nbak"
+            exit 1
+          fi
+          if find "$plugins" -maxdepth 1 -name '.manufacturing-skill.new.*' | grep -q .; then
+            echo "::error::staging dir left behind in $plugins"
+            exit 1
+          fi
+          echo "ok  re-install succeeds and leaves exactly one backup"
+
+          # Invalid profile names fail (rc != 0) before touching the install
+          before="$(tree_hash)"
+          for bad in '../x' '..' 'a b' '*' 'cnc-machining,../profiles/cnc-machining' 'no-such-profile'; do
+            if bash adapters/claude-code/install.sh "$bad" </dev/null >/dev/null 2>&1; then
+              echo "::error::install.sh '$bad' exited 0; expected failure"
+              exit 1
+            fi
+            if [ "$(tree_hash)" != "$before" ]; then
+              echo "::error::install.sh '$bad' modified the existing install"
+              exit 1
+            fi
+          done
+          echo "ok  invalid profile names rejected; existing install untouched"
+
+          # A failure between the two renames restores the previous install
+          if MFG_INSTALL_TEST_FAIL_SWAP=1 bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1; then
+            echo "::error::simulated swap failure exited 0"
+            exit 1
+          fi
+          if [ "$(tree_hash)" != "$before" ]; then
+            echo "::error::simulated swap failure did not restore the previous install"
+            exit 1
+          fi
+          echo "ok  swap failure rolls back to the previous install"
+
+          # Maturity header on the REAL food-processing install, driven by the
+          # status currently in its profile.json (stub here; alpha once the
+          # profile PRs land), so this step does not break when it changes.
+          fp_json=profiles/food-processing/profile.json
+          fp_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("status") or "complete")' "$fp_json")"
+          fp_nwarn="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("warnings") or []))' "$fp_json")"
+          out="$(bash adapters/claude-code/install.sh food-processing </dev/null 2>&1)"
+          if [ "$fp_status" = "stub" ]; then
+            want='STUB PROFILE: food-processing'
+          else
+            if printf '%s\n' "$out" | grep -qF 'STUB PROFILE: food-processing'; then
+              echo "::error::food-processing is '$fp_status' but the install printed the STUB header"
+              exit 1
+            fi
+            want=''
+            if [ "$fp_nwarn" -gt 0 ]; then want="food-processing ($fp_status) — read before use"; fi
+          fi
+          if [ -n "$want" ] && ! printf '%s\n' "$out" | grep -qF "$want"; then
+            echo "::error::food-processing ($fp_status) install output is missing: $want"
+            exit 1
+          fi
+          echo "ok  maturity header matches profile.json status for food-processing ($fp_status)"
+
+          # Stub path, deterministically: flip food-processing to "stub" in a
+          # scratch copy of the repo and install from that copy.
+          stubrepo="$(mktemp -d)/repo"
+          mkdir -p "$stubrepo"
+          tar --exclude=.git -cf - . | tar -xf - -C "$stubrepo"
+          python3 - "$stubrepo/$fp_json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          with open(p, encoding="utf-8") as f:
+              d = json.load(f)
+          d["status"] = "stub"
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(d, f, ensure_ascii=False, indent=2)
+          PY
+          stub_home="$(mktemp -d)"; mkdir -p "$stub_home/.claude"
+          out="$(HOME="$stub_home" bash "$stubrepo/adapters/claude-code/install.sh" food-processing </dev/null 2>&1)"
+          for want in 'STUB PROFILE: food-processing' 'generic core layer only' 'HACCP / food-safety content is NOT included'; do
+            if ! printf '%s\n' "$out" | grep -qF "$want"; then
+              echo "::error::food-processing (stub, scratch copy) install output is missing: $want"
+              exit 1
+            fi
+          done
+          echo "ok  stub warning shown for food-processing flipped to stub in a scratch copy"
+
+          # ~/.claude missing + stdin not a TTY: exit 2, nothing created
+          empty_home="$(mktemp -d)"
+          rc=0
+          HOME="$empty_home" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1 || rc=$?
+          if [ "$rc" != "2" ] || [ -e "$empty_home/.claude" ]; then
+            echo "::error::missing ~/.claude without a TTY: expected rc=2 and no dir, got rc=$rc"
+            exit 1
+          fi
+          echo "ok  missing ~/.claude without a TTY exits 2"
+
+          # CRLF profile file with `extends:` must still be resolved, and
+          # .installed must be valid JSON when both HOME and the repo path
+          # contain a space and a double quote (backslash too for the repo).
+          tmp="$(mktemp -d)"
+          repo_copy="$tmp/re\\po \"with\" space"
+          mkdir -p "$repo_copy"
+          tar --exclude=.git -cf - . | tar -xf - -C "$repo_copy"
+          printf -- '---\r\nname: crlf-agent\r\nextends: core/agents/inventory-manager\r\n---\r\n\r\n<!-- inherit -->\r\n' \
+            > "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"
+          crlf_home="$tmp/h \"q\""
+          mkdir -p "$crlf_home/.claude"
+          crlf_out="$(HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"
+          if ! printf '%s\n' "$crlf_out" | grep -qF 'resolving extends: agents/crlf-agent.md'; then
+            echo "::error::CRLF profile file with extends: was not resolved"
+            printf '%s\n' "$crlf_out"
+            exit 1
+          fi
+          crlf_target="$crlf_home/.claude/plugins/manufacturing-skill"
+          if [ ! -s "$crlf_target/agents/crlf-agent.md" ] || grep -q '^extends:' "$crlf_target/agents/crlf-agent.md"; then
+            echo "::error::CRLF extends: file was copied raw instead of resolved"
+            exit 1
+          fi
+          echo "ok  CRLF profile file with extends: is resolved"
+          python3 -m json.tool "$crlf_target/.installed" >/dev/null
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+            "$crlf_target/.installed" "$repo_copy"
+          echo "ok  .installed is valid JSON (python path) with quote/space/backslash in repo path and HOME"
+
+          # Same without python: stub interpreters that fail --version force
+          # the pure-bash fallback (single plain profile needs no python).
+          rm -f "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"   # extends: needs python
+          nopy="$tmp/nopy"; mkdir -p "$nopy"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          for args in "cnc-machining" "--core-only"; do
+            rm -rf "$crlf_home/.claude"; mkdir -p "$crlf_home/.claude"
+            PATH="$nopy:$PATH" HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" $args </dev/null >/dev/null
+            python3 -m json.tool "$crlf_target/.installed" >/dev/null
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+              "$crlf_target/.installed" "$repo_copy"
+          done
+          echo "ok  .installed is valid JSON (no-python fallback) with quote/space/backslash in repo path and HOME"
+
+      # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
       # must declare the fields install.sh + adapters expect to read
       # ---------------------------------------------------------------
