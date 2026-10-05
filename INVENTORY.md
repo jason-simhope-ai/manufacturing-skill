@@ -227,8 +227,9 @@ INVENTORY.md              ← 這份
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化／`<<UNTRUSTED>>` 信封／tripwire／DLP／輸出過濾 · 回覆版型 · prompt 組裝與 12,000 B 預算 |
 | `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· 雜湊鏈稽核 · secret／名稱／DLP 樣式唯一來源 · 環境變數設定 |
-| `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試）、`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**） |
-| `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`claude_code.py`（固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
+| `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
+| `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py` |
+| `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
 | `fixtures/` | 範例 roster 快照、`demo.jsonl` 劇本、`mock_driver.json` |
 
 **測試**

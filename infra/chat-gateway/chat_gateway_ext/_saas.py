@@ -18,8 +18,8 @@ import re
 import sys
 from typing import Any, Iterator, Mapping
 
-from .. import ConfigRefused
-from .base import ApprovalCard, Event, Reply
+from chat_gateway import ConfigRefused
+from chat_gateway.adapters.base import ApprovalCard, Event, Reply
 
 PIP_HINT = "pip install -r infra/chat-gateway/requirements-optional.txt"
 RISK_FLAG_VAR = "MFG_TEAM_SLACK_T2_RISK_ACCEPTED"

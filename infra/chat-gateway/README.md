@@ -54,7 +54,7 @@ Exit codes: `0` OK · `3` T3 refused · `64` usage error · `70` internal error 
 | `chat_gateway/patterns.py` | `SECRET_PATTERNS`, `NAME_PATTERNS`, `DLP_PATTERNS`. This is the single source for the gateway and for `team/tools/teamctl.py`. |
 | `chat_gateway/formatter.py`, `prompt.py`, `config.py` | Reply layout, prompt assembly and the 12,000 B budget, environment config |
 | `chat_gateway/adapters/mock.py`, `drivers/mock.py` | Scripted/REPL adapter. The deterministic driver also has a `compliant_malicious` mode. |
-| `chat_gateway/adapters/slack.py`, `discord.py`, `_saas.py` | Real-platform adapters: pure event mappings (`slack_to_event`, `discord_to_event`), the tier gate, the secret checks, and SDK transports that are imported lazily |
+| `chat_gateway_ext/slack.py`, `discord.py`, `_saas.py` | Real-platform adapters: pure event mappings (`slack_to_event`, `discord_to_event`), the tier gate, the secret checks, and SDK transports that are imported lazily |
 
 The Slack and Discord adapters (WP4) and the claude-code driver (WP5) are
 imported lazily. `import chat_gateway.core` never needs a third-party SDK.
@@ -143,8 +143,8 @@ into `bindings.json`, so you have to add the block by hand.
 `--driver claude-code` runs one restricted `claude -p` process per message
 (`chat_gateway_ext/claude_code.py`, spec §9.5). It is the only place a model runs.
 Two packages: `chat_gateway/` is the hardened core (no subprocess, no network; enforced by `TestStaticSecurity`), and
-`chat_gateway_ext/` holds integrations that cross the process/network boundary and so sit outside that invariant.
-`load_driver_class("claude-code")` imports `chat_gateway_ext.claude_code` only when asked by name; the core never imports it at module import time (a test checks this).
+`chat_gateway_ext/` holds integrations that cross the process/network boundary (this driver and the Slack/Discord adapters) and so sit outside that invariant.
+`load_driver_class("claude-code")` and `load_adapter_class("slack"|"discord")` import `chat_gateway_ext.*` only when asked by name; the core never imports it at module import time (a test checks this).
 Tests use a fake `claude` script (`python3 tests/gateway/test_claude_code_driver.py`); CI never calls a real one.
 
 | Variable | Default | Notes |

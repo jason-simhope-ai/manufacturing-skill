@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "properties": {
+    "reply": {
+      "type": "string"
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assumed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unverified": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "中",
+        "低"
+      ]
+    },
+    "decisionPoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proposedActions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "suggestTwin": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "reply",
+    "confidence"
+  ],
+  "additionalProperties": false
+}

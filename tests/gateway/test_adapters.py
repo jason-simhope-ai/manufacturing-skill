@@ -29,9 +29,9 @@ sys.path.insert(0, str(GW_DIR))
 
 from chat_gateway import ConfigRefused  # noqa: E402
 from chat_gateway.adapters import load_adapter_class  # noqa: E402
-from chat_gateway.adapters import discord as dmod  # noqa: E402
-from chat_gateway.adapters import slack as smod  # noqa: E402
-from chat_gateway.adapters._saas import RISK_FLAG_VAR  # noqa: E402
+from chat_gateway_ext import discord as dmod  # noqa: E402
+from chat_gateway_ext import slack as smod  # noqa: E402
+from chat_gateway_ext._saas import RISK_FLAG_VAR  # noqa: E402
 from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, InboundMessage, Reply  # noqa: E402
 from chat_gateway.audit import AuditLog  # noqa: E402
 from chat_gateway.core import Gateway, load_roster  # noqa: E402
@@ -127,9 +127,9 @@ def d_click(custom_id=f"mfg:approve:{APV}:{NONCE}", **over) -> dict:
 class TestImportHygiene(unittest.TestCase):
     def test_modules_import_without_third_party_packages(self):
         code = ("import sys; before = set(sys.modules); sys.path.insert(0, sys.argv[1]);"
-                "import chat_gateway.core, chat_gateway.adapters.slack, chat_gateway.adapters.discord;"
+                "import chat_gateway.core, chat_gateway_ext.slack, chat_gateway_ext.discord;"
                 "new = {m.split('.')[0] for m in set(sys.modules) - before};"
-                "bad = sorted(m for m in new if m not in sys.stdlib_module_names and m != 'chat_gateway');"
+                "bad = sorted(m for m in new if m not in sys.stdlib_module_names and m not in ('chat_gateway', 'chat_gateway_ext'));"
                 "print(bad); sys.exit(1 if bad else 0)")
         p = subprocess.run([sys.executable, "-c", code, str(GW_DIR)], capture_output=True, text=True, timeout=60)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)

@@ -19,8 +19,8 @@ import threading
 import time
 from typing import Any, Collection
 
-from .base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
-from ._saas import SaasAdapterBase, attachment_note, sdk_missing
+from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
+from chat_gateway_ext._saas import SaasAdapterBase, attachment_note, sdk_missing
 
 TOKEN_VAR = "MFG_TEAM_DISCORD_TOKEN"
 INTENTS = ("guilds", "guild_messages")

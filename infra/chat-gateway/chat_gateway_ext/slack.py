@@ -14,9 +14,9 @@ from __future__ import annotations
 import re
 from typing import Any, Collection
 
-from .. import ConfigRefused
-from .base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
-from ._saas import DECISIONS, SaasAdapterBase, approval_ref, attachment_note, sdk_missing
+from chat_gateway import ConfigRefused
+from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
+from chat_gateway_ext._saas import DECISIONS, SaasAdapterBase, approval_ref, attachment_note, sdk_missing
 
 BOT_TOKEN_VAR = "MFG_TEAM_SLACK_BOT_TOKEN"
 APP_TOKEN_VAR = "MFG_TEAM_SLACK_APP_TOKEN"
