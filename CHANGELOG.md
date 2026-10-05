@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Missing `~/.claude` with no TTY** (CI, piped input) now prints why and exits 2 instead of exiting silently after the `Create it? [y/N]` prompt.
 - **Interactive picker**: entering `08` or `09` no longer aborts with "value too great for base".
 - **`install.sh -h`** prints the whole usage block (the last two examples were cut off).
+- **CRLF profile files with `extends:` are now resolved.** `has_extends` matched `^---$`, so a CRLF file (`---\r`) was never seen as having frontmatter and was copied raw, with `extends:` unresolved. It now strips `\r` first. New root `.gitattributes` (`* text=auto eol=lf`, `*.sh` / `*.py` `eol=lf`) keeps Windows checkouts from converting the installer and tools to CRLF.
+- **`.installed` is always valid JSON.** `source`, `pluginVersion` and the profile names are now JSON-escaped (via python3 `json` when available; pure-bash fallback escapes `\` and `"`). Previously a repo path containing `"` or `\` produced invalid JSON that `/manufacturing` could not read. CI now installs from a repo path and a `HOME` containing a space and `"`, and validates `.installed` with `python3 -m json.tool` (python and no-python paths).
 
 ### Changed
 

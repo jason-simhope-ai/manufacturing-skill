@@ -72,10 +72,23 @@ require_python() {
   fi
 }
 
-# Return 0 if file has an `extends:` field in its YAML frontmatter
+# Return 0 if file has an `extends:` field in its YAML frontmatter.
+# CRLF-tolerant: a trailing \r is stripped from every line first (a Windows
+# checkout with autocrlf turns "---" into "---\r"). Single awk, no pipe, so
+# pipefail cannot misreport an early exit.
 has_extends() {
-  awk '/^---$/{c++; if (c==2) exit; next} c==1' "$1" \
-    | grep -qE '^extends:[[:space:]]'
+  awk '
+    { sub(/\r$/, "") }
+    /^---$/ { c++; if (c == 2) exit; next }
+    c == 1 && /^extends:[[:space:]]/ { found = 1; exit }
+    END { exit !found }
+  ' "$1"
+}
+
+# JSON-escape a string for use between double quotes (pure sed fallback:
+# backslash and double quote; used only when python3 is unavailable).
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 # Resolve a profile file via the Python resolver, write to target.
@@ -526,25 +539,48 @@ fi
 # `activeProfiles` (canonical from v0.1.5) are written.
 if [[ "${CORE_ONLY}" == "true" ]]; then
   ACTIVE_PROFILE_FIRST="(core-only)"
-  ACTIVE_PROFILES_JSON="[]"
+  ACTIVE_PROFILES_LIST=()
 else
   ACTIVE_PROFILE_FIRST="${ACTIVE_PROFILES[0]}"
-  # Build JSON array literal: ["a","b","c"]
-  ACTIVE_PROFILES_JSON=$(printf '"%s",' "${ACTIVE_PROFILES[@]}" | sed 's/,$//')
-  ACTIVE_PROFILES_JSON="[${ACTIVE_PROFILES_JSON}]"
+  ACTIVE_PROFILES_LIST=("${ACTIVE_PROFILES[@]}")
 fi
 PLUGIN_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "${PLUGIN_ROOT}/plugin.json" \
   | head -1 \
   | sed -E 's/.*"([^"]*)"$/\1/')
-cat > "${STAGE_DIR}/.installed" <<JSON
+INSTALLED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if [[ -z "${PYTHON_BIN:-}" ]]; then   # --core-only skips the preflight lookup
+  PYTHON_BIN="$(detect_python || true)"
+fi
+if [[ -n "${PYTHON_BIN}" ]]; then
+  # Proper JSON via python (handles every special character in the path).
+  # ${arr[@]+...} keeps an empty array safe under `set -u` on bash 3.2.
+  "${PYTHON_BIN}" -c '
+import json, sys
+at, ver, first, src = sys.argv[1:5]
+doc = {"installedAt": at, "pluginVersion": ver, "activeProfile": first,
+       "activeProfiles": sys.argv[5:], "source": src}
+sys.stdout.write(json.dumps(doc, indent=2) + "\n")
+' "${INSTALLED_AT}" "${PLUGIN_VERSION}" "${ACTIVE_PROFILE_FIRST}" "${PLUGIN_ROOT}" \
+    ${ACTIVE_PROFILES_LIST[@]+"${ACTIVE_PROFILES_LIST[@]}"} > "${STAGE_DIR}/.installed"
+else
+  # Pure-bash fallback: escapes `\` and `"` (profile names are validated;
+  # the repo path is the only free-form value).
+  ACTIVE_PROFILES_JSON=""
+  if [[ ${#ACTIVE_PROFILES_LIST[@]} -gt 0 ]]; then
+    for _p in "${ACTIVE_PROFILES_LIST[@]}"; do
+      ACTIVE_PROFILES_JSON="${ACTIVE_PROFILES_JSON:+${ACTIVE_PROFILES_JSON},}\"$(json_escape "${_p}")\""
+    done
+  fi
+  cat > "${STAGE_DIR}/.installed" <<JSON
 {
-  "installedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "pluginVersion": "${PLUGIN_VERSION}",
-  "activeProfile": "${ACTIVE_PROFILE_FIRST}",
-  "activeProfiles": ${ACTIVE_PROFILES_JSON},
-  "source": "${PLUGIN_ROOT}"
+  "installedAt": "${INSTALLED_AT}",
+  "pluginVersion": "$(json_escape "${PLUGIN_VERSION}")",
+  "activeProfile": "$(json_escape "${ACTIVE_PROFILE_FIRST}")",
+  "activeProfiles": [${ACTIVE_PROFILES_JSON}],
+  "source": "$(json_escape "${PLUGIN_ROOT}")"
 }
 JSON
+fi
 
 # Swap: old → unique backup path, new → target.
 if [[ -e "${TARGET_DIR}" || -L "${TARGET_DIR}" ]]; then

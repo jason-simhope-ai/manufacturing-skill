@@ -256,6 +256,50 @@ jobs:
           fi
           echo "ok  missing ~/.claude without a TTY exits 2"
 
+          # CRLF profile file with `extends:` must still be resolved, and
+          # .installed must be valid JSON when both HOME and the repo path
+          # contain a space and a double quote (backslash too for the repo).
+          tmp="$(mktemp -d)"
+          repo_copy="$tmp/re\\po \"with\" space"
+          mkdir -p "$repo_copy"
+          tar --exclude=.git -cf - . | tar -xf - -C "$repo_copy"
+          printf -- '---\r\nname: crlf-agent\r\nextends: core/agents/inventory-manager\r\n---\r\n\r\n<!-- inherit -->\r\n' \
+            > "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"
+          crlf_home="$tmp/h \"q\""
+          mkdir -p "$crlf_home/.claude"
+          crlf_out="$(HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"
+          if ! printf '%s\n' "$crlf_out" | grep -qF 'resolving extends: agents/crlf-agent.md'; then
+            echo "::error::CRLF profile file with extends: was not resolved"
+            printf '%s\n' "$crlf_out"
+            exit 1
+          fi
+          crlf_target="$crlf_home/.claude/plugins/manufacturing-skill"
+          if [ ! -s "$crlf_target/agents/crlf-agent.md" ] || grep -q '^extends:' "$crlf_target/agents/crlf-agent.md"; then
+            echo "::error::CRLF extends: file was copied raw instead of resolved"
+            exit 1
+          fi
+          echo "ok  CRLF profile file with extends: is resolved"
+          python3 -m json.tool "$crlf_target/.installed" >/dev/null
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+            "$crlf_target/.installed" "$repo_copy"
+          echo "ok  .installed is valid JSON (python path) with quote/space/backslash in repo path and HOME"
+
+          # Same without python: stub interpreters that fail --version force
+          # the pure-bash fallback (single plain profile needs no python).
+          rm -f "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"   # extends: needs python
+          nopy="$tmp/nopy"; mkdir -p "$nopy"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          for args in "cnc-machining" "--core-only"; do
+            rm -rf "$crlf_home/.claude"; mkdir -p "$crlf_home/.claude"
+            PATH="$nopy:$PATH" HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" $args </dev/null >/dev/null
+            python3 -m json.tool "$crlf_target/.installed" >/dev/null
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+              "$crlf_target/.installed" "$repo_copy"
+          done
+          echo "ok  .installed is valid JSON (no-python fallback) with quote/space/backslash in repo path and HOME"
+
       # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
       # must declare the fields install.sh + adapters expect to read
