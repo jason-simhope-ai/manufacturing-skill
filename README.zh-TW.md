@@ -49,7 +49,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 3   | 🏭 **追工單**         | 工單跑到哪了？哪台機台卡住了？哪個訂單可能延誤？隨時問                       |
 | 4   | 🔍 **顧品管**         | 不良追蹤、客訴 8D 處理、IATF（汽車業品質體系）稽核準備 — AI 引導你跑完合規流程 |
 | 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
-| 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥都有起點範本）  |
+| 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出已有 alpha 內容，食品 / 製藥有起點範本） |
 
 **5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
 
@@ -63,7 +63,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 採用「**core + profile overlay**」架構：
 
 - **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出與食品（HACCP / ISO 22000、批次追溯）是 alpha（有內容、尚待業界實務驗證）；PCB / 製藥是 stub
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出成型、食品（HACCP / ISO 22000、批次追溯）與 PCB 組裝（SMT / EMS）是 alpha（有內容、尚待業界實務驗證）；製藥是 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
 
@@ -192,7 +192,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
-2. **Alpha / Stub 加碼客製** — 射出、食品是 alpha（有內容但需驗證）；PCB / 製藥是 stub，有 starter template 可照著填。
+2. **Alpha / Stub 加碼客製** — 射出、食品、PCB 組裝是 alpha（內容標示「需驗證」，請自家工程師審過再用）；製藥是 stub，有 starter template 可照著填。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
 ---
@@ -228,7 +228,7 @@ manufacturing-skill/
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/                 # 產業包
 │   ├── cnc-machining/        # ★ v1 唯一完整產業包
-│   ├── pcb-assembly/         # Stub — 歡迎 contribute
+│   ├── pcb-assembly/         # Alpha — SMT / EMS，待業界驗證
 │   ├── injection-molding/    # Alpha — 待射出廠驗證
 │   ├── food-processing/      # Alpha — HACCP / ISO 22000，待食品廠驗證
 │   └── pharma/               # Stub
@@ -284,7 +284,7 @@ manufacturing-skill/
 
 PR 都歡迎，特別是：
 
-- 新產業包（PCB / 射出 / 食品 / 製藥 — 看各產業包的 README 知道要做什麼）
+- 產業包（驗證 PCB / 射出 / 食品 alpha 內容；補完製藥 stub — 看各產業包 README 知道要做什麼）
 - ERP connector 實作（SAP / Oracle / 鼎新 / Workday）
 - explainer 卡片翻譯成其他語言
 - 真實導入 case study

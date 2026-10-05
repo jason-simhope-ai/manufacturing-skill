@@ -13,7 +13,7 @@ body:
     attributes:
       label: Which vertical?
       options:
-        - pcb-assembly (currently stub)
+        - pcb-assembly (currently alpha)
         - injection-molding (currently alpha)
         - food-processing (currently alpha)
         - pharma (currently stub)

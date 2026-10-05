@@ -160,11 +160,22 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於 Codex / ISO 22000 公開資料，未經食品廠 HACCP 小組驗證；管制界限皆為範例，法規細節標「需驗證」。不可取代 HACCP 管制小組或法規顧問，AI 不簽核 CCP 偏差、不決定回收。
 
-#### Stub profiles（2 個 — 歡迎 contribute）
+#### `profiles/pcb-assembly/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)                                                            |
+| Agents (2)   | [smt-process-engineer](profiles/pcb-assembly/agents/smt-process-engineer.md) · [ems-quality-analyst](profiles/pcb-assembly/agents/ems-quality-analyst.md)     |
+| Skills (2)   | [smt-dfm-review](profiles/pcb-assembly/skills/smt-dfm-review.md) · [aoi-defect-pareto](profiles/pcb-assembly/skills/aoi-defect-pareto.md)                     |
+| Know-how (2) | [ipc-a-610-basics](profiles/pcb-assembly/know-how/ipc-a-610-basics.md) · [smt-common-defects](profiles/pcb-assembly/know-how/smt-common-defects.md)           |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)                                                                            |
+
+> **Alpha 警告**：內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師驗證；數字標「範例 / 需驗證」。尚無 MES 連線 — AOI/SPI/ICT/FCT 分析需先匯出 CSV。
+
+#### Stub profiles（1 個 — 歡迎 contribute）
 
 | Profile                                      | manifest                                                                                                | 預留範本                                                                             |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
 | [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
@@ -272,7 +283,8 @@ core/  hooks            : 4
 CNC profile (complete)  : 4 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
 Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
-Stub profiles           : 2 (PCB / pharma — manifest + README + _templates)
+PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
+Stub profiles           : 1 (pharma — manifest + README + _templates)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + CAPTURE-GUIDE.md
