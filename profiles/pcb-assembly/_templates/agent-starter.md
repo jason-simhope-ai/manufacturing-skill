@@ -3,7 +3,7 @@ name: <TODO-agent-name>
 displayName: <TODO 中文名>
 description: <TODO 一句話描述這個 agent 做什麼>
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # <TODO 中文名> / <TODO English Name>

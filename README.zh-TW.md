@@ -193,7 +193,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
 2. **Alpha 加碼客製** — 射出、食品、PCB 組裝、製藥、機械設備 ETO 都是 alpha（內容標示「需驗證」，請自家工程師審過再用）；各產業包的 `_templates/` 有 starter template 可照著填。
-3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
+3. **做你自己的產業包** — 複製一個 alpha 產業包當骨架，照 [docs/profile-development.md](docs/profile-development.md) 逐步做（含過得了 CI 的範本、登記步驟與必改清單）。
 
 ---
 

@@ -58,6 +58,8 @@ AI-DRAFT — 非 GMP 紀錄，須由調查人員在受控系統中正式撰寫
 
 ### 5. 趨勢與重複發生
 
+<!-- tools: bash-justified: step 5 runs read-only grouping / counting over a user-supplied, de-identified deviation CSV (equipment / line / category / root-cause clusters) to find repeat deviations; no network, no writes outside the working directory -->
+
 使用者提供偏差清單（建議去識別化的 CSV）時，可用 Bash 做簡單統計：依設備、產線、偏差類別、根因類別分群，找重複發生 — 並提醒「重複發生代表上一次 CAPA 可能無效」。
 
 ## 你會用的資源

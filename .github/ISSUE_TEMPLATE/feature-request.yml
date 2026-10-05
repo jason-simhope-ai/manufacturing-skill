@@ -40,7 +40,7 @@ body:
       options:
         - core agent / skill (applies to all manufacturing)
         - existing profile (CNC)
-        - new profile (one of the stubs)
+        - new profile (see docs/profile-development.md)
         - install.sh / adapters
         - infra (MCP server / on-prem guide)
         - docs / explainers

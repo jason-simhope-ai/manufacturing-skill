@@ -436,3 +436,195 @@ jobs:
             done <<< "${removed}"
           done <<< "${changed}"
           exit $fail
+
+      # ---------------------------------------------------------------
+      # Step 14: Registration guardrail. An unregistered profiles/<dir>
+      # is silently skipped by Step 3 (manifest vs filesystem), Step 11
+      # (explainer stat panel) and Step 12 (pairwise conflict scan), so
+      # CI would stay green while the profile is invisible. Every
+      # profiles/<dir>/ (dirs starting with "_" are exempt) must be in
+      # plugin.json `profiles.available`, and its `status` (missing
+      # = complete) must match the plugin.json list that names it.
+      # ---------------------------------------------------------------
+      - name: Profiles — every profiles/<dir> is registered in plugin.json
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          plugin = json.load(open("plugin.json", encoding="utf-8"))
+          reg = plugin["profiles"]
+          available = set(reg.get("available", []))
+          status_lists = {k: set(reg.get(k, [])) for k in ("complete", "alpha", "stub")}
+          fail = False
+          dirs = sorted(
+              d for d in os.listdir("profiles")
+              if os.path.isdir(os.path.join("profiles", d)) and not d.startswith("_")
+          )
+          for d in dirs:
+              pj = f"profiles/{d}/profile.json"
+              if d not in available:
+                  print(f"::error file=plugin.json::profiles/{d}/ exists but is not in "
+                        f"profiles.available — it is silently skipped by the pairwise "
+                        f"conflict scan and the explainer stats. Register it (see "
+                        f"docs/profile-development.md).")
+                  fail = True
+              if not os.path.isfile(pj):
+                  print(f"::error file=profiles/{d}::directory has no profile.json")
+                  fail = True
+                  continue
+              status = json.load(open(pj, encoding="utf-8")).get("status", "complete")
+              if status not in status_lists:
+                  print(f"::error file={pj}::status {status!r} is not one of "
+                        f"complete / alpha / stub")
+                  fail = True
+              elif d not in status_lists[status]:
+                  print(f"::error file=plugin.json::{d} has status {status!r} in "
+                        f"{pj} but is not listed in plugin.json profiles.{status}")
+                  fail = True
+              others = [k for k, v in status_lists.items() if d in v and k != status]
+              if others:
+                  print(f"::error file=plugin.json::{d} (status {status!r}) is also "
+                        f"listed under profiles.{others}")
+                  fail = True
+          for name in sorted(available - set(dirs)):
+              print(f"::error file=plugin.json::profiles.available lists {name!r} "
+                    f"but profiles/{name}/ does not exist")
+              fail = True
+          for key, names in status_lists.items():
+              for name in sorted(names - available):
+                  print(f"::error file=plugin.json::profiles.{key} lists {name!r} "
+                        f"which is not in profiles.available")
+                  fail = True
+          default = reg.get("default")
+          if default and default not in available:
+              print(f"::error file=plugin.json::profiles.default {default!r} is not "
+                    f"in profiles.available")
+              fail = True
+          print(f"{len(dirs)} profile dirs, {len(available)} registered")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 15: Agent tool allowlist (least privilege). Every agent
+      # (core/**/agents, profiles/**/agents) and every profile
+      # _templates/agent-*.md starter must declare `tools:` and keep it
+      # inside ALLOWED. Bash is opt-in per agent: the body must contain
+      #   <!-- tools: bash-justified: <reason> -->
+      # Starters under _templates/ may never opt in (they get copied).
+      # WebFetch / Write / Edit etc. are not allowed at all — widen
+      # ALLOWED / OPT_IN below only in a PR that discusses why.
+      # ---------------------------------------------------------------
+      - name: Agents — tool allowlist
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys, yaml
+          ALLOWED = {"Read", "Grep", "Glob"}
+          OPT_IN = {"Bash"}   # allowed only with the bash-justified marker
+          MARKER = re.compile(r"<!--\s*tools:\s*bash-justified:\s*\S[^>]*?-->")
+          files = sorted(set(
+              glob.glob("core/**/agents/*.md", recursive=True)
+              + glob.glob("profiles/**/agents/*.md", recursive=True)
+              + glob.glob("profiles/**/_templates/agent-*.md", recursive=True)
+          ))
+          fail = False
+          for f in files:
+              text = open(f, encoding="utf-8").read()
+              parts = text.split("---", 2)
+              if not text.startswith("---") or len(parts) < 3:
+                  continue  # Step 4 reports missing / unclosed frontmatter
+              try:
+                  fm = yaml.safe_load(parts[1]) or {}
+              except yaml.YAMLError:
+                  continue  # Step 4 reports invalid YAML
+              if "tools" not in fm:
+                  print(f"::error file={f}::agent must declare `tools:` "
+                        f"(omitting it inherits every tool); use [Read, Grep, Glob]")
+                  fail = True
+                  continue
+              raw = fm["tools"]
+              tools = ({t.strip() for t in raw.split(",") if t.strip()}
+                       if isinstance(raw, str) else {str(t) for t in (raw or [])})
+              is_template = "/_templates/" in f
+              has_marker = bool(MARKER.search(parts[2]))
+              bad = sorted(tools - ALLOWED - OPT_IN)
+              if bad:
+                  print(f"::error file={f}::tools {bad} are not on the allowlist "
+                        f"{sorted(ALLOWED)} (+ Bash with a justification marker)")
+                  fail = True
+              if tools & OPT_IN:
+                  if is_template:
+                      print(f"::error file={f}::starter templates must not declare "
+                            f"{sorted(tools & OPT_IN)}; contributors copy this file")
+                      fail = True
+                  elif not has_marker:
+                      print(f"::error file={f}::declares Bash but the body has no "
+                            f"`<!-- tools: bash-justified: <reason> -->` marker")
+                      fail = True
+              elif has_marker:
+                  print(f"::error file={f}::has a bash-justified marker but does not "
+                        f"declare Bash in `tools:` — remove the stale marker")
+                  fail = True
+              print(f"ok  {f}  tools={sorted(tools)}")
+          print(f"checked {len(files)} agent files")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 16: Explainer 01 overlay rows vs stat panel. Step 11 only
+      # regenerates the stat panel; the agent / know-how / hook overlay
+      # rows (and their "CNC a + alpha α b" labels) are hand-edited.
+      # Count the item tiles per row and compare with (1) the label and
+      # (2) the regenerated stat numbers, so adding a profile cannot
+      # leave the rows stale. Skills have no row in explainer 01.
+      # ---------------------------------------------------------------
+      - name: Explainer 01 — overlay rows vs stat panel
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          path = glob.glob("docs/explainers/01-*.html")[0]
+          html = open(path, encoding="utf-8").read()
+          stats = html[html.index("AUTO-START: explainer01-stats"):html.index("AUTO-END")]
+          def stat(label, with_alpha=True):
+              m = re.search(label + r"（(\d+) \+ (\d+)(?: \+ (\d+)α)?）", stats)
+              if not m:
+                  print(f"::error file={path}::cannot find stat line {label!r}")
+                  sys.exit(1)
+              return int(m[1]), int(m[2]), int(m[3] or 0)
+          expected = {            # layer marker -> (stat label, noun)
+              "ROLE": ("Agents", "agent"),
+              "REF":  ("Know-how", "know-how"),
+              "HOOK": ("Hooks", "hook"),
+          }
+          fail = False
+          for layer, (label, noun) in expected.items():
+              m = re.search(r"<!-- LAYER \d+ " + layer + r" -->(.*?)(?=<!-- LAYER |\Z)",
+                            html, re.S)
+              if not m:
+                  print(f"::error file={path}::LAYER {layer} block not found")
+                  fail = True
+                  continue
+              core_html, _, overlay_html = m[1].partition('class="layer-overlay"')
+              n_core = len(re.findall(r'<div class="item(?: new)?">', core_html))
+              n_cnc = len(re.findall(r'<div class="item cnc">', overlay_html))
+              n_alpha = len(re.findall(r'<div class="item alpha">', overlay_html))
+              s_core, s_cnc, s_alpha = stat(label)
+              o_label = re.search(r'col-label profile">([^<]*)<', overlay_html)[1]
+              c_label = re.search(r'col-label">([^<]*)<', core_html)[1]
+              l_core = int(re.search(r"(\d+)", c_label)[1])
+              l_cnc = int((re.search(r"CNC (\d+)", o_label) or [0, 0])[1])
+              l_alpha = int((re.search(r"α (\d+)", o_label) or [0, 0])[1])
+              rows = [
+                  ("core", n_core, s_core, l_core, c_label),
+                  ("CNC", n_cnc, s_cnc, l_cnc, o_label),
+                  ("alpha", n_alpha, s_alpha, l_alpha, o_label),
+              ]
+              for what, n, s, l, text in rows:
+                  if n != s or l != s:
+                      print(f"::error file={path}::{layer} row, {what} {noun}s: "
+                            f"{n} tiles, label says {l} ({text.strip()!r}), stat panel "
+                            f"says {s} — hand-edit the overlay row/label after "
+                            f"`python3 scripts/regen_explainers.py`")
+                      fail = True
+              print(f"{layer}: tiles core/cnc/alpha = {n_core}/{n_cnc}/{n_alpha}; "
+                    f"stat = {s_core}/{s_cnc}/{s_alpha}")
+          sys.exit(1 if fail else 0)
+          PY

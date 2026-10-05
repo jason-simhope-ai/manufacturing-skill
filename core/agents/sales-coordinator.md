@@ -3,7 +3,7 @@ name: sales-coordinator
 displayName: 業務助理 / Sales Coordinator
 description: 客戶溝通、訂單追蹤、交期協調 — 業務團隊與生產端的橋樑
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 業務助理 / Sales Coordinator

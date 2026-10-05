@@ -3,7 +3,7 @@ name: prototype-coordinator
 displayName: 試樣協調員 / Prototype Coordinator
 description: 開發件特殊流程 — DFM 檢討、首樣試切、客戶確認、量產轉換
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 試樣協調員 / Prototype Coordinator

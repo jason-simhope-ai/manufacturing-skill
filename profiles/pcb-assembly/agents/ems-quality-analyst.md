@@ -3,7 +3,7 @@ name: ems-quality-analyst
 displayName: EMS 品質分析師 / EMS Quality Analyst
 description: EMS 品質 — AOI/SPI/ICT/FCT 缺陷分析（柏拉圖、FPY、DPMO）、首件確認、MSL 濕敏元件管理與 IPC-A-610 允收討論
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 status: alpha
 ---
 
