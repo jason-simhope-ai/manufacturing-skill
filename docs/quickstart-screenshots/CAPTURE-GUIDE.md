@@ -68,6 +68,23 @@
 
 ---
 
+## 一鍵重生所有 PNG（explainer / slide / mockup）
+
+`scripts/regen_screenshots.py` 會從 HTML 原始檔重新渲染 `docs/explainers/screenshots/*.png`、`docs/demo/slides/six-things.png` 與 3 張 `*-mockup.png`。用 Node 版 Playwright（Chromium 取自 `PLAYWRIGHT_BROWSERS_PATH`，不需要 Python playwright，也不需要 dev server）：
+
+```bash
+python3 scripts/regen_screenshots.py --check   # 列出比 HTML 舊的 PNG（有舊的就 exit 1）
+python3 scripts/regen_screenshots.py           # 只重生過期的
+python3 scripts/regen_screenshots.py --all     # 全部重生
+python3 scripts/regen_screenshots.py --only six-things   # 只重生路徑含此字串的
+```
+
+- 過期判斷：HTML 最後一次 git commit 是否比 PNG 新（未 commit 的檔案用 mtime）。
+- 設定：explainer 寬 1600 px、slide 1920×1080、mockup 尺寸見上面各 step；全頁截圖、`deviceScaleFactor 2`；超過 1.5 MB 會自動降到 1.5 → 1。
+- 重生後請用眼睛看過每張 PNG（不是空白、沒被切掉）再 commit。
+
+---
+
 ## 想重新生 mockup？
 
 3 張 mockup 的原始 HTML 在 `docs/quickstart-screenshots/mockups/`。改完內容後重新渲染：
