@@ -17,10 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `verify_approval(token, action_hash)` hook plus `authorize_write()` helper on the ERP contract: implementations must verify an approval token bound to the action hash (signature, expiry, approver different from requester) before any write. Vendor-neutral; the chat gateway in `infra/chat-gateway/` is the intended issuer.
+- `verify_approval(token, action_hash)` hook plus `authorize_write()` helper on the ERP contract: implementations must verify an approval token bound to the action hash (signature, expiry, approver different from requester, approver role allowed for the tool via `approver_roles`) before any write, and one approval (`approval_id`) authorises exactly one write (`approval_already_used`).
+- Canonical approval hash and token format defined in `contract.py` (`canonical_args`, `compute_action_hash`, `issue_approval_token`, `verify_approval_token`, golden vector in the tests): Decimal/int -> normalised decimal string, datetime -> UTC `Z`, float rejected. Nothing signs tokens in production yet; the chat gateway will adopt this format when its execute path lands.
+- `to_jsonable()` for result types, `aware()` for naive ERP timestamps (result types now reject naive datetimes), `ListResult.total_matched` may be `None` (`has_more`), `sensitive_groups` for custom masked fields; default `record_audit` writes JSON lines to stderr instead of an unconfigured logger.
 - `max_rows` (default 200, hard cap 1000) and `fields` (allowlist) on the new list tools `list_customers`, `list_parts`, `list_inventory`; default masking of `price` and `customer_contact` field groups unless the role is granted them (deny by default).
 - `infra/mcp-servers/erp-connector/mock_connector.py` and `mock-data/erp_mock.json` — reference `MockErpConnector` over synthetic data demonstrating masking, row caps, idempotent writes and refusal without a valid approval token.
-- `tests/mcp/test_erp_contract.py` (stdlib `unittest`) and a CI step "erp-connector — contract tests".
+- `tests/mcp/test_erp_contract.py` (stdlib `unittest`) with a reusable `ConformanceSuite` mixin to run against your own connector, and a CI step "erp-connector — contract tests".
 
 ## [0.1.5] — 2026-05-09
 

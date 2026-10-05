@@ -13,27 +13,27 @@ What it demonstrates
 - ``max_rows`` default 200 / hard cap 1000, and the ``fields`` allowlist;
 - idempotent writes (same key + same arguments -> same record, no duplicate);
 - refusal without a valid approval token (role check, token bound to the
-  action hash, expiry, approver != requester);
+  action hash, expiry, approver != requester, approver role allowed);
+- single-use approvals: one approval_id commits at most one write;
 - an audit event for every call, in ``self.audit_log``.
 
-The approval token format below (``issue_approval_token``) is a mock stand-in
-for whatever your approval service issues; the contract only requires that
-``verify_approval`` validates it and binds it to ``action_hash``.
+Tokens use the canonical format defined in ``contract.py``
+(``issue_approval_token`` / ``verify_approval_token``); ``issue_approval_token``
+is re-exported here for existing imports.
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import threading
-import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from contract import (
+    REASON_APPROVAL_ALREADY_USED,
+    REASON_IDEMPOTENCY_KEY_CONFLICT,
     ApprovalDecision,
     CallContext,
     CreditStatus,
@@ -46,39 +46,14 @@ from contract import (
     PurchasePrice,
     WriteResult,
     clamp_max_rows,
+    issue_approval_token,
     project_fields,
+    verify_approval_token,
 )
 
+__all__ = ["MockErpConnector", "issue_approval_token", "DEFAULT_DATA_PATH"]
+
 DEFAULT_DATA_PATH = Path(__file__).parent / "mock-data" / "erp_mock.json"
-
-
-def issue_approval_token(
-    secret: bytes,
-    approver_id: str,
-    action_hash: str,
-    *,
-    ttl_seconds: int = 900,
-    now: datetime | None = None,
-    approval_id: str | None = None,
-) -> str:
-    """Mint a mock approval token: ``v1|approver|approval_id|expiry|mac``.
-
-    Mirrors what an approval service (e.g. the chat gateway) would do after a
-    human approves. The MAC covers approver, approval id, expiry and the
-    action hash, so the token cannot be reused for a different action.
-    """
-    now = now or datetime.now(timezone.utc)
-    expiry = int((now + timedelta(seconds=ttl_seconds)).timestamp())
-    approval_id = approval_id or uuid.uuid4().hex
-    mac = _mac(secret, approver_id, approval_id, expiry, action_hash)
-    return f"v1|{approver_id}|{approval_id}|{expiry}|{mac}"
-
-
-def _mac(
-    secret: bytes, approver_id: str, approval_id: str, expiry: int, action_hash: str
-) -> str:
-    msg = f"v1|{approver_id}|{approval_id}|{expiry}|{action_hash}".encode("utf-8")
-    return hmac.new(secret, msg, hashlib.sha256).hexdigest()
 
 
 def _dec(value: Any) -> Decimal:
@@ -112,6 +87,8 @@ class MockErpConnector(ErpConnector):
         self.purchase_requests: dict[str, dict] = {}
         self.movements: list[dict] = []
         self._idem: dict[tuple[str, str], tuple[str, str]] = {}
+        # approval_id -> (tool, idempotency_key) of the write it authorised
+        self._approvals_used: dict[str, tuple[str, str]] = {}
         self._lock = threading.Lock()
         self._seq = 0
         # Every call, allowed or refused (see ErpConnector.record_audit)
@@ -123,23 +100,7 @@ class MockErpConnector(ErpConnector):
         self.audit_log.append(event)
 
     def verify_approval(self, token: str | None, action_hash: str) -> ApprovalDecision:
-        if not token or not isinstance(token, str):
-            return ApprovalDecision(False, reason="approval_required")
-        parts = token.split("|")
-        if len(parts) != 5 or parts[0] != "v1":
-            return ApprovalDecision(False, reason="approval_malformed")
-        _, approver_id, approval_id, expiry_s, mac = parts
-        try:
-            expiry = int(expiry_s)
-        except ValueError:
-            return ApprovalDecision(False, reason="approval_malformed")
-        expected = _mac(self._secret, approver_id, approval_id, expiry, action_hash)
-        if not hmac.compare_digest(mac, expected):
-            # Wrong secret, tampered token, or token for a different action.
-            return ApprovalDecision(False, reason="approval_signature_invalid")
-        if self._clock().timestamp() > expiry:
-            return ApprovalDecision(False, reason="approval_expired")
-        return ApprovalDecision(True, approver_id=approver_id, approval_id=approval_id)
+        return verify_approval_token(self._secret, token, action_hash, now=self._clock())
 
     # ─── Read tools ─────────────────────────────────────────
 
@@ -326,11 +287,11 @@ class MockErpConnector(ErpConnector):
         *,
         idempotency_key: str,
     ) -> WriteResult:
+        # delivery_date stays a datetime: canonical_args turns it into UTC "Z".
         args = {
             "customer_id": customer_id,
             "items": items,
-            "delivery_date": delivery_date.isoformat()
-            if isinstance(delivery_date, datetime) else delivery_date,
+            "delivery_date": delivery_date,
             "po_reference": po_reference,
         }
 
@@ -345,7 +306,7 @@ class MockErpConnector(ErpConnector):
             so_id = self._next_id("SO")
             self.sales_orders[so_id] = {
                 "so_id": so_id, "customer_id": customer_id, "items": items,
-                "delivery_date": args["delivery_date"],
+                "delivery_date": delivery_date.isoformat(),
                 "po_reference": po_reference, "status": "open",
                 "created_by": ctx.operator_id,
             }
@@ -469,11 +430,17 @@ class MockErpConnector(ErpConnector):
                 if seen_hash != action_hash:
                     return self.make_write_result(
                         ctx, tool, key, action_hash, decision, status="refused",
-                        reason="idempotency_key_conflict", timestamp=self._clock(),
+                        reason=REASON_IDEMPOTENCY_KEY_CONFLICT, timestamp=self._clock(),
                     )
                 return self.make_write_result(
                     ctx, tool, key, action_hash, decision, status="replayed",
                     record_id=record_id, timestamp=self._clock(),
+                )
+            if decision.approval_id in self._approvals_used:
+                # One approval, one write: a new key cannot reuse the token.
+                return self.make_write_result(
+                    ctx, tool, key, action_hash, decision, status="refused",
+                    reason=REASON_APPROVAL_ALREADY_USED, timestamp=self._clock(),
                 )
             problem = validate()
             if problem is not None:
@@ -483,6 +450,7 @@ class MockErpConnector(ErpConnector):
                 )
             record_id = commit()
             self._idem[(tool, key)] = (action_hash, record_id)
+            self._approvals_used[decision.approval_id] = (tool, key)
         return self.make_write_result(
             ctx, tool, key, action_hash, decision, status="committed",
             record_id=record_id, timestamp=self._clock(),
