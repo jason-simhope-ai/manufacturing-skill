@@ -16,6 +16,7 @@
 | v2      | 2026-10-05 | 依 round-2 裁決重寫：(A1) 全面去識別 — 範例公司改為通用設計假設，pilot 只用通用部門；(A2) capability 加 `today`/`humanStillDoes`，旗艦能力拆成 strengthen + 休眠 outsource；(A3) team/ 預設安裝；(A4) claude-code driver 固定受限旗標集；(A5) wave-1 品保分身降為 T1 + 來源端去識別；(A6) `/team ask` 只是預覽；(A7) 每輪必須 @mention、前綴身分；(A8) 刪 JSON Schema，改手寫驗證 + 錯誤碼；(A9) 分身互相交棒延後。B1–B17 定值（分級 T0–T3、autonomy 名稱制、bytes 預算、TTL 30 分、限流、無長期記憶、`MFG_TEAM_` 前綴、gate 欄位、outsource 每分身 ≤ 1、T3 拒載 exit 3）。新增 §14 Deferred、§15 Known gaps；§18 改為 7 個可平行實作的 WP。 |
 | v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
 | v2.2    | 2026-10-05 | 前線情境模擬（R7）修訂：§5.3 capability 加 `affectedRoles`、`doerAckedOn`，`E038` 改用 `REVIEW_ONLY_WORDS` 並涵蓋 `create`、逐職位行判斷，新增 `E061`–`E063`、`W009`；§5.1 position twin 加 `vacancyApprovedBy`／`vacancyApprovedOn`（`E064`），channel 加 `learners`、`predictFirstDefault`、`twinFreeDays`；§5.4 roster.json 的 `policy.timezone` 與上述 channel 欄位；§5.5 專業參考只供對照、不出判定；§9.4 回覆標頭改中文、固定「這是參考，不是指示」行、「結論」改「分身的看法」；gateway 新增 `human_override`／`practice_checkin`／`twin_free_day` 匿名計數與學習模式。 |
+| v2.4    | 2026-10-05 | 董事長情境模擬（R8）修訂：§13.2 pilot 定為 **4 週** = Wave 0 模擬預演 1 週 + Wave 1 測試工作區 3 週（原 2 + 6 週），第 4 週五依「第 4 週決策表」（越界次數、主管是否仍每週 review、人改 🧭 結論的次數、同仁匿名問卷；門檻由董事長填）決定繼續／延長／停止，G1 的每週小時數與 baseline 只當參考、不是成效指標；§13.3 董事長室簽三件事（原則、pilot 核准、預算核准）；§9.6、§18 WP3：`MFG_TEAM_DAILY_BUDGET_USD` 在 `--driver claude-code` 時必填（未設或非正有限數 → exit 64），當日累計以 0600 JSON（UTC 日期 → 分身 → USD，檔案鎖）存於 `$MFG_TEAM_STATE_DIR/daily-spend.json`，重啟不歸零，未回報費用或失敗的呼叫以每次上限計；§12 Q6 伺服器名改為 `manufacturing-scheduler`。 |
 
 ## 0. TL;DR
 
@@ -440,7 +441,7 @@ $MFG_TEAM_CLAUDE_BIN -p --output-format json --restricted --strict-mcp-config --
 ### 9.6 稽核、限流、錯誤
 
 - **Audit**（`audit.py`）：寫入 `${MFG_TEAM_STATE_DIR}/audit/<tier>/audit.jsonl`，append-only，每行一筆。欄位（snake_case）：`v, ts, seq, event_id, platform, channel, channel_tier, thread, operator`（`role:<position>`，或 `role:unknown`）`, operator_ref`（`HMAC-SHA256(MFG_TEAM_AUDIT_HMAC_KEY, platform+":"+user_id)` 的前 16 個 hex）`, twin, twin_prompt_sha, driver, action, capability, category, effective_autonomy, args_hash, approval_id, decision`（`allow|deny`）`, deny_reason, content_sha256, content_len, redactions{secret,pii,amount}, tainted, usage, latency_ms, prev_hash, hash`。`hash = "hmac-sha256:"+HMAC-SHA256(由 MFG_TEAM_AUDIT_HMAC_KEY 衍生的分級子金鑰, prev_hash+"\n"+canonical_json(該筆去掉 hash 欄位))`；第一筆的 `prev_hash = "sha256:0"`；`content_sha256` 存 HMAC 內容標記（衍生金鑰），不是明文雜湊。每次寫入後以衍生金鑰簽署 `audit/checkpoint.json`（各分級筆數、最後 seq、head）；`audit-verify` 據此偵測竄改、刪除、重排、截尾、整檔刪除與 seq 缺號。把 checkpoint 定期複製到主機外是營運者的責任（它擋不住「log 與 checkpoint 一起回滾」）。alpha 不存訊息全文。`action` 列舉：`msg_in msg_out route_decision tool_proposed tool_denied approval_requested approval_granted approval_denied approval_expired injection_flag policy_denied rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded config_refused post_failed`。所有 deny 與 `injection_flag` 都必須記錄。
-- **限流**：每人 6 則/分、每頻道 60 則/時、每頻道主動貼文 3 則/日、driver 併發 2、每次呼叫 `--max-budget-usd 0.10`；`MFG_TEAM_DAILY_BUDGET_USD`（每分身每日軟上限）預設關閉。event_id 去重保留 10 分鐘或 1,000 筆。
+- **限流**：每人 6 則/分、每頻道 60 則/時、每頻道主動貼文 3 則/日、driver 併發 2、每次呼叫 `--max-budget-usd 0.10`；`MFG_TEAM_DAILY_BUDGET_USD`（每分身每 UTC 日上限）mock driver 選填、`claude-code` 必填（未設或非正有限數 → exit 64）；當日累計存在 `${MFG_TEAM_STATE_DIR}/daily-spend.json`（0600、UTC 日期 → 分身 → USD、讀寫持檔案鎖，`post` 行程共用），重啟不歸零，檔案壞掉或權限過寬 → 拒絕啟動（exit 78），不自動歸零；未回報費用或失敗的呼叫以 `--max-budget-usd` 計；寫不進去就停止呼叫模型。到上限回「今日預算已用完，明天再問」。event_id 去重保留 10 分鐘或 1,000 筆。
 - **錯誤**：driver 逾時或失敗 → 回「暫時無法回應（#seq）」，絕不臆測；同一分身連續失敗 3 次 → 自動降為 observe。
 
 ## 10. Bootstrap：agent 與人
@@ -528,7 +529,7 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 
 **Q5 — Alpha 沒有長期記憶。** *否決*：向量庫自動記憶——無法審查，被注入的內容會被「記住」並持續生效。人工審查的 markdown 記憶管線列入 §14。
 
-**Q6 — 問 / 做 / 核准分權。** *否決*：聊天文字「核准」即生效（可偽造、可被注入）；一律雙人核准（pilot 會被摩擦拖垮）。alpha 根本沒有可寫的工具（ERP connector 只有 contract、scheduler-mcp 是 stub），所以只交付核准機制與測試。
+**Q6 — 問 / 做 / 核准分權。** *否決*：聊天文字「核准」即生效（可偽造、可被注入）；一律雙人核准（pilot 會被摩擦拖垮）。alpha 根本沒有可寫的工具（ERP connector 只有 contract、`manufacturing-scheduler`（`infra/mcp-servers/scheduler-mcp`）是 stub），所以只交付核准機制與測試。
 
 **Q7 — 手寫驗證器 + 錯誤碼，三處強制。** *否決*：JSON Schema（CI 沒有 `jsonschema` 套件，而且每個 `*.json` 都會被 Step 1 解析，故意寫錯的 fixture 會讓 Step 1 失敗）；比例上限（只有 3–4 項能力時，灌一項 strengthen 就能繞過）；完全禁止 outsource（不誠實，只會逼人把外包標成強化）。
 
@@ -544,16 +545,18 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 
 ### 13.2 波次
 
-- **Wave 0（2 週）**：只用 mock adapter + 合成資料重播；`/team ask` 預覽。目的：讓主管看到口吻、🧭 決策點與頁尾。
-- **Wave 1（6 週）**：**生產部主管分身**（`briefing-risk-check` strengthen：主管先貼 3 個今日重點，分身用排程資料挑戰並補漏；`briefing-data-pack` 為休眠的 outsource，若喚醒，生管列為 `today` 的共同擁有者）＋ **品保部主管分身**（§5.2）。tier T1，上限 draft。NCR 匯出先在來源端用 `team/tools/deid.py` 去識別。成功指標：人修改 🧭 結論的比例（> 0 是健康的）、人先寫 D4 的比例、週 review 出席率；**不用**「省下多少時間」當指標，因為那其實是外包指標。
-- **Wave 1b**：技術部主管分身（ECN 影響面交叉檢查，create）——只有 G2 與 G5 通過（ECN 表單與 BOM where-used 已數位化）才開；沒通過就先做流程修正，這本身也是成果。
+Pilot 合計 **4 週**（v2.4；董事長核准的就是這 4 週，到期即停，延長或擴大須重新簽 pilot 與預算核准）：
+
+- **Wave 0：模擬預演（第 1 週）**：只用 mock adapter + 合成資料重播；`/team ask` 預覽。目的：讓主管看到口吻、🧭 決策點與頁尾。同週 IT 部署測試工作區並演練停機一次；週五決定是否進測試工作區。
+- **Wave 1：測試工作區（第 2–4 週）**：**生產部主管分身**（`briefing-risk-check` strengthen：主管先貼 3 個今日重點，分身用排程資料挑戰並補漏；`briefing-data-pack` 為休眠的 outsource，若喚醒，生管列為 `today` 的共同擁有者）＋ **品保部主管分身**（§5.2）。tier T1，上限 draft。NCR 匯出先在來源端用 `team/tools/deid.py` 去識別。第 4 週五依「第 4 週決策表」決定繼續／延長／停止：越界次數（預期 0）、兩位主管是否仍每週 review、人改 🧭 結論的次數（0 代表照單全收）、同仁 3 題匿名問卷（是否覺得被取代）；門檻由董事長在 pilot 核准時填（`docs/adoption-guide.md`、`docs/owner-one-page.zh-TW.md`）。**不用**「省下多少時間」當指標，因為那其實是外包指標；閘門 G1 的每週小時數與 baseline 只當參考。
+- **Wave 1b**：技術部主管分身（ECN 影響面交叉檢查，create）——不在 4 週 pilot 內，要另簽；只有 G2 與 G5 通過（ECN 表單與 BOM where-used 已數位化）才開；沒通過就先做流程修正，這本身也是成果。
 - **之後**：加工部、業務部多半會判 `use-command` 或 `process-fix`；T3 等 G3；董事長室不開分身，改收月彙總。
 
 ### 13.3 導入負責人對各部門的下一步（通用職稱）
 
 | 對象 | 下一步 | 產出 |
 | ---- | ------ | ---- |
-| 董事長室 | 20 分鐘說明「副駕不是替身」與三分類；簽署「AI 賦能原則」（分身指標與技能保留紀錄不作為人力或績效依據，至少到 v1.0）；核准 pilot 範圍（2 個分身、6 週、T1、上限 draft）；指定稽核錨點簽收人 | 一頁原則、pilot 範圍 |
+| 董事長室 | 20 分鐘說明「副駕不是替身」與三分類；簽三件事：「AI 賦能原則」（分身指標與技能保留紀錄不作為人力或績效依據，至少到 v1.0；第 9 條違反時）、pilot 核准（2 個分身、4 週 = 1 週模擬預演 + 3 週測試工作區、T1、上限 draft、第 4 週決策表門檻）、預算核准（每分身每日上限）；指定稽核錨點簽收人、pilot 總負責人、機密事件受理人 | 一頁原則、pilot 與預算核准表 |
 | 生產部主管 | 旁聽 3 次早會、記錄現行簡報形式；跑 gate；訪談生管（填 `today`）；確認決策點（插單、加班、外包加工）；約定每週 15 分鐘 review | gate 紀錄、baseline |
 | 品保部主管 | 挑 10 件歷史 NCR，用 deid 去識別後做 mock 重播；訪談品保工程師；列出 decisionRights；決定哪些能力開放「我先說」 | 合成重播劇本、gate 紀錄 |
 | 技術部主管 | 盤點 ECN 表單與 BOM where-used；跑 gate；沒通過就提出流程修正案 | ECN 流程圖、gate 紀錄 |
@@ -640,7 +643,7 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 - `patterns.SECRET_PATTERNS`、`NAME_PATTERNS`、`DLP_PATTERNS`（皆為 `list[tuple[str, re.Pattern]]`）。
 - CLI：`PYTHONPATH=infra/chat-gateway python3 -m chat_gateway run [--roster PATH] [--adapter mock|slack|discord] [--driver mock|claude-code] [--script FILE.jsonl] [--pace SECONDS]`，以及 `… post --twin ID --capability ID [--channel ID]`、`… audit-verify FILE`、`… self-check`。
 - `demo.py [--check GOLDEN] [--pace S] [--roster PATH]`：未給 `--roster` 時，以 `team/tools/build.py` 從範例 build 到 tmpdir；使用 mock 的 demo key 並印出「DEMO KEYS」橫幅；`--check` 與 golden 不符 → exit 1。
-- 環境變數：`MFG_TEAM_ROSTER`（預設 `team/.build/roster.json`）、`MFG_TEAM_ADAPTER`（預設 `mock`）、`MFG_TEAM_DRIVER`（預設 `mock`）、`MFG_TEAM_STATE_DIR`（預設 `~/.local/state/manufacturing-skill/team`）、`MFG_TEAM_AUDIT_HMAC_KEY`、`MFG_TEAM_APPROVAL_HMAC_KEY`（非 mock 模式必填）、`MFG_TEAM_DAILY_BUDGET_USD`（選填）。
+- 環境變數：`MFG_TEAM_ROSTER`（預設 `team/.build/roster.json`）、`MFG_TEAM_ADAPTER`（預設 `mock`）、`MFG_TEAM_DRIVER`（預設 `mock`）、`MFG_TEAM_STATE_DIR`（預設 `~/.local/state/manufacturing-skill/team`）、`MFG_TEAM_AUDIT_HMAC_KEY`、`MFG_TEAM_APPROVAL_HMAC_KEY`（非 mock 模式必填）、`MFG_TEAM_DAILY_BUDGET_USD`（mock 選填；`--driver claude-code` 必填，v2.4）。
 - 測試檔各自把 `infra/chat-gateway` 插入 `sys.path`；`test_security.py` 涵蓋：INJ 類（信封偽造、零寬與 Tag 字元、文字核准、URL／圖片外洩、`@everyone`、身分冒充、「以後都你決定」、路徑穿越、重放、bot 作者、DM、外部頻道、秘密外洩、T3 設定）。
 - 驗收：`python3 -m unittest discover -s tests/chat_gateway -p 'test_*.py'` 綠；`python3 infra/chat-gateway/demo.py --check tests/chat_gateway/golden/demo.txt` exit 0。
 

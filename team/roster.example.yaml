@@ -36,7 +36,7 @@ positions:
       autonomyCeiling: draft
       needsTwinGate:
         result: twin
-        rationale: NCR 翻查與 8D 檢查每週耗數小時；品保工程師已訪談；NCR 匯出已在來源端去識別
+        rationale: NCR 翻查與 8D 檢查每週約 6 小時（合成例：品保工程師 4、主管 2）；品保工程師已訪談；NCR 匯出已在來源端去識別
         reviewedOn: "2026-10-05"
   - id: production-manager
     department: production
@@ -48,7 +48,7 @@ positions:
       autonomyCeiling: draft
       needsTwinGate:
         result: twin
-        rationale: 晨會簡報每日耗時；生管已訪談；排程資料已數位化
+        rationale: 晨會資料整理每天約 40 分鐘、每週約 3.5 小時（合成例）；生管已訪談；排程資料已數位化
         reviewedOn: "2026-10-05"
   - { id: qa-inspector, department: qa, title: 品保檢驗員, incumbent: LOCAL }
   - { id: machining-manager, department: machining, title: 加工部主管, incumbent: LOCAL }

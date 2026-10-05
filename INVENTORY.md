@@ -16,6 +16,7 @@
 | 第一次看到、完全不懂          | [docs/quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                              |
 | 想 5 分鐘看懂這玩意           | [docs/explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                                          |
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
+| 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
 | AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
@@ -258,7 +259,8 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
 | [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
-| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
+| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算；分身 4 週 pilot、原則與核准範本 |
+| [owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)                                                                       | 董事長：簽三件事前的一頁（費用、最壞情況、停機、第 4 週決策表） |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
@@ -343,11 +345,11 @@ Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
 Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-claude-response.md
                               + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 5 (architecture / adoption-guide / profile-dev / ROADMAP
-                              / quickstart-for-beginners) + 6 design specs
+Docs                    : 6 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page) + 6 design specs
 Scripts                 : 1 (regen_explainers.py)
 Tests                   : 54 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
-                              cases + 58 unittest, gateway 253 unittest + demo golden
+                              cases + 58 unittest, gateway 266 unittest + demo golden
 Examples                : 4 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template

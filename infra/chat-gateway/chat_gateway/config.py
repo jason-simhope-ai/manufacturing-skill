@@ -18,7 +18,8 @@ DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
 DEFAULT_DENYLIST = "team/local/names.denylist"
 STATE_DIR_VAR = "MFG_TEAM_STATE_DIR"
 # All the gateway (and the claude-code driver) ever writes there.
-STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home"})
+STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home", "daily-spend.json",
+                           "daily-spend.json.tmp", "daily-spend.json.lock"})
 DENYLIST_VAR = "MFG_TEAM_DENYLIST"
 AUDIT_KEY_VAR = "MFG_TEAM_AUDIT_HMAC_KEY"
 APPROVAL_KEY_VAR = "MFG_TEAM_APPROVAL_HMAC_KEY"
@@ -29,6 +30,9 @@ DEMO_APPROVAL_KEY = b"demo-approval-key--not-a-secret"
 # Numeric limits (EXT-02): finite, > 0 and below a sane ceiling. `nan` and `inf` are refused
 # (`spent >= nan` is always false, so a nan daily budget would never stop anything).
 MAX_DAILY_BUDGET_USD = 1000.0
+DAILY_BUDGET_VAR = "MFG_TEAM_DAILY_BUDGET_USD"
+# Drivers that bill a real account: the daily budget is mandatory for them (refuse start, exit 64).
+BILLED_DRIVERS = frozenset({"claude-code"})
 MAX_CALL_BUDGET_USD = 5.0
 TIMEOUT_RANGE_S = (5, 600)
 
@@ -148,13 +152,20 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
     if deny_raw and not Path(deny_raw).expanduser().is_file():
         raise ConfigRefused(f"{DENYLIST_VAR} is set but is not a file")
     deny = Path(deny_raw or DEFAULT_DENYLIST).expanduser()
+    daily = _num(env, DAILY_BUDGET_VAR, None, high=MAX_DAILY_BUDGET_USD)
+    if daily is None and driver in BILLED_DRIVERS:
+        raise ConfigRefused(
+            f"{DAILY_BUDGET_VAR} is required with --driver {driver}: set it to the most this gateway may "
+            f"spend per twin per UTC day, in USD (a number > 0 and at most {MAX_DAILY_BUDGET_USD:g}); "
+            "the day's total is kept in the state dir (daily-spend.json) and survives restarts",
+            exit=EXIT_USAGE)
     return GatewayConfig(
         roster=Path(roster or env.get("MFG_TEAM_ROSTER") or DEFAULT_ROSTER),
         adapter=adapter, driver=driver, state_dir=state.resolve(),
         audit_key=env[AUDIT_KEY_VAR].encode() if env.get(AUDIT_KEY_VAR) else DEMO_AUDIT_KEY,
         approval_key=env[APPROVAL_KEY_VAR].encode() if env.get(APPROVAL_KEY_VAR) else DEMO_APPROVAL_KEY,
         demo_keys=bool(missing),
-        daily_budget_usd=_num(env, "MFG_TEAM_DAILY_BUDGET_USD", None, high=MAX_DAILY_BUDGET_USD),
+        daily_budget_usd=daily,
         max_budget_usd=_num(env, "MFG_TEAM_MAX_BUDGET_USD", 0.10, high=MAX_CALL_BUDGET_USD),
         timeout_s=int(_num(env, "MFG_TEAM_TIMEOUT_S", 60, int, low=TIMEOUT_RANGE_S[0], high=TIMEOUT_RANGE_S[1])),
         denylist=deny if deny.is_file() else None,

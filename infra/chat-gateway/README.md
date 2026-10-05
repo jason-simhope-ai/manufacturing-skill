@@ -1,5 +1,11 @@
 # chat-gateway — digital-twin team chat-ops (v0.2.0-alpha, experimental)
 
+> **這份是給 IT（部署者、金鑰保管人）的技術文件，董事長不必讀。**
+> 董事長只需要三件事，都在 [董事長一頁](../../docs/owner-one-page.zh-TW.md)：
+> ① **花多少**：每個分身每天的費用上限 `MFG_TEAM_DAILY_BUDGET_USD` 由董事長核准；用真模型時沒設就不啟動，重啟也不歸零。
+> ② **怎麼停**：任何主管一句話，金鑰保管人在 30 分鐘內停止服務並撤銷聊天 bot 與 API 金鑰；董事長不需持有金鑰。
+> ③ **資料到哪**：圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不進來；分身只處理 T0／T1，T1 會經聊天平台與雲端模型。
+
 A thin, stdlib-only Python 3.11 gateway that connects a chat platform to twin
 "copilots". It owns routing, policy, rate limits, approvals, taint tracking and
 the audit log. A `HarnessDriver` runs the model; the gateway never calls a model
@@ -85,10 +91,10 @@ Rules to know before you replay NCRs:
 | -------- | ------- | ----- |
 | `MFG_TEAM_ROSTER` | `team/.build/roster.json` | The roster the build step writes. `identities.json` and `bindings.json` are read from the same directory. |
 | `MFG_TEAM_ADAPTER` / `MFG_TEAM_DRIVER` | `mock` / `mock` | |
-| `MFG_TEAM_STATE_DIR` | `~/.local/state/manufacturing-skill/team` | Must be an absolute path. Created `0700` if missing; start is refused (exit 78) if it is a symlink, owned by another user, or group/other-writable. The gateway writes only here: `audit/<tier>/audit.jsonl`, `audit/checkpoint.json`, `post-limits.json`, and for the claude-code driver `driver-tmp/` and `driver-home/`. |
+| `MFG_TEAM_STATE_DIR` | `~/.local/state/manufacturing-skill/team` | Must be an absolute path. Created `0700` if missing; start is refused (exit 78) if it is a symlink, owned by another user, or group/other-writable. The gateway writes only here: `audit/<tier>/audit.jsonl`, `audit/checkpoint.json`, `post-limits.json`, `daily-spend.json` (+ `.lock`) when a daily budget is set, and for the claude-code driver `driver-tmp/` and `driver-home/`. |
 | `MFG_TEAM_DENYLIST` | `team/local/names.denylist` if present | Local denylist (one regex per line). A hit counts as T2 for inbound DLP and the output filter. If the variable is set, the file must exist; a bad regex refuses start (exit 78), naming only the line number. |
 | `MFG_TEAM_AUDIT_HMAC_KEY`, `MFG_TEAM_APPROVAL_HMAC_KEY` | — | Required unless both adapter and driver are mock. Each must be at least 16 characters. Error messages name a missing variable but never print its value. |
-| `MFG_TEAM_DAILY_BUDGET_USD` | off | Soft daily spending cap per twin, at most 1000. |
+| `MFG_TEAM_DAILY_BUDGET_USD` | off with the mock driver; **required** with `--driver claude-code` | Daily spending ceiling per twin per UTC day, in USD (> 0, at most 1000). With `claude-code`, unset or not a positive finite number refuses start (exit 64). The day's total is kept in `$MFG_TEAM_STATE_DIR/daily-spend.json` (`0600`, keyed by UTC date then twin id, read and written under a file lock so cron `post` processes share it), so a restart does not reset it; a file that is not valid, is a symlink or is group/other-accessible refuses start (exit 78) and is never reset automatically. When the total reaches the ceiling the twin answers 「今日預算已用完，明天再問」 without calling the model until the next UTC day. A call whose cost the CLI does not report, and a failed or timed-out call, is charged at `MFG_TEAM_MAX_BUDGET_USD`. A call already running when the ceiling is reached can overshoot it by at most that per-call cap. If the file cannot be written, the gateway stops calling the model (audited as `driver_error`, `spend_not_saved`). |
 | `MFG_TEAM_MAX_BUDGET_USD`, `MFG_TEAM_TIMEOUT_S` | `0.10`, `60` | Passed to the driver on every call. Budget at most 5 USD; timeout 5–600 s. |
 
 Numbers must be finite: `nan`, `inf`, a value out of range or not a number refuses start with exit 64, naming the variable.
@@ -219,4 +225,4 @@ claude -p --output-format json --restricted --strict-mcp-config --tools "Read,Gr
 - **Output.** The CLI's JSON envelope is parsed; `structured_output` (or a JSON `result` string) becomes a `TwinResult`, with `usage` filled from the envelope. `TWIN_RESULT_SCHEMA` is also kept as `chat_gateway_ext/twin_result.schema.json`; a test keeps the two identical.
 - **Failures.** A non-zero exit, a timeout, unparsable output (more than 1 MB, invalid UTF-8, nesting too deep, duplicate JSON keys) or a CLI-reported error becomes a `DriverError` with a short message. The child runs in its own process group, killed on every exit path; the timeout is a hard deadline even if a descendant keeps the output pipe open. Stderr is discarded, never forwarded.
 - **Self-check.** `self_check()` runs `claude --version` and `claude --help` and refuses to start (exit 78) if any pinned flag is missing. `--system-prompt[-file]` in the help text is accepted. It also requires the config dir and the API key.
-- **Billing.** The driver needs an Anthropic API key (`ANTHROPIC_API_KEY`) and spends that account's API credit, not a personal subscription. `--max-budget-usd` caps each call. Use a service account, not a personal login, for a shared bot.
+- **Billing.** The driver needs an Anthropic API key (`ANTHROPIC_API_KEY`) and spends that account's API credit, not a personal subscription. `--max-budget-usd` caps each call; `MFG_TEAM_DAILY_BUDGET_USD` (required with this driver, see the environment table above) caps each twin's day and is persisted in the state dir. Worst case per month ≈ days × enabled twins × daily ceiling. Use a service account, not a personal login, for a shared bot.

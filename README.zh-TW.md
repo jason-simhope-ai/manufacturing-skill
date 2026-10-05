@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上、不外流圖紙。
+> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上。圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不出公司（要讓 AI 讀圖紙請用地端模型，見 [Cloud first, on-prem later](#cloud-first-on-prem-later)）；分身只處理 T0/T1，T1 會經聊天平台與雲端模型。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 **這份 README 給三種人看：**
 
-- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)
+- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；**要簽字導入分身前，先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判、給客戶稽核員的三行）
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
@@ -62,7 +62,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 > 每個職位一個**副駕分身**，住在公司的聊天工作區。**副駕不是替身**：判斷永遠由人做，分身只負責補資料、挑戰假設、定時提醒。
 
 - **分身是什麼**：一個職位一個分身（例：品保部主管分身），由既有的 agents、skills、know-how 以 id **組合**而成，不複製、不覆寫。只在被 @ 時回答，回覆一律標明「【某某分身】」，遇到決策點就停下來把選項交還給人（`🧭 需要你判斷`）。
-- **三分類**：分身的每項能力必標 `strengthen`（強化既有優勢：人仍親手判斷）、`create`（創造新能力：以前沒人做）或 `outsource`（外包既有工作：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。`outsource` 預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判 `outsource`。
+- **三分類**：分身的每項能力必標強化既有優勢（`strengthen`：人仍親手判斷）、創造新能力（`create`：以前沒人做）或外包既有工作（`outsource`：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。外包既有工作預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判外包既有工作。
 - **先過閘門**：流程修正或既有 `/command` 能解決的，就不開分身（`team/gate/need-a-twin.md`）。
 
 **2 分鐘離線試玩**（零憑證、零網路、純 Python 標準庫）：
@@ -153,7 +153,7 @@ sequenceDiagram
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
 | AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 6 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
-| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
+| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 需要時改走地端 GB10/Ollama：圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不出公司；分身只處理 T0/T1，T1 會經聊天平台與雲端模型 |
 
 ---
 
@@ -172,7 +172,7 @@ sequenceDiagram
 
 ## 💰 成本預期
 
-**最便宜路徑：先用雲端試一個月，總成本約 NT$650**
+**最便宜路徑：先用雲端試一個月，總成本約 NT$650**（一個人在自己電腦試 Claude Code plugin 的個人訂閱；**不是分身 pilot 的費用**——分身走 API 金鑰計費，另有聊天平台與人力，見 [董事長一頁](docs/owner-one-page.zh-TW.md)）
 
 | 階段                       | 月成本                | 一次性                 |
 | -------------------------- | --------------------- | ---------------------- |
@@ -277,6 +277,7 @@ manufacturing-skill/
 │   ├── explainers/           # 三張可印 A3 的繁中說明卡
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
+│   ├── owner-one-page.zh-TW.md  # 董事長一頁：簽什麼、花多少、怎麼停
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
 ├── tests/
@@ -302,7 +303,7 @@ manufacturing-skill/
 
 ## 我要在自己的工廠導入
 
-→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。
+→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。要導入分身、需要董事長簽字的，先給董事長 [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)。
 
 裡面有 Jason 用過的導入順序、踩雷清單、客製化指引。
 

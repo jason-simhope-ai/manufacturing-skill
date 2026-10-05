@@ -27,6 +27,7 @@ from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_e
                      stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
 from .sanitize import load_denylist
+from .spend import SPEND_FILE
 from .drivers import load_driver_class
 
 
@@ -79,7 +80,8 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
     data_root = env.get("MFG_TEAM_DATA_T1")
     return Gateway(roster, adapter, driver, audit, clock, approvals=ApprovalBook(cfg.approval_key, clock=clock),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,
-                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp)
+                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp,
+                   spend_path=cfg.state_dir / SPEND_FILE if cfg.daily_budget_usd is not None else None)
 
 
 def _post(gw: Gateway, cfg: GatewayConfig, twin: str, capability: str, channel: str | None) -> int:

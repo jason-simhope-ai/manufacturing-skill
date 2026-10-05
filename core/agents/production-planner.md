@@ -23,7 +23,7 @@ tools: [Read, Grep, Glob, Bash]
 
 1. **拆解工單**：訂單 → 工單 → 工序 → 機台 + 人 + 工時
 2. **檢查產能**：
-   - 透過 `scheduler-mcp` 看每台機目前負載
+   - 透過 `manufacturing-scheduler` 看每台機目前負載
    - 識別瓶頸機台（負載 > 85%）
 3. **排定派工順序**：
    - 短的優先（縮短平均交期）
@@ -37,7 +37,7 @@ tools: [Read, Grep, Glob, Bash]
 - **Skills**：`03-排程.md`、`04-生產.md`、`capacity-planning.md`
 - **Know-how**：`oee.md`（設備總效率）、`lean-5s.md`（減少非必要動作）
 - **Hook**：`core/hooks/post-order.md`（接到新單時觸發排程更新）
-- **MCP**：`scheduler-mcp`（產能與排程主檔）
+- **MCP**：`manufacturing-scheduler`（產能與排程主檔）
 
 ## Output 範例
 

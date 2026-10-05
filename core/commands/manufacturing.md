@@ -27,7 +27,7 @@ manufacturing-skill v0.1.5
 ├── Know-how（8 + 4 = 12）
 ├── Hooks（4 + 1 = 5）
 └── Infra
-    ├── MCP servers: scheduler-mcp, erp-connector
+    ├── MCP servers: manufacturing-scheduler, erp-connector
     └── On-prem LLM: Ollama @ GB10 (offline)
 ```
 
@@ -44,7 +44,7 @@ manufacturing-skill v0.1.5
 ├── Know-how（8 + 4 + 2 = 14）
 ├── Hooks（4 + 1 = 5）
 └── Infra
-    └── MCP servers: scheduler-mcp, erp-connector
+    └── MCP servers: manufacturing-scheduler, erp-connector
 ```
 
 ## 子指令

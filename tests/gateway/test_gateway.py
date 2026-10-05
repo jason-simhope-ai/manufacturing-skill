@@ -1429,6 +1429,171 @@ class TestDemoGolden(unittest.TestCase):
         self.assertEqual(text.count("━━ Beat "), 8)
 
 
+
+# ── O04: the daily budget is required for a billed driver and survives restarts ──
+class TestDailyBudgetRequired(unittest.TestCase):
+    KEYS = {"MFG_TEAM_STATE_DIR": "/tmp/x", "MFG_TEAM_AUDIT_HMAC_KEY": "a" * 20,
+            "MFG_TEAM_APPROVAL_HMAC_KEY": "b" * 20}
+
+    def test_claude_code_without_daily_budget_refused_exit_64(self):
+        with self.assertRaises(ConfigRefused) as cm:
+            config_from_env(self.KEYS, driver="claude-code")
+        self.assertEqual(cm.exception.exit, 64)
+        self.assertIn("MFG_TEAM_DAILY_BUDGET_USD is required", str(cm.exception))
+        with self.assertRaises(ConfigRefused) as cm:   # an empty value counts as unset
+            config_from_env({**self.KEYS, "MFG_TEAM_DRIVER": "claude-code", "MFG_TEAM_DAILY_BUDGET_USD": ""})
+        self.assertEqual(cm.exception.exit, 64)
+
+    def test_claude_code_daily_budget_must_be_positive_finite(self):
+        for val in ("0", "-1", "nan", "inf", "-inf", "abc", "1000.5", " "):
+            with self.subTest(val=val):
+                with self.assertRaises(ConfigRefused) as cm:
+                    config_from_env({**self.KEYS, "MFG_TEAM_DAILY_BUDGET_USD": val}, driver="claude-code")
+                self.assertEqual(cm.exception.exit, 64)
+                self.assertIn("MFG_TEAM_DAILY_BUDGET_USD", str(cm.exception))
+        cfg = config_from_env({**self.KEYS, "MFG_TEAM_DAILY_BUDGET_USD": "2.5"}, driver="claude-code")
+        self.assertEqual((cfg.driver, cfg.daily_budget_usd), ("claude-code", 2.5))
+
+    def test_mock_driver_keeps_budget_optional(self):
+        self.assertIsNone(config_from_env({"MFG_TEAM_STATE_DIR": "/tmp/x"}).daily_budget_usd)
+        self.assertIsNone(config_from_env(self.KEYS, adapter="slack").daily_budget_usd)
+
+    def test_cli_self_check_claude_code_without_budget_exit_64(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {**self.KEYS, "MFG_TEAM_STATE_DIR": str(Path(tmp) / "state")}
+            p = run_cli(["-m", "chat_gateway", "self-check", "--driver", "claude-code",
+                         "--roster", str(FIXTURES / "roster.json")], env)
+            self.assertEqual(p.returncode, 64, p.stderr)
+            self.assertIn("MFG_TEAM_DAILY_BUDGET_USD is required", p.stderr)
+            self.assertNotIn("a" * 20, p.stderr + p.stdout)
+            self.assertFalse((Path(tmp) / "state").exists())   # refused before touching the state dir
+
+
+class TestDailySpendPersisted(HarnessCase):
+    def test_spend_written_0600_keyed_by_utc_date(self):
+        h = self.make(daily_budget_usd=5.0, spend_path=self.tmp_spend())
+        h.msg("@品保 spc-watch")
+        path = self._spend
+        self.assertEqual(stat_mode(path), 0o600)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        day = time.strftime("%Y-%m-%d", time.gmtime(h.clock()))
+        self.assertEqual(list(data), [day])
+        self.assertGreater(data[day]["qa-manager"], 0)
+        self.assertEqual(data[day]["qa-manager"], h.gw.spend.get("qa-manager", day))
+
+    def tmp_spend(self):
+        self._dir = Path(tempfile.mkdtemp(prefix="gw-spend-"))
+        self.addCleanup(shutil.rmtree, self._dir, True)
+        os.chmod(self._dir, 0o700)
+        self._spend = self._dir / "daily-spend.json"
+        return self._spend
+
+    def test_restart_does_not_reset_the_day(self):
+        path = self.tmp_spend()
+        h = self.make(daily_budget_usd=0.000001, spend_path=path)
+        [first] = h.msg("@品保 spc-watch")
+        self.assertNotIn("今日預算已用完", first.text)
+        # "restart": a new gateway over the same state file, same day
+        h2 = self.make(daily_budget_usd=0.000001, spend_path=path)
+        [r] = h2.msg("@品保 spc-watch")
+        self.assertIn("今日預算已用完", r.text)
+        self.assertEqual(h2.driver.calls, [])
+        self.assertIn("daily_budget", h2.reasons())
+        # the next UTC day starts from zero
+        h2.clock.t += 86400
+        [r] = h2.msg("@品保 spc-watch 隔天")
+        self.assertNotIn("今日預算已用完", r.text)
+        self.assertEqual(len(h2.driver.calls), 1)
+
+    def test_two_gateways_share_one_total(self):
+        path = self.tmp_spend()
+        a = self.make(daily_budget_usd=5.0, spend_path=path)
+        b = self.make(daily_budget_usd=5.0, spend_path=path)
+        a.msg("@品保 spc-watch")
+        b.msg("@品保 spc-watch")
+        day = time.strftime("%Y-%m-%d", time.gmtime(a.clock()))
+        total = json.loads(path.read_text(encoding="utf-8"))[day]["qa-manager"]
+        self.assertAlmostEqual(total, a.gw.spend.get("qa-manager", day))
+        self.assertAlmostEqual(total, b.gw.spend.get("qa-manager", day))
+        self.assertGreater(total, 0)
+
+    def test_bad_spend_file_refuses_start_never_resets(self):
+        for content, mode in (("{not json", 0o600), ('{"2026-10-05": {"qa-manager": -1}}', 0o600),
+                              ('{"2026-10-05": {"qa-manager": "NaN"}}', 0o600), ('["x"]', 0o600),
+                              ('{"2026-10-05": {"qa-manager": 0.5}}', 0o644)):
+            with self.subTest(content=content, mode=oct(mode)):
+                path = self.tmp_spend()
+                path.write_text(content, encoding="utf-8")
+                os.chmod(path, mode)
+                with self.assertRaises(ConfigRefused) as cm:
+                    self.make(daily_budget_usd=1.0, spend_path=path)
+                self.assertEqual(cm.exception.exit, 78)
+                self.assertEqual(path.read_text(encoding="utf-8"), content)   # left as found
+
+    def test_symlinked_spend_file_refused(self):
+        path = self.tmp_spend()
+        target = self._dir / "elsewhere.json"
+        target.write_text("{}", encoding="utf-8")
+        os.chmod(target, 0o600)
+        path.symlink_to(target)
+        with self.assertRaises(ConfigRefused):
+            self.make(daily_budget_usd=1.0, spend_path=path)
+
+    def test_unreported_cost_is_charged_at_the_per_call_cap(self):
+        import dataclasses
+        from unittest import mock
+        path = self.tmp_spend()
+        h = self.make(daily_budget_usd=0.25, spend_path=path, max_budget_usd=0.10)
+        real_run = h.driver.run
+
+        def no_cost(inv):
+            res = real_run(inv)
+            return dataclasses.replace(res, usage={"input_tokens": 1})
+        with mock.patch.object(h.driver, "run", side_effect=no_cost):
+            for i in range(4):
+                h.msg(f"@品保 spc-watch {i}")
+        day = time.strftime("%Y-%m-%d", time.gmtime(h.clock()))
+        self.assertAlmostEqual(h.gw.spend.get("qa-manager", day), 0.30)   # 3 calls x 0.10, then refused
+        self.assertEqual(h.reasons().count("daily_budget"), 1)
+
+    def test_failed_call_is_charged_at_the_per_call_cap(self):
+        from unittest import mock
+        from chat_gateway.drivers.base import DriverError
+        h = self.make(daily_budget_usd=0.15, spend_path=self.tmp_spend(), max_budget_usd=0.10)
+        with mock.patch.object(h.driver, "run", side_effect=DriverError("timeout")):
+            h.msg("@品保 spc-watch 1")
+            h.msg("@品保 spc-watch 2")
+        [r] = h.msg("@品保 spc-watch 3")
+        self.assertIn("今日預算已用完", r.text)
+
+    def test_unwritable_spend_file_stops_model_calls(self):
+        from unittest import mock
+        from chat_gateway.spend import DailySpend, SpendPersistError
+        h = self.make(daily_budget_usd=5.0, spend_path=self.tmp_spend())
+        with mock.patch.object(DailySpend, "_write", side_effect=SpendPersistError("disk full")):
+            h.msg("@品保 spc-watch 1")
+        self.assertIn("spend_not_saved:SpendPersistError", h.reasons())
+        [r] = h.msg("@品保 spc-watch 2")
+        self.assertIn("今日預算已用完", r.text)
+        self.assertEqual(len(h.driver.calls), 1)
+
+    def test_cli_passes_state_dir_spend_file(self):
+        from chat_gateway.__main__ import build_gateway
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"MFG_TEAM_STATE_DIR": str(Path(tmp) / "state"), "MFG_TEAM_DAILY_BUDGET_USD": "3"}
+            cfg = config_from_env(env, roster=str(FIXTURES / "roster.json"))
+            with contextlib.redirect_stderr(io.StringIO()):
+                gw = build_gateway(cfg, env)
+            self.assertEqual(gw.spend.path, Path(tmp).resolve() / "state" / "daily-spend.json")
+            env.pop("MFG_TEAM_DAILY_BUDGET_USD")
+            with contextlib.redirect_stderr(io.StringIO()):
+                gw = build_gateway(config_from_env(env, roster=str(FIXTURES / "roster.json")), env)
+            self.assertIsNone(gw.spend.path)   # mock without a budget: in memory only
+
+
+def stat_mode(path: Path) -> int:
+    return os.stat(path).st_mode & 0o777
+
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=1).result
     sys.exit(0 if result.wasSuccessful() else 1)
