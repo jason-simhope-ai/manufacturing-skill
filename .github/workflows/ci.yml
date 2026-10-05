@@ -663,11 +663,15 @@ jobs:
           # A diff failure is an error, never a silent skip.
           git("cat-file", "-e", f"{base}^{{commit}}")
           git("cat-file", "-e", f"{head}^{{commit}}")
+          # -z: NUL-separated, unquoted paths. Without it git prints
+          # non-ASCII names (e.g. core/skills/01-報價.md) in quoted/escaped
+          # form, which `git cat-file`/`git show` cannot resolve, so those
+          # files would never be checked.
           changed = [
               f for f in git(
-                  "diff", "--no-renames", "--name-only", f"{base}...{head}",
-                  "--", ":(glob)core/**/*.md",
-              ).stdout.splitlines() if f
+                  "diff", "-z", "--no-renames", "--name-only",
+                  f"{base}...{head}", "--", ":(glob)core/**/*.md",
+              ).stdout.split("\0") if f
           ]
           if not changed:
               print(f"core heading guard: no core/ markdown files touched "
