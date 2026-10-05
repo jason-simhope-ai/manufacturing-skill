@@ -539,6 +539,44 @@ class CliExitCodes(unittest.TestCase):
                 self.assertEqual(teamctl.main(["audit-verify", str(f)]), 1)
             self.assertIn("not a JSON object", buf.getvalue())
 
+    def test_state_reset_needs_confirm_and_only_moves_aside(self):
+        from unittest import mock
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+        base = Path(tempfile.mkdtemp(prefix="state-"))
+        self.addCleanup(__import__("shutil").rmtree, base, True)
+        state = base / "team"
+        (state / "audit").mkdir(parents=True)
+        (state / "audit" / "checkpoint.json").write_text("{}", encoding="utf-8")
+        env = {**os.environ, "MFG_TEAM_STATE_DIR": str(state)}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(teamctl.main(["state-reset"]), 2)            # no --confirm: nothing moves
+            self.assertTrue(state.is_dir())
+            with redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(teamctl.main(["state-reset", "--confirm"]), 0)
+            moved = next(base.glob("team.stale-*"))
+            self.assertFalse(state.exists())
+            self.assertTrue((moved / "audit" / "checkpoint.json").is_file())  # kept, not deleted
+            self.assertIn(str(moved), out.getvalue())
+            with redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(teamctl.main(["state-reset", "--confirm"]), 0)
+            self.assertIn("nothing to move", out.getvalue())
+            (state).mkdir()
+            (state / "my-notes.txt").write_text("x", encoding="utf-8")        # not a gateway state dir
+            with redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(teamctl.main(["state-reset", "--confirm"]), 2)
+            self.assertIn("refusing", err.getvalue())
+            self.assertTrue((state / "my-notes.txt").is_file())
+        with mock.patch.dict(os.environ, {**env, "MFG_TEAM_STATE_DIR": "rel/dir"}, clear=True), \
+                redirect_stderr(io.StringIO()):
+            self.assertEqual(teamctl.main(["state-reset", "--confirm"]), 2)
+
+    def test_dlp_scan_uses_the_ubn_cue_rule(self):
+        self.assertEqual(lib.dlp_scan("交期 20230103"), [])
+        self.assertEqual(lib.dlp_scan("工單 12345675"), [])
+        self.assertEqual(lib.dlp_scan("統編 04595257"), ["tw-ubn"])
+
     def test_invalid_calendar_date_is_e005_not_traceback(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "r.yaml"

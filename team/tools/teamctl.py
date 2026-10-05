@@ -4,6 +4,7 @@
     teamctl.py [--repo-root DIR] check [--roster PATH] [--ci|--strict] [--today YYYY-MM-DD]
     teamctl.py roster [--roster PATH] [--json] [--crontab]
     teamctl.py audit-verify FILE_OR_DIR     (chat_gateway.audit; key from MFG_TEAM_AUDIT_HMAC_KEY)
+    teamctl.py state-reset [--confirm]        (move the gateway state dir aside, never delete)
     teamctl.py build [build.py options]       (same as build.py)
 
 `check` prints `::error file=PATH::E0xx: message` lines (CI annotation
@@ -119,6 +120,33 @@ def cmd_audit_verify(args, root: Path) -> int:
     return 0 if print_verify(args.file, audit_key_for_verify(os.environ)) else 1
 
 
+def cmd_state_reset(args, root: Path) -> int:
+    """Move the gateway state dir ($MFG_TEAM_STATE_DIR or the default) to `<dir>.stale-<stamp>`."""
+    import os  # noqa: PLC0415
+    sys.path.insert(0, str(root / "infra" / "chat-gateway"))
+    try:
+        from chat_gateway import ConfigRefused  # noqa: PLC0415
+        from chat_gateway.config import move_state_aside, resolve_state_dir  # noqa: PLC0415
+    except ImportError as e:
+        print(f"teamctl: cannot import chat_gateway.config ({e})", file=sys.stderr)
+        return 2
+    try:
+        state = resolve_state_dir(os.environ)
+        if not args.confirm:
+            print(f"state-reset would move {state} aside (nothing is deleted). "
+                  "Re-run with --confirm; only on a dev machine, never to hide a failed audit-verify.")
+            return 2
+        moved = move_state_aside(state)
+    except ConfigRefused as e:
+        print(f"teamctl: {e}", file=sys.stderr)
+        return 2
+    if moved is None:
+        print(f"state-reset: {state} does not exist, nothing to move")
+    else:
+        print(f"state-reset: moved {state} to {moved} (kept; delete it yourself when you are sure)")
+    return 0
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     repo_root = None
@@ -144,11 +172,14 @@ def main(argv=None) -> int:
     r.add_argument("--crontab", action="store_true")
     a = sub.add_parser("audit-verify")
     a.add_argument("file", metavar="FILE_OR_DIR")
+    sr = sub.add_parser("state-reset")
+    sr.add_argument("--confirm", action="store_true")
     args = ap.parse_args(argv)
     root = _root(args.repo_root)
     try:
         return {"check": cmd_check, "roster": cmd_roster,
-                "audit-verify": cmd_audit_verify}[args.cmd](args, root)
+                "audit-verify": cmd_audit_verify,
+                "state-reset": cmd_state_reset}[args.cmd](args, root)
     except lib.LoadError as e:
         print(f"::error::{e.code}: {e.message}")
         return 1

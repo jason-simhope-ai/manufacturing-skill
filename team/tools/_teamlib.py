@@ -18,6 +18,19 @@ Public interface (spec section 18, WP2):
 
 Runtime: Python 3.11, stdlib only, plus PyYAML (build / validate paths only).
 """
+# Module map (81 KB, kept whole on purpose; grep the `# ----` banners, line numbers drift):
+#      1-163  docstring, imports, constants (BUDGETS, CODES)
+#    164-195  Findings
+#    196-267  YAML loading
+#    268-328  Small helpers
+#    329-497  Schema walker
+#    498-569  Heuristic scanners (patterns.py bridge: dlp_scan, secrets)
+#    570-595  Effective autonomy
+#    596-1412 Validator (class _Validator, validate / validate_ex)
+#   1413-1815 Reference resolution + compiler (compile_all, render_summary, build)
+#   1816-1820 default_roster
+# Split candidates when it grows: validator (596+) and compiler (1413+) as modules, shared helpers in a base.
+
 from __future__ import annotations
 
 import dataclasses
@@ -522,7 +535,7 @@ def dlp_scan(text: str) -> list[str]:
     hits = []
     for name, pat in _PAT.DLP_PATTERNS:
         for m in pat.finditer(text):
-            if name != "tw-ubn" or _PAT.valid_ubn(m.group(0)):
+            if name != "tw-ubn" or _PAT.ubn_hit(text, m):
                 hits.append(name)
                 break
     return hits

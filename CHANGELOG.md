@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`install.sh` copies `team/` by default** (without `team/.build/` and `team/local/`; `.installed` gains `"team": true`). Claude Code does not auto-load it, so v0.1.5 behavior is unchanged and the core-only agent count stays 6.
 - **`docs/architecture.md`** — corrects the core agent count from 5 to 6 (`engineering-change-manager` was missing); now describes seven layers and three tiers.
 - **`SECURITY.md`** — scope table and "Operating securely" extended for `team/` and `infra/chat-gateway/`.
+- **DLP precision and state-dir UX.** `受限` / `軍規` / `軍工` / `管制` skip negated and unrelated-word forms (`不受限制`, `將軍規模`, `監管制度`); a checksum-valid 8-digit number is a UBN only with a cue within 12 characters (統編, VAT, 公司, 發票 ...), and dates need a strong cue. A gateway refusal over a stale audit log now prints the directory, the safe fix and the env var; new `teamctl state-reset --confirm` moves the state dir aside (never deletes). The explainer stat panel counts team-tier twins; `_teamlib.py` gets a module map.
 
 ### Security
 

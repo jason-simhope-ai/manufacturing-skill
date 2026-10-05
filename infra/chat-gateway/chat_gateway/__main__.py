@@ -22,7 +22,7 @@ from .adapters.base import ApprovalCard, ScheduledPost
 from .adapters.mock import MockAdapter
 from .approvals import ApprovalBook
 from .audit import AuditLog, heads, verify_report
-from .config import AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env
+from .config import AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, stale_state_help
 from .core import Gateway, load_roster, synthetic_mock_identities
 from .sanitize import load_denylist
 from .drivers import load_driver_class
@@ -64,7 +64,10 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
         raise ConfigRefused(f"local denylist unusable: {exc}") from None
     adapter = _make_adapter(cfg, roster, script)
     driver = _make_driver(cfg, env)
-    audit = AuditLog(cfg.state_dir / "audit", cfg.audit_key)
+    try:
+        audit = AuditLog(cfg.state_dir / "audit", cfg.audit_key)
+    except ConfigRefused as exc:
+        raise ConfigRefused(str(exc) + stale_state_help(cfg.state_dir, env), exc.exit) from None
     data_root = env.get("MFG_TEAM_DATA_T1")
     return Gateway(roster, adapter, driver, audit, approvals=ApprovalBook(cfg.approval_key),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from . import tier_rank
-from .patterns import DLP_PATTERNS, DLP_TIERS, GENERIC_SECRET, SECRET_PATTERNS, valid_ubn
+from .patterns import DLP_PATTERNS, DLP_TIERS, GENERIC_SECRET, SECRET_PATTERNS, ubn_hit
 
 # ── inbound normalisation ────────────────────────────────────────────
 # Invisible / format characters that can split a marker ("機\u00ad密") without being
@@ -152,7 +152,7 @@ def dlp_hits(text: str, extra: Iterable[tuple[str, re.Pattern]] = ()) -> list[tu
     for name, pat in DLP_PATTERNS:
         views = (folded, squeezed) if name in _WORD_MARKERS else (folded,)
         for view in views:
-            m = next((m for m in pat.finditer(view) if name != "tw-ubn" or valid_ubn(m.group(0))), None)
+            m = next((m for m in pat.finditer(view) if name != "tw-ubn" or ubn_hit(view, m)), None)
             if m:
                 hits.append((name, DLP_TIERS[name]))
                 break

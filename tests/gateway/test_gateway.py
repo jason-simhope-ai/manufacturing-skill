@@ -234,6 +234,48 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(ConfigRefused):
             config_from_env({"MFG_TEAM_STATE_DIR": "rel/dir"})
 
+    def test_stale_default_state_dir_refusal_says_what_to_do(self):
+        from unittest import mock
+        from chat_gateway.__main__ import main
+        home = Path(tempfile.mkdtemp(prefix="home-"))
+        self.addCleanup(shutil.rmtree, home, True)
+        state = home / ".local" / "state" / "manufacturing-skill" / "team"
+        log = AuditLog(state / "audit", b"another-key-0123456789")     # a log signed with some other key
+        log.append(action="msg_in", event_id="e1")
+        err = io.StringIO()
+        with mock.patch.dict("os.environ", {"HOME": str(home)}), contextlib.redirect_stderr(err):
+            rc = main(["self-check", "--roster", str(FIXTURES / "roster.json")], env={})
+        self.assertEqual(rc, 78)
+        msg = err.getvalue()
+        self.assertIn(str(state.resolve()), msg)
+        self.assertIn("the default", msg)
+        self.assertIn("state-reset --confirm", msg)
+        self.assertIn("MFG_TEAM_STATE_DIR=/absolute/other/dir", msg)
+        self.assertIn("nothing is deleted", msg)
+        self.assertTrue((state / "audit" / "checkpoint.json").is_file())      # the refusal touched nothing
+
+    def test_move_state_aside_never_deletes_and_guards_foreign_dirs(self):
+        from chat_gateway.config import move_state_aside
+        base = Path(tempfile.mkdtemp(prefix="state-"))
+        self.addCleanup(shutil.rmtree, base, True)
+        self.assertIsNone(move_state_aside(base / "missing"))
+        state = base / "team"
+        (state / "audit").mkdir(parents=True)
+        (state / "post-limits.json").write_text("{}", encoding="utf-8")
+        moved = move_state_aside(state, now=T0)
+        self.assertFalse(state.exists())
+        self.assertRegex(moved.name, r"^team\.stale-\d{8}-\d{6}$")
+        self.assertTrue((moved / "post-limits.json").is_file())
+        (state / "audit").mkdir(parents=True)
+        again = move_state_aside(state, now=T0)                                # same second: new suffix
+        self.assertNotEqual(again, moved)
+        self.assertTrue(moved.exists() and again.exists())
+        (state / "notes.txt").parent.mkdir(exist_ok=True)
+        (state / "notes.txt").write_text("mine", encoding="utf-8")
+        with self.assertRaises(ConfigRefused):
+            move_state_aside(state)
+        self.assertTrue((state / "notes.txt").is_file())
+
 
 # ── routing & filters ────────────────────────────────────────────────
 class TestRouting(HarnessCase):
@@ -632,6 +674,32 @@ class TestDLP(HarnessCase):
         self.assertEqual(sanitize.dlp_tier("this is RESTRICTED"), "T3")
         self.assertEqual(sanitize.dlp_tier("CONFIDENTIAL draft"), "T2")
         self.assertIsNone(sanitize.dlp_tier("一般 SOP 說明"))
+
+    def test_restricted_zh_skips_negated_and_constraint_forms(self):
+        for text in ("這個設計不受限制", "尺寸不受限", "公差未受限", "無受限條件", "受限於預算與設備", "不 受 限制"):
+            self.assertIsNone(sanitize.dlp_tier(text), text)
+        for text in ("這是受限文件", "受限制的圖面", "受 限 文件"):
+            self.assertEqual(sanitize.dlp_tier(text), "T3", text)
+
+    def test_t3_words_skip_unrelated_compounds(self):
+        for text in ("將軍規模很大", "行軍規律", "從軍工作三年", "監管制度", "託管制度說明", "主管制定", "保管制止"):
+            self.assertIsNone(sanitize.dlp_tier(text), text)
+        for text in ("符合軍規", "軍工件", "出口管制", "受管制品"):
+            self.assertEqual(sanitize.dlp_tier(text), "T3", text)
+
+    def test_ubn_needs_a_context_cue_and_a_valid_checksum(self):
+        self.assertTrue(valid_ubn("20230103") and valid_ubn("12345675"))        # both pass the checksum alone
+        self.assertIsNone(sanitize.dlp_tier("交期 20230103 出貨"))                # a date: no cue
+        self.assertIsNone(sanitize.dlp_tier("工單 12345675 已完工"))               # random WO number: no cue
+        self.assertIsNone(sanitize.dlp_tier("12345675"))
+        self.assertEqual(sanitize.dlp_tier("統一編號 04595257"), "T2")
+        self.assertEqual(sanitize.dlp_tier("客戶 VAT: 04595257"), "T2")
+        self.assertEqual(sanitize.dlp_tier("04595257 有限公司"), "T2")
+        self.assertEqual(sanitize.dlp_tier("發票 04595257"), "T2")
+        self.assertIsNone(sanitize.dlp_tier("統編 04595258"))                    # cue but bad checksum
+        self.assertIsNone(sanitize.dlp_tier("公司 20230103 出貨"))                # weak cue + plausible date
+        self.assertEqual(sanitize.dlp_tier("統編 20230103"), "T2")               # strong cue wins
+        self.assertIsNone(sanitize.dlp_tier("統編" + "x" * 13 + "04595257"))      # cue out of the 12-char window
 
     def test_t3_words_added_in_round_3(self):
         for text in ("這批航太件的公差", "軍工訂單 BOM", "符合軍規嗎", "醫材客戶的 NCR", "醫療器材客戶",

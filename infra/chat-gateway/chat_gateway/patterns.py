@@ -75,9 +75,10 @@ DLP_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("confidential-zh", _P(r"機密")),
     ("confidential-en", _P(r"(?i)(?<![a-z])confidential(?![a-z])")),
     ("restricted-en", _P(r"(?i)(?<![a-z])restricted(?![a-z])")),
-    ("restricted-zh", _P(r"受限")),
+    # 受限 alone is also everyday speech (不受限制, 受限於預算); negated and "constrained by" forms are skipped.
+    ("restricted-zh", _P(r"(?<![不未無沒没免])受限(?!於)")),
     ("defense-zh", _P(r"國防")),
-    ("tw-ubn", _P(r"(?<!\d)\d{8}(?!\d)")),          # 統一編號; checksum in valid_ubn()
+    ("tw-ubn", _P(r"(?<!\d)\d{8}(?!\d)")),          # 統一編號; checksum + context cue in ubn_hit()
     ("tw-national-id", _P(r"(?<![A-Za-z0-9])[A-Z][12]\d{8}(?!\d)")),
     ("amount-ntd", _P(r"NT\$\s?[\d,]{4,}")),
     # Other currency forms (T2): US$ / USD followed or preceded by digits, "125 萬元", "3千元".
@@ -86,14 +87,15 @@ DLP_PATTERNS: list[tuple[str, re.Pattern]] = [
     # Defence / aerospace / medical-device / export-control wording (T3 tripwire). A word match,
     # not understanding: it cannot know what a message is about, only that it contains the word.
     ("aerospace-zh", _P(r"航太")),
-    ("military-zh", _P(r"軍工|軍規")),
+    # 軍規 / 軍工 also sit inside unrelated words (將軍規模, 行軍規律, 從軍工作): those are skipped.
+    ("military-zh", _P(r"(?<![將行大三全])軍規(?![模律劃])|軍工(?!作)")),
     ("medical-device-zh", _P(r"醫材|醫療器材")),
     ("export-permit-zh", _P(r"外銷許可")),
     ("export-control-en", _P(r"(?<![A-Za-z])(?:(?i:itar)|EAR|CUI)(?![A-Za-z])")),
     # 管制 alone is also everyday QC / production vocabulary (管制圖, 文件管制, 製程管制 ...), so the
     # common compounds are excluded; export-control phrasing (出口管制, 管制品, 受管制) still hits.
     ("control-zh", _P(r"(?<!品質|製程|生產|物料|庫存|進度|文件|變更|溫度|標示|流程|成本|數量|校正|版本|資料|製造|現場|外觀|不良|異常|程序|作業|倉庫|設備)"
-                      r"管制(?!圖|界限|上限|下限|線|計畫|計劃|點|特性|參數|項目|標準|程序|流程|表|卡|站|中心|人員|員|措施|方法|範圍|區)")),
+                      r"管制(?!度|定|訂|止|裁|約|圖|界限|上限|下限|線|計畫|計劃|點|特性|參數|項目|標準|程序|流程|表|卡|站|中心|人員|員|措施|方法|範圍|區)")),
 ]
 DLP_TIERS: dict[str, str] = {
     "confidential-zh": "T2", "confidential-en": "T2", "tw-ubn": "T2",
@@ -116,6 +118,25 @@ def valid_ubn(digits: str) -> bool:
     if total % 5 == 0:
         return True
     return digits[6] == "7" and (total + 1) % 5 == 0
+
+
+# A bare 8-digit number is a UBN only with a context cue within UBN_CUE_WINDOW characters.
+# Strong cues decide on their own; weak cues (公司, 股份, 發票 ...) also need the number not to be
+# a plausible 19xx/20xx YYYYMMDD date. Without a cue nothing trips (work orders, dates, part numbers).
+UBN_CUE_WINDOW = 12
+_UBN_STRONG = _P(r"統編|統一編號|(?i:vat|tax\s*id)")
+_UBN_WEAK = _P(r"公司|股份|發票")
+_PLAUSIBLE_DATE = _P(r"(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])")
+
+
+def ubn_hit(text: str, m: re.Match) -> bool:
+    """True when the 8-digit match `m` in `text` is a checksum-valid UBN with a context cue nearby."""
+    if not valid_ubn(m.group(0)):
+        return False
+    near = text[max(0, m.start() - UBN_CUE_WINDOW):m.start()] + " " + text[m.end():m.end() + UBN_CUE_WINDOW]
+    if _UBN_STRONG.search(near):
+        return True
+    return bool(_UBN_WEAK.search(near)) and not _PLAUSIBLE_DATE.fullmatch(m.group(0))
 
 
 def find_secrets(text: str) -> list[str]:
