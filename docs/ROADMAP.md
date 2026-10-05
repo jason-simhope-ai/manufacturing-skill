@@ -60,7 +60,6 @@
 - 🎯 `openai-compatible` / `anthropic-messages` driver
 - 🎯 加工部主管分身、profile 提供的分身、LINE / Teams / Mattermost adapter、hook 事件橋接到聊天
 - 🎯 JSON Schema 檔；SBOM、`pip-audit`、`--require-hashes`、CODEOWNERS；kill switch `/team freeze`（上 pilot 前）
-- ✅ 設備接單設計（ETO）profile：`machinery-eto` alpha 已出貨（3 agent、3 skill、3 know-how、`pre-quote` hook override；內容需設備製造業工程師驗證）
 
 ## v0.2 (預計 2026-Q3)
 
