@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **`infra/mcp-servers/scheduler-mcp`** is now a genuine MCP stdio server (JSON-RPC 2.0: `initialize`, `tools/list`, `tools/call`, `ping`) using only the Python standard library (3.10+). The README now shows the real tool names and arguments, a `claude mcp add` example, and a manual smoke test; `tests/mcp/test_scheduler_mcp.py` runs in CI.
+
+### Fixed
+
+- **scheduler-mcp**: `get_machine_load` now honours `days_ahead`, inputs are validated against each tool's schema, errors no longer leak raw exception text, and missing mock data fails at start-up instead of returning empty results. `erp-connector/README.md` no longer lists `get_sales_order` / `list_open_pos`, which are not in `contract.py`.
 
 ## [0.1.5] — 2026-05-09
 
