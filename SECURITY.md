@@ -63,10 +63,17 @@ If you're an enterprise IT team adopting `manufacturing-skill`:
 - Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` includes an `operator` audit field on every write tool — keep it.
 - Customer drawings, BOMs, and pricing are sensitive. Verify `.gitignore` excludes your real data directories before any team member runs `git add`.
 
-For the digital-twin gateway (`infra/chat-gateway/`, experimental):
-
-- **Secrets come from environment variables only** (`MFG_TEAM_*`: platform tokens, HMAC keys, API key). Never put them in the roster, twin files, bindings or any tracked file; run the bot under a dedicated service account, not a personal login.
-- **T3 (high-assurance custom project data) never goes on SaaS chat or a cloud model.** Slack/Discord and cloud models are capped at T1; the alpha gateway refuses to start if the roster contains any T3 channel or twin. When unsure of a tier, go one tier up.
-- **Keep the audit log on a separate host** (or write-once storage) from the gateway, and have someone other than the adoption lead verify the hash chain (`audit-verify`) on a schedule. The log stores hashes, not message text.
-
 For a deeper deployment-security checklist, see [`infra/on-prem/gb10-setup.md`](infra/on-prem/gb10-setup.md).
+
+## Operating the twin gateway
+
+The digital-twin gateway (`infra/chat-gateway/`, experimental) and the `team/` tier add a chat-facing attack surface. Design rationale: [`docs/superpowers/specs/2026-10-05-digital-twin-team-design.md`](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md) §11. Operating rules:
+
+- **Secrets come from environment variables only** (`MFG_TEAM_*`: platform tokens, HMAC keys, API key). Never put them in the roster, twin files, bindings or any tracked file; run the bot under a dedicated service account, not a personal login. The gateway refuses to start (exit 78) if a config file looks like it contains a token, and prints only variable names when one is missing.
+- **T3 (high-assurance custom project data) never goes on SaaS chat or a cloud model.** Slack/Discord and cloud models are capped at T1; the alpha gateway refuses to start (exit 3) if the roster contains any T3 channel or twin. T2 (drawings, BOMs, quotes, customer names) is mock-only in alpha; relaxing it to a cloud model needs a zero-retention contract and written approval. When unsure of a tier, go one tier up; a channel's tier only goes up, never down.
+- **Keep the audit log on a separate host** (or write-once storage) from the gateway, and have someone other than the adoption lead verify the hash chain (`teamctl audit-verify`) on a schedule. The log stores hashes, not message text. The adoption lead does not act as approver and does not hold the audit anchor.
+- **Identity is the platform user id in `team/local/identities.local.yaml`, never a display name.** Bot authors (including other twins), external shared channels, other guilds and DMs are ignored. Request only the minimum platform scopes (`users:read` is for `is_bot` and team membership).
+- **Chat content is untrusted.** Quotes, code blocks, attachments and tool output carry no instruction authority; the gateway wraps them in randomized `<<UNTRUSTED ...>>` envelopes, strips invisible and bidi characters, and downgrades a turn that trips an injection tripwire (no approval cards, no URLs, autonomy at most `suggest`). An approval is valid only as a structured click bound to the exact action hash; text such as "approved" is never accepted. The DLP tripwire is an alarm, not a defence.
+- **Keep real names, ids and customer or project codes out of tracked files.** `teamctl check --ci` (and CI) scans for names, platform ids, emails and secrets, but it cannot see your private denylist: copy `team/tools/pre-commit-names.sample` into your git hooks and fill `team/local/names.denylist` locally. Local overlays (`team/local/*`, `*.local.yaml`, `team/.build/`, `logs/`, audit and memory directories) are gitignored; keep them that way.
+- **Go-live gates.** Alpha = mock mode and all tests green, T0/T1 data only. Pilot = a test Slack/Discord workspace, minimum scopes, weekly audit-hash sign-off. Anything beyond that (T2 on SaaS, T3) is out of scope for this repository.
+- **Residual risks your policies must cover:** shadow AI (staff pasting data into personal AI accounts), a compromised workstation, chat and cloud vendor data retention, semantically plausible but wrong output (a mis-quoted price or spec), over-privileged platform admins, and misconfiguration.

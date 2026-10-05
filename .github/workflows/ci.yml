@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 # Cancel duplicate runs on the same branch (push then PR open) to save minutes.
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # ---------------------------------------------------------------
       # Step 1: All JSON files must parse
@@ -436,3 +439,122 @@ jobs:
             done <<< "${removed}"
           done <<< "${changed}"
           exit $fail
+
+      # ---------------------------------------------------------------
+      # Step 18: Team tier manifest validation (spec 2026-10-05-digital-
+      # twin-team-design.md, WP6). `check --ci` validates the example
+      # roster, twin refs, categories, byte budgets, and scans tracked
+      # files for real names / ids / secrets. Needs PyYAML (installed in
+      # the earlier "Install PyYAML" step).
+      # ---------------------------------------------------------------
+      - name: Team — check (schema, refs, categories, budgets, names, secrets)
+        run: |
+          set -o pipefail
+          python3 team/tools/teamctl.py check --ci | tee /tmp/teamctl-check.out
+          if ! grep -q '^teamctl check \[ci\]: OK' /tmp/teamctl-check.out; then
+            echo "::error file=team/tools/teamctl.py::teamctl check --ci did not report OK (vacuous or truncated run)"
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------
+      # Step 18b: Team build determinism. Compile the example roster twice
+      # into separate temp dirs; the bytes (and so the sourceHash) must be
+      # identical, and the output must be non-empty.
+      # ---------------------------------------------------------------
+      - name: Team — build determinism
+        run: |
+          a=$(mktemp -d); b=$(mktemp -d)
+          python3 team/tools/build.py --check-deterministic --out "$a/out" \
+            || { echo "::error file=team/tools/build.py::build failed or is not deterministic (E051)"; exit 1; }
+          python3 team/tools/build.py --out "$b/out" > /dev/null \
+            || { echo "::error file=team/tools/build.py::second build failed"; exit 1; }
+          n=$(find "$a/out" -type f | wc -l)
+          if [ "$n" -lt 1 ] || [ ! -f "$a/out/roster.json" ]; then
+            echo "::error file=team/tools/build.py::build produced no output (roster.json missing)"
+            exit 1
+          fi
+          if ! diff -r "$a/out" "$b/out"; then
+            echo "::error file=team/tools/build.py::two builds of the same roster differ"
+            exit 1
+          fi
+          echo "ok  $n build files identical across two builds"
+
+      # ---------------------------------------------------------------
+      # Step 19: Team lint fixtures (tests/team/run.py: every fixture case
+      # must produce its expected exit code and E/W codes) plus the team
+      # unit tests (tests/team/test_team.py).
+      # ---------------------------------------------------------------
+      - name: Team — lint fixtures
+        run: |
+          set -o pipefail
+          python3 tests/team/run.py | tee /tmp/team-fixtures.out
+          if ! grep -Eq '^team fixtures: ([1-9][0-9]*)/\1 passed' /tmp/team-fixtures.out; then
+            echo "::error file=tests/team/run.py::fixture runner did not report all cases passed (or ran zero cases)"
+            exit 1
+          fi
+          python3 tests/team/test_team.py 2>&1 | tee /tmp/team-unit.out
+          if ! grep -Eq '^Ran [1-9][0-9]* tests?' /tmp/team-unit.out || ! grep -q '^OK' /tmp/team-unit.out; then
+            echo "::error file=tests/team/test_team.py::team unit tests failed or ran zero tests"
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------
+      # Step 20: Chat gateway unit + security tests. Offline: platform
+      # SDKs are never imported and the Claude Code driver is exercised
+      # only against a stub executable.
+      # ---------------------------------------------------------------
+      - name: Chat gateway — unit and security tests (offline)
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s tests/gateway -p 'test_*.py' 2>&1 | tee /tmp/gateway-tests.out
+          if ! grep -Eq '^Ran [1-9][0-9]* tests?' /tmp/gateway-tests.out || ! grep -q '^OK' /tmp/gateway-tests.out; then
+            echo "::error file=tests/gateway::gateway tests failed or ran zero tests"
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------
+      # Step 21: Chat gateway demo golden transcript. The mock-mode demo
+      # must reproduce tests/gateway/golden/demo.txt byte for byte.
+      # ---------------------------------------------------------------
+      - name: Chat gateway — demo golden transcript
+        run: |
+          if [ ! -s tests/gateway/golden/demo.txt ]; then
+            echo "::error file=tests/gateway/golden/demo.txt::golden transcript missing or empty"
+            exit 1
+          fi
+          python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt \
+            || { echo "::error file=infra/chat-gateway/demo.py::demo transcript differs from tests/gateway/golden/demo.txt"; exit 1; }
+
+      # ---------------------------------------------------------------
+      # Step 22: install.sh team-tier smoke. Plants decoy local files in
+      # the source tree, installs into a throwaway $HOME (stdin closed so
+      # no prompt can hang), and asserts team/ + TEAM.md arrive while
+      # team/.build and team/local contents do not.
+      # ---------------------------------------------------------------
+      - name: install.sh — team tier smoke
+        run: |
+          export HOME="$(mktemp -d)"
+          mkdir -p "$HOME/.claude"
+          unset CLAUDE_CONFIG_DIR
+          mkdir -p team/.build team/local
+          echo decoy > team/.build/ci-decoy.txt
+          echo decoy > team/local/ci-decoy.local.yaml
+          cleanup() { rm -f team/.build/ci-decoy.txt team/local/ci-decoy.local.yaml; }
+          trap cleanup EXIT
+          bash adapters/claude-code/install.sh --core-only </dev/null
+          T="$HOME/.claude/plugins/manufacturing-skill"
+          [ -d "$T" ] || { echo "::error file=adapters/claude-code/install.sh::install target $T was not created"; exit 1; }
+          fail=0
+          err() { echo "::error file=adapters/claude-code/install.sh::$1"; fail=1; }
+          [ -f "$T/TEAM.md" ] || err "TEAM.md was not installed"
+          [ -f "$T/team/roster.example.yaml" ] || err "team/roster.example.yaml was not installed"
+          [ -f "$T/team/tools/teamctl.py" ] || err "team/tools/teamctl.py was not installed"
+          [ ! -e "$T/team/.build" ] || err "team/.build must not be installed"
+          [ ! -e "$T/team/local/ci-decoy.local.yaml" ] || err "team/local contents must not be installed"
+          if [ -n "$(find "$T/team" -name '*.local.*' -print -quit)" ]; then err "*.local.* file installed under team/"; fi
+          want=$(ls core/agents | wc -l)
+          got=$(ls "$T/agents" | wc -l)
+          if [ "$got" -lt 1 ] || [ "$got" -ne "$want" ]; then err "agents/ has $got files, expected $want"; fi
+          grep -q '"team": true' "$T/.installed" || err '.installed lacks "team": true'
+          [ "$fail" -eq 0 ] || exit 1
+          echo "ok  team tier installed ($got agents); .build/local excluded"
