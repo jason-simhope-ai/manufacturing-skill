@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Fixed
+
+- **Resolver ignores directives and headings inside fenced code** (`_resolve_extends.py`) — `<!-- inherit -->` / `<!-- override-body -->` / `<!-- replace-section: X -->` examples inside ``` or ~~~ fences are now skipped by both validation and assembly (they previously passed validation but were substituted in the output, producing a corrupted file with exit 0). `## ` lines inside fences no longer end a replace-section block, and no longer split sections of the core body. Validation and assembly now share one offset-preserving scan.
+- **Resolver rejects bad `extends:` values with a clean error** — a list, mapping, int or empty `extends:` and unparsable YAML frontmatter now exit non-zero with a one-line `::error` instead of a Python traceback. `--out` creates missing parent directories.
+- **`extends:` path check no longer bypassable** — the core-containment test compared string prefixes, so `core-evil/...` passed; the path is now normalised and checked by components (absolute paths, `..` and non-`core/` roots are rejected before any file is touched).
+- **`tests/extends/run.py` cannot pass vacuously** — fails when zero cases are discovered (and prints the count), when the cases do not exercise every directive type (`inherit`, `override-body`, `replace-section`) plus an error case, when an error case crashes with a traceback or emits other than one `::error` line, or when `lint` disagrees with `resolve`. Adds fixtures `case-14` to `case-24` (fenced markers, fenced headings, bad `extends` types, bad YAML, `core-evil` prefix, `..` traversal).
+- **Multi-profile collision scan is case-insensitive** (`_multiprofile.py`) — `Quote.md` vs `quote.md` now collide (macOS/Windows filesystems fold case); a missing kind directory is treated as empty; a non-dict `mcp` in a manifest no longer crashes aggregation. 8 new unit tests (16 total).
 
 ## [0.1.5] — 2026-05-09
 
