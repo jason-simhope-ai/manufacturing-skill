@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`CLAUDE.md`** — contributor guide for coding agents: repo map, language conventions, CI rules with local replay commands, profile checklist, and the never-list.
 
 ## [0.1.5] — 2026-05-09
 
