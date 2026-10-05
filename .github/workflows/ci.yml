@@ -162,9 +162,11 @@ jobs:
 
       # ---------------------------------------------------------------
       # Step 6b: install.sh smoke — --list, --core-only, single profile
-      # (guards against pipefail aborts on profiles without "status")
+      # (guards against pipefail aborts on profiles without "status"),
+      # plus preflight-before-touch, atomic swap/rollback, backup count,
+      # stub-profile warning and non-TTY exit code
       # ---------------------------------------------------------------
-      - name: install.sh — smoke (--list, --core-only, single profile)
+      - name: install.sh — smoke (--list, --core-only, single profile, preflight, atomic swap)
         run: |
           set -euo pipefail
           export HOME="$(mktemp -d)"
@@ -187,6 +189,72 @@ jobs:
             fi
             echo "ok  install.sh $args"
           done
+
+          plugins="$HOME/.claude/plugins"
+          tree_hash() {
+            ( cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort ) | sha256sum
+          }
+
+          # Re-install over an existing install: succeeds, exactly one backup,
+          # no staging dir left behind
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          nbak="$(find "$plugins" -maxdepth 1 -name 'manufacturing-skill.bak.*' | wc -l | tr -d ' ')"
+          if [ "$nbak" != "1" ]; then
+            echo "::error::expected exactly 1 backup after a re-install, found $nbak"
+            exit 1
+          fi
+          if find "$plugins" -maxdepth 1 -name '.manufacturing-skill.new.*' | grep -q .; then
+            echo "::error::staging dir left behind in $plugins"
+            exit 1
+          fi
+          echo "ok  re-install succeeds and leaves exactly one backup"
+
+          # Invalid profile names fail (rc != 0) before touching the install
+          before="$(tree_hash)"
+          for bad in '../x' '..' 'a b' '*' 'cnc-machining,../profiles/cnc-machining' 'no-such-profile'; do
+            if bash adapters/claude-code/install.sh "$bad" </dev/null >/dev/null 2>&1; then
+              echo "::error::install.sh '$bad' exited 0; expected failure"
+              exit 1
+            fi
+            if [ "$(tree_hash)" != "$before" ]; then
+              echo "::error::install.sh '$bad' modified the existing install"
+              exit 1
+            fi
+          done
+          echo "ok  invalid profile names rejected; existing install untouched"
+
+          # A failure between the two renames restores the previous install
+          if MFG_INSTALL_TEST_FAIL_SWAP=1 bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1; then
+            echo "::error::simulated swap failure exited 0"
+            exit 1
+          fi
+          if [ "$(tree_hash)" != "$before" ]; then
+            echo "::error::simulated swap failure did not restore the previous install"
+            exit 1
+          fi
+          echo "ok  swap failure rolls back to the previous install"
+
+          # Stub profile prints a visible warning (core-only content, no HACCP)
+          out="$(bash adapters/claude-code/install.sh food-processing </dev/null 2>&1)"
+          for want in 'STUB PROFILE: food-processing' 'generic core layer only' 'HACCP / food-safety content is NOT included'; do
+            if ! printf '%s\n' "$out" | grep -qF "$want"; then
+              echo "::error::food-processing install output is missing: $want"
+              exit 1
+            fi
+          done
+          echo "ok  stub warning shown for food-processing"
+
+          # ~/.claude missing + stdin not a TTY: exit 2, nothing created
+          empty_home="$(mktemp -d)"
+          rc=0
+          HOME="$empty_home" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1 || rc=$?
+          if [ "$rc" != "2" ] || [ -e "$empty_home/.claude" ]; then
+            echo "::error::missing ~/.claude without a TTY: expected rc=2 and no dir, got rc=$rc"
+            exit 1
+          fi
+          echo "ok  missing ~/.claude without a TTY exits 2"
 
       # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest

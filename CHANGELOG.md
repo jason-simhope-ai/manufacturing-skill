@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`install.sh --list` and the interactive picker no longer abort** under `set -euo pipefail` when a `profile.json` has no `"status"` key (e.g. `cnc-machining`); a missing status still means `complete`. CI now smoke-tests `--list`, `--core-only` and single-profile installs.
+- **`install.sh` no longer leaves a half-built install behind.** Every check (profile names, profile dirs, python3 / PyYAML when needed, conflict scan) now runs before the existing install is touched. Previously `install.sh ..`, a missing python3, missing PyYAML or a bad `extends:` target failed *after* the old install had been moved to `.bak`, leaving `plugins/manufacturing-skill/` without `.installed`.
+- **Profile names are validated** (`[A-Za-z0-9_-]`, no leading `-`): `..`, `../x`, `a/b`, names with spaces and `*` are rejected up front; `*` is no longer glob-expanded against the current directory.
+- **Backups can no longer collide or nest**: two installs in the same second used to nest the second backup inside the first, and a third failed with `Directory not empty`.
+- **Missing `~/.claude` with no TTY** (CI, piped input) now prints why and exits 2 instead of exiting silently after the `Create it? [y/N]` prompt.
+- **Interactive picker**: entering `08` or `09` no longer aborts with "value too great for base".
+- **`install.sh -h`** prints the whole usage block (the last two examples were cut off).
+
+### Changed
+
+- **Atomic install swap**: the new tree is built in a staging dir next to the target (same filesystem), then swapped in with `mv`. The old install moves to `manufacturing-skill.bak.<timestamp>.<pid>`; if the swap fails, it is moved back automatically and the installer exits non-zero. Only the newest 3 backups are kept (older `manufacturing-skill.bak.*` dirs are deleted; the output says so and prints an undo command).
+- **python3 is only required when it is actually used**: multi-profile installs (conflict scan + `active-profiles.json`) and profiles with `extends:` files (which also need PyYAML). A single plain profile installs without python3; `active-profiles.json` is then skipped and readers fall back to `active-profile.json`.
+- **Stub-profile warning**: installing a profile with `"status": "stub"` prints a warning block (profile files installed: 0, core layer only; for `food-processing` "HACCP / food-safety content is NOT included", for `pharma` "GxP content is NOT included") and the profile's `warnings` array. Alpha profiles with `warnings` (e.g. `injection-molding`) print them too. When only stubs are installed, the "Try in Claude Code" hints no longer suggest the CNC drawing example.
+- **`--list` / picker** show `alpha` profiles with 🧪 instead of ❓.
+- **CI `install.sh — smoke` step** now also checks: re-install leaves exactly one backup; invalid names (`../x`, `..`, `a b`, `*`) fail and leave a pre-existing install byte-identical; a simulated swap failure (`MFG_INSTALL_TEST_FAIL_SWAP=1`, test hook) restores the previous install; the stub warning appears for `food-processing`; missing `~/.claude` without a TTY exits 2.
 
 ## [0.1.5] — 2026-05-09
 
