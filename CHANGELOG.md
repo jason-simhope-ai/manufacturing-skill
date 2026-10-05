@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **Docs: state the real data flow.** Removed "drawings never leave the company / runs on your own machine" claims from the READMEs, `manufacturing.md`, the landing page and explainers 01/02. The plugin's prompts and files stay local, but the default model is Anthropic's cloud (Claude Code), so pasted or attached content is sent to the model provider under its terms; on-prem (GB10 / Ollama) is an option that this project has not verified end-to-end. Added a data-flow section to both READMEs.
+- **Docs: `infra/on-prem/gb10-setup.md`** now carries an "unverified" warning, no longer ships a JSON snippet with comments, and tells IT how to verify isolation themselves (egress deny + traffic observation). The beginner quickstart no longer advises `sudo`, covers Git Bash on Windows, and adds the missing "open Claude Code in the repo folder" step.
 
 ## [0.1.5] — 2026-05-09
 
