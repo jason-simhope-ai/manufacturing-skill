@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI profile-extends lint (step 10a) no longer passes vacuously** — it now also lints the `tests/extends/case-*/profile.md` fixtures (error cases must be rejected, others accepted) alongside real `profiles/` files, and fails if zero files were linted.
 - **CI core heading-anchor guard (step 10b) now actually runs on PRs** — checkout uses `fetch-depth: 0`, a failing diff is an error instead of a silent skip, the step reports whether core files were touched, and its logic moved into an argv/env-driven Python block (no filename or heading interpolated into `python3 -c`, no hidden errors, dead check removed).
 
 ## [0.1.5] — 2026-05-09

@@ -342,42 +342,88 @@ jobs:
       # one of <!-- inherit --> or <!-- override-body -->),
       # replace-section heading existence, and frontmatter
       # post-merge requirements. See spec §10.1.
+      #
+      # No shipped profile uses `extends:` yet, so this ALSO lints the
+      # fixtures tests/extends/case-*/profile.md (laid out in a temp
+      # repo, as tests/extends/run.py does): cases with an
+      # expected_error.txt must make the linter exit non-zero, the
+      # rest must exit zero. The step fails if nothing was linted, so
+      # it can never pass vacuously.
       # ---------------------------------------------------------------
       - name: Profile extends — lint
         run: |
           python3 - <<'PY'
-          import os, sys, glob, subprocess
-          resolver = "adapters/claude-code/_resolve_extends.py"
+          import glob, shutil, subprocess, sys, tempfile
+          from pathlib import Path
+
+          repo = Path(".").resolve()
+          resolver = str(repo / "adapters/claude-code/_resolve_extends.py")
           fail = False
-          checked = 0
-          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
-              # Skip _templates
-              if any(p.startswith("_") for p in f.replace("\\","/").split("/")):
-                  continue
-              try:
-                  with open(f, encoding="utf-8") as fp:
-                      text = fp.read()
-              except OSError:
-                  continue
-              if not text.startswith("---"):
-                  continue
-              parts = text.split("---", 2)
-              if len(parts) < 3:
-                  continue
-              fm_block = parts[1]
-              if "\nextends:" not in "\n" + fm_block:
-                  continue
-              proc = subprocess.run(
-                  ["python3", resolver, "--repo-root", ".", "lint", f],
+          real = fixtures = 0
+
+
+          def lint(root, f):
+              return subprocess.run(
+                  ["python3", resolver, "--repo-root", str(root), "lint", str(f)],
                   capture_output=True, text=True,
               )
+
+
+          # 1. Real profiles/ files that use `extends:`.
+          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
+              if any(p.startswith("_") for p in f.replace("\\", "/").split("/")):
+                  continue
+              try:
+                  text = Path(f).read_text(encoding="utf-8")
+              except OSError:
+                  continue
+              parts = text.split("---", 2) if text.startswith("---") else []
+              if len(parts) < 3 or "\nextends:" not in "\n" + parts[1]:
+                  continue
+              proc = lint(repo, f)
               if proc.returncode != 0:
                   sys.stdout.write(proc.stderr)
                   fail = True
               else:
                   print(f"ok  {f}")
-              checked += 1
-          print(f"checked {checked} profile files with `extends:`")
+              real += 1
+
+          # 2. Fixture profiles: exercise the linter itself.
+          for case in sorted(glob.glob("tests/extends/case-*/profile.md")):
+              case = Path(case).parent
+              cfg = {}
+              if (case / "case.cfg").exists():
+                  for line in (case / "case.cfg").read_text(encoding="utf-8").splitlines():
+                      if "=" in line and not line.startswith("#"):
+                          k, v = line.split("=", 1)
+                          cfg[k.strip()] = v.strip()
+              kind = cfg.get("kind", "agents")
+              base = cfg.get("basename", "subject")
+              want_error = (case / "expected_error.txt").exists()
+              with tempfile.TemporaryDirectory() as tmp:
+                  tmp = Path(tmp)
+                  (tmp / "core" / kind).mkdir(parents=True)
+                  prof_dir = tmp / "profiles" / cfg.get("profile", "test-profile") / kind
+                  prof_dir.mkdir(parents=True)
+                  shutil.copyfile(case / "core.md", tmp / "core" / kind / f"{base}.md")
+                  prof = prof_dir / f"{base}.md"
+                  shutil.copyfile(case / "profile.md", prof)
+                  proc = lint(tmp, prof)
+              if (proc.returncode != 0) == want_error:
+                  print(f"ok  {case} (lint {'rejected' if want_error else 'accepted'} as expected)")
+              else:
+                  print(f"::error::{case}: lint exit {proc.returncode}, "
+                        f"expected {'non-zero' if want_error else 'zero'}")
+                  sys.stdout.write(proc.stderr)
+                  fail = True
+              fixtures += 1
+
+          total = real + fixtures
+          print(f"checked {total} profile files with `extends:` "
+                f"({real} real, {fixtures} fixtures)")
+          if total == 0:
+              print("::error::linted 0 files; the extends lint would pass vacuously")
+              sys.exit(1)
           sys.exit(1 if fail else 0)
           PY
 
