@@ -8,7 +8,7 @@ argument-hint: "[訂單號 或 客戶名稱 或 工單號]"
 # /order-status — 訂單狀態查詢
 
 > **注意：沒有 MCP 連線時，輸出是模擬資料。**
-> 若 `erp-connector` / `scheduler-mcp` 沒有接上真實系統，本指令只會使用
+> 若 `erp-connector` / `manufacturing-scheduler` 沒有接上真實系統，本指令只會使用
 > `infra/mcp-servers/scheduler-mcp/mock-data/` 內的 mock data。此時回覆**必須**在開頭與每個數字區塊標示
 > 「模擬資料」，不得當作真實訂單 / 機台狀態呈現，也不得改用 `git log` 或其他推測方式補齊狀態。
 > 沒有任何資料來源時，直接回答「無法取得資料」。

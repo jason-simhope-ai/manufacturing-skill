@@ -27,7 +27,7 @@ manufacturing-skill v0.1.5
 ├── Know-how（8 + 4 = 12）
 ├── Hooks（4 + 1 = 5）
 └── Infra
-    ├── MCP servers: scheduler-mcp, erp-connector
+    ├── MCP servers: manufacturing-scheduler, erp-connector
     └── On-prem LLM: Ollama @ GB10 (offline)
 ```
 
@@ -44,10 +44,10 @@ manufacturing-skill v0.1.5
 ├── Know-how（8 + 4 + 2 = 14）
 ├── Hooks（4 + 1 = 5）
 └── Infra
-    └── MCP servers: scheduler-mcp, erp-connector
+    └── MCP servers: manufacturing-scheduler, erp-connector
 ```
 
-> **注意：MCP 連線狀態。** 上面範例中的 `scheduler-mcp` / `erp-connector` 只代表「已安裝」，不代表已接上真實 ERP / MES。
+> **注意：MCP 連線狀態。** 上面範例中的 `manufacturing-scheduler` / `erp-connector` 只代表「已安裝」，不代表已接上真實 ERP / MES。
 > 未接上時，依賴它們的指令（如 `/order-status`、`/morning-briefing`）使用的是
 > `infra/mcp-servers/scheduler-mcp/mock-data/` 的 mock data，輸出必須標示「模擬資料」。
 > 顯示 MCP 狀態時，請區分「已連線」與「僅 mock data」，不要用 `git log` 等方式推測。

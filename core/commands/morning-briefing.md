@@ -7,10 +7,10 @@ argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 
 # /morning-briefing — 廠長 / 生管 / 業務每日早會懶人包
 
-每天早上 8 點打這個。AI 自動爬 ERP / scheduler-mcp / 昨日 inspection log，整理成 5 分鐘看完的早會稿。
+每天早上 8 點打這個。AI 自動爬 ERP / manufacturing-scheduler / 昨日 inspection log，整理成 5 分鐘看完的早會稿。
 
 > **注意：沒有 MCP 連線時，輸出是模擬資料。**
-> 若 `erp-connector` / `scheduler-mcp` 沒有接上真實系統，本指令只會使用
+> 若 `erp-connector` / `manufacturing-scheduler` 沒有接上真實系統，本指令只會使用
 > `infra/mcp-servers/scheduler-mcp/mock-data/` 內的 mock data。此時回覆**必須**在開頭與每個數字區塊標示
 > 「模擬資料」，不得當作真實訂單 / 機台狀態呈現，也不得改用 `git log` 或其他推測方式補齊狀態。
 > 沒有任何資料來源時，直接回答「無法取得資料」。
@@ -72,7 +72,7 @@ argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 
 ## 沒接 ERP / MCP 時的降級行為
 
-如果 `scheduler-mcp` 沒回應，AI 會：
+如果 `manufacturing-scheduler` 沒回應，AI 會：
 
 1. 改用 `infra/mcp-servers/scheduler-mcp/mock-data/` 的 mock data，並在簡報最上方標明「模擬資料：未連線 ERP / MES，以下數字僅供示範，不可用於早會決策」
 2. mock data 也不可用時，回答「無法取得資料」，**不要**用 `git log`、commit 紀錄或檔案修改時間推測工單 / 機台狀態
