@@ -217,16 +217,19 @@ INVENTORY.md              ← 這份
 | [build.py](team/tools/build.py) | 編譯 `team/.build/`（`roster.json`、分身 prompt、`ref/`；輸出可重現） |
 | [deid.py](team/tools/deid.py) | 來源端去識別（CSV：NFKC／空白折疊後客戶名 → `CUST-xx`、整詞比對、刪欄；殘留掃描含 email、電話、姓名＋職稱、聯絡人欄，命中即 exit 1，除非 `--allow-residual`） |
 | [teamlib/](team/tools/teamlib/) · [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`）：`schema.py`（常數、`CODES`、欄位規格、樣式橋接）· `io.py`（YAML／JSON／日期）· `compile.py`（組裝與 build）· `validate.py`（驗證器）；`_teamlib.py` 是相容 shim |
-| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本 |
+| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本（Python regex，與 gateway 同語法） |
+| [denylist.starter.txt](team/tools/denylist.starter.txt) | 建議起始 denylist：通用中英同義詞、保密約定、金額寫法；`T3:` 開頭的行命中視為 T3 |
 
 **Chat gateway（[infra/chat-gateway/](infra/chat-gateway/)；Python 3.11，核心只用 stdlib）**
 
 | 路徑 | 用途 |
 | ---- | ---- |
 | [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證） |
+| [DEPLOY.md](infra/chat-gateway/DEPLOY.md) · [RUNBOOK.md](infra/chat-gateway/RUNBOOK.md) | Pilot 部署檢核表（主機、帳號、systemd、出口、祕密、廠商檢查表、首日驗收）· 停機與外洩處置（凍結、撤銷、輪替、封存） |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
-| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint＋主機外錨點（`--heads-out`／`--anchor`）· secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
+| `chat_gateway/datascan.py` | `MFG_TEAM_DATA_T1` 資料夾內容掃描（DLP＋denylist，只重讀變動檔，5,000 檔上限） |
 | `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
 | `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py` |
 | `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
@@ -237,7 +240,7 @@ INVENTORY.md              ← 這份
 | 套件 | 內容 | 怎麼跑（CI Step） |
 | ---- | ---- | ----------------- |
 | [tests/team/](tests/team/) | `fixtures.yaml` 110 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 42 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code） | `python3 tests/team/run.py`（Step 19）· `python3 -m unittest tests/team/test_team.py` |
-| [tests/gateway/](tests/gateway/) | `test_gateway.py` 98 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 35 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 39 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 129 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 50 個 unittest（Slack／Discord 事件對應、T1 上限、Slack scope 檢查與 README 一致性，假 transport）；`test_claude_code_driver.py` 68 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`、資料夾掃描、家目錄隱藏目錄）；`test_pilot.py` 19 個 unittest（starter denylist 與 7 句實測、kill switch、稽核錨點、symlink state dir、錯誤訊息）；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
 
@@ -248,6 +251,7 @@ INVENTORY.md              ← 這份
 | [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
 | [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
 | [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
+| [audit-operations.md](docs/audit-operations.md) | IT／稽核：分身 gateway 稽核週作業、簽收單、金鑰輪替與遺失、ISO 27001 對應 |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |

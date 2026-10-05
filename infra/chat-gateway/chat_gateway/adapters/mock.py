@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 from typing import Callable, Iterator, TextIO
 
+from .. import UsageError
 from .base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply, ScheduledPost
 
 MAX_SCRIPT_BYTES = 2_000_000
@@ -76,7 +77,7 @@ class MockAdapter:
             return [_check(n, o) for n, o in enumerate(self.script, 1)]
         path = Path(self.script)
         if not path.is_file() or path.stat().st_size > MAX_SCRIPT_BYTES:
-            raise ValueError(f"mock script missing or too large: {path}")
+            raise UsageError(f"mock script missing or too large: {path}")
         out = []
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if not line.strip():

@@ -2,8 +2,9 @@
 
     run          [--roster P] [--adapter mock|slack|discord] [--driver mock|claude-code] [--script F.jsonl] [--pace S]
     post         --twin ID --capability ID [--channel ID] [--roster P] [--adapter …] [--driver …]
-    audit-verify FILE_OR_DIR
+    audit-verify FILE_OR_DIR [--heads-out FILE] [--anchor FILE]
     self-check   [--roster P] [--adapter …] [--driver …]
+    freeze | unfreeze                       (kill switch: flag file in the state dir)
 
 Exit: 0 OK · 3 T3 refused · 64 usage · 65 bad script line · 70 internal · 78 config refused.
 """
@@ -17,14 +18,14 @@ import time
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from . import EXIT_CONFIG, EXIT_DATA, EXIT_INTERNAL, EXIT_OK, EXIT_USAGE, ConfigRefused
+from . import EXIT_CONFIG, EXIT_DATA, EXIT_INTERNAL, EXIT_OK, EXIT_USAGE, ConfigRefused, UsageError
 from .adapters import load_adapter_class
 from .adapters.base import ScheduledPost
 from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
-from .audit import AuditLog, heads, verify_report
-from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, ensure_state_dir,
-                     stale_state_help)
+from .audit import AuditLog, check_anchor, heads, heads_document, verify_report, write_heads
+from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, FREEZE_FILE, STATE_DIR_VAR, GatewayConfig, config_from_env,
+                     ensure_state_dir, resolve_state_dir, stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
 from .sanitize import load_denylist
 from .drivers import load_driver_class
@@ -40,7 +41,7 @@ def _make_adapter(cfg: GatewayConfig, roster: dict, script: str | None):
     return cls(bindings=roster.get("_bindings") or {})
 
 
-def _make_driver(cfg: GatewayConfig, env: Mapping[str, str]):
+def _make_driver(cfg: GatewayConfig, env: Mapping[str, str], extra_dlp=()):
     cls = load_driver_class(cfg.driver)
     if cfg.driver == "mock":
         return cls()
@@ -48,7 +49,8 @@ def _make_driver(cfg: GatewayConfig, env: Mapping[str, str]):
         raise ConfigRefused("missing required environment variables: MFG_TEAM_CLAUDE_CONFIG_DIR")
     return cls(bin=env.get("MFG_TEAM_CLAUDE_BIN", "claude"), config_dir=env["MFG_TEAM_CLAUDE_CONFIG_DIR"],
                max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s,
-               data_root=env.get("MFG_TEAM_DATA_T1") or None, state_dir=cfg.state_dir, env=env)
+               data_root=env.get("MFG_TEAM_DATA_T1") or None, state_dir=cfg.state_dir, env=env,
+               extra_dlp=extra_dlp)
 
 
 def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None = None) -> Gateway:
@@ -66,7 +68,7 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
     except (OSError, ValueError) as exc:
         raise ConfigRefused(f"local denylist unusable: {exc}") from None
     adapter = _make_adapter(cfg, roster, script)
-    driver = _make_driver(cfg, env)
+    driver = _make_driver(cfg, env, extra_dlp)
     if cfg.driver == "mock":
         print("mock driver: replies are canned keyword matches from fixtures/mock_driver.json, "
               "not model output", file=sys.stderr)
@@ -79,7 +81,8 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
     data_root = env.get("MFG_TEAM_DATA_T1")
     return Gateway(roster, adapter, driver, audit, clock, approvals=ApprovalBook(cfg.approval_key, clock=clock),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,
-                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp)
+                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp,
+                   frozen_flag=cfg.state_dir / FREEZE_FILE)
 
 
 def _post(gw: Gateway, cfg: GatewayConfig, twin: str, capability: str, channel: str | None) -> int:
@@ -113,8 +116,19 @@ def audit_key_for_verify(env: Mapping[str, str]) -> bytes:
     return DEMO_AUDIT_KEY
 
 
-def print_verify(path: str, key: bytes) -> bool:
+def print_verify(path: str, key: bytes, heads_out: str | None = None, anchor: str | None = None) -> bool:
+    """Verify, then optionally compare with an earlier off-host heads file (`anchor`) and write the
+    current heads (`heads_out`, only when everything verified). Returns overall success."""
     ok, n, problems = verify_report(path, key)
+    anchor_doc = None
+    if anchor is not None:
+        try:
+            anchor_doc = json.loads(Path(anchor).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            problems = problems + [f"anchor {anchor} unreadable ({type(exc).__name__})"]
+        else:
+            problems = problems + (check_anchor(path, key, anchor_doc) if ok else [])
+        ok = not problems
     print(f"audit verify: {'OK' if ok else 'FAILED'} ({n})")
     for problem in problems[:20]:
         print(f"  problem: {problem}")
@@ -123,11 +137,48 @@ def print_verify(path: str, key: bytes) -> bool:
         print(f"  last seq {info['seq']}; checkpoint heads (copy off-host for sign-off):")
         for tier, h in sorted(info["tiers"].items()):
             print(f"    {tier}: count={h['count']} seq={h['seq']} head={h['head']}")
+    if ok and anchor_doc is not None:
+        print(f"  anchor: OK — no tier went backwards since {anchor_doc.get('created')} (seq {anchor_doc.get('seq')})")
+    if ok and heads_out:
+        doc = heads_document(path, key)
+        if doc is None:
+            return False
+        try:
+            write_heads(doc, heads_out)
+        except OSError as exc:
+            print(f"  problem: cannot write {heads_out} ({type(exc).__name__})")
+            return False
+        print(f"  heads written to {heads_out} (copy it off-host; use it as --anchor next time)")
     return ok
 
 
-def _audit_verify(path: str, env: Mapping[str, str]) -> int:
-    return EXIT_OK if print_verify(path, audit_key_for_verify(env)) else EXIT_CONFIG
+def _audit_verify(path: str, env: Mapping[str, str], heads_out: str | None = None, anchor: str | None = None) -> int:
+    return EXIT_OK if print_verify(path, audit_key_for_verify(env), heads_out, anchor) else EXIT_CONFIG
+
+
+def _freeze(env: Mapping[str, str], on: bool) -> int:
+    """S03 kill switch. `freeze` writes `<state dir>/frozen`; a running gateway checks it before every
+    event and answers 「分身暫停服務中」 without calling the model. `unfreeze` removes it."""
+    state = resolve_state_dir(env)
+    if state.is_symlink():
+        raise ConfigRefused(f"state directory {state} is a symlink; set {STATE_DIR_VAR} to the real directory")
+    flag = state / FREEZE_FILE
+    if on:
+        ensure_state_dir(state)
+        fd = os.open(flag, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"frozen_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}) + "\n")
+        print(f"frozen: {flag} written. A running gateway answers 「分身暫停服務中」 from its next event on "
+              "(audit action `frozen`). To cut access completely, also stop the service and revoke the tokens "
+              "(infra/chat-gateway/RUNBOOK.md).")
+        return EXIT_OK
+    try:
+        flag.unlink()
+    except FileNotFoundError:
+        print(f"unfreeze: {flag} not present; the gateway was not frozen")
+        return EXIT_OK
+    print(f"unfrozen: {flag} removed; the gateway serves again from its next event")
+    return EXIT_OK
 
 
 def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None) -> int:
@@ -146,7 +197,12 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
             p.add_argument("--twin", required=True)
             p.add_argument("--capability", required=True)
             p.add_argument("--channel")
-    sub.add_parser("audit-verify").add_argument("path")
+    av = sub.add_parser("audit-verify")
+    av.add_argument("path")
+    av.add_argument("--heads-out", metavar="FILE")
+    av.add_argument("--anchor", metavar="FILE")
+    sub.add_parser("freeze")
+    sub.add_parser("unfreeze")
     try:
         args = ap.parse_args(argv)
     except SystemExit as exc:
@@ -156,11 +212,16 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
             if not Path(args.path).exists():
                 print(f"no such file: {args.path}", file=sys.stderr)
                 return EXIT_USAGE
-            return _audit_verify(args.path, env)
+            return _audit_verify(args.path, env, args.heads_out, args.anchor)
+        if args.cmd in ("freeze", "unfreeze"):
+            return _freeze(env, args.cmd == "freeze")
         cfg = config_from_env(env, roster=args.roster, adapter=args.adapter, driver=args.driver)
         gw = build_gateway(cfg, env, getattr(args, "script", None))
+        if gw.frozen():
+            print(f"FROZEN: {gw.frozen_flag} exists; every event is answered 「分身暫停服務中」 until "
+                  "`python3 -m chat_gateway unfreeze`", file=sys.stderr)
         if args.cmd == "self-check":
-            print("self-check: OK")
+            print("self-check: OK" + (" (frozen)" if gw.frozen() else ""))
             return EXIT_OK
         if args.cmd == "post":
             return _post(gw, cfg, args.twin, args.capability, args.channel)
@@ -172,8 +233,12 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
     except ScriptError as exc:
         print(f"chat_gateway: {exc}", file=sys.stderr)
         return EXIT_DATA
-    except (ValueError, ImportError) as exc:
+    except UsageError as exc:                        # our own wording (unknown name, missing script)
         print(f"chat_gateway: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except (ValueError, ImportError) as exc:
+        # R-02 (EXT-15): class name only; an SDK or transport ValueError can carry URLs or request data.
+        print(f"chat_gateway: {type(exc).__name__}", file=sys.stderr)
         return EXIT_USAGE
     except Exception as exc:  # noqa: BLE001
         # EXT-15: class name only. An SDK exception's text can carry request context (ids, URLs).

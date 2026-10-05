@@ -52,7 +52,7 @@
 
 1. 設定層：roster 裡出現任何 T3 頻道或 T3 分身，gateway 啟動就拒絕（exit 3），什麼都不載入。
 2. 字樣層（DLP 關鍵字告警）：訊息含下列字樣時，gateway 擋下、不送進模型，並回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
-   - 視為 T3（與 `patterns.py` 完全一致）：中文 `受限`、`國防`、`航太`、`軍工`、`軍規`、`醫材`、`醫療器材`、`外銷許可`、`管制`，英文只有 `RESTRICTED`、`ITAR`、`EAR`、`CUI`。`不受限制`、`將軍規模`、`管制圖`、`文件管制`、`製程管制` 等日常用語不算。**英文同義詞（defense、aerospace、medical device、export permit、Mil-Spec）與混淆字元（例如西里爾字母的 `ІТАR`）不擋。**
+   - 視為 T3（與 `patterns.py` 完全一致）：中文 `受限`、`國防`、`航太`、`軍工`、`軍規`、`醫材`、`醫療器材`、`外銷許可`、`管制`，英文只有 `RESTRICTED`、`ITAR`、`EAR`、`CUI`。`不受限制`、`將軍規模`、`管制圖`、`文件管制`、`製程管制` 等日常用語不算。**英文同義詞（defense、aerospace、medical device、export permit、Mil-Spec）與混淆字元（例如西里爾字母的 `ІТАR`）不擋。** 補法：把 `team/tools/denylist.starter.txt`（通用中英同義詞、保密約定、金額寫法；`T3:` 開頭的行命中視為 T3）併入 `team/local/names.denylist`。pilot 審查的 7 句實測句子，沒載入時全部通過、載入後全部擋下；仍然只是字樣比對。
    - 視為 T2（送進 T1 頻道會被擋）：`機密`／`CONFIDENTIAL`、統一編號（只有前後 12 字內出現「統編」「統一編號」「VAT」「公司」「股份」「發票」且檢查碼正確才擋，單獨一串 8 位數字不擋）、身分證字號、`NT$`／`US$`／`USD` 金額、`萬元`／`千元`、email、手機號碼、有分隔的市話（`02-1234-5678`），以及你自己放進 `team/local/names.denylist` 的客戶名、圖號、專案代號。**人名不擋**（只有放進 denylist 的才擋；`deid.py` 會掃「姓＋職稱」，gateway 不會）。回覆裡出現的 email／手機另外會被遮成 `[REDACTED:email]`／`[REDACTED:tw-mobile]`。
    - **這是字樣比對，不是內容理解**：換個說法、縮寫、圖號、客戶代號、照片裡的文字都擋不到；`受限` 也會誤擋「不受限制」。所以不要對同仁說「T3 一律不處理」，要說「T3 不准進來，系統只會擋明顯字樣，其餘靠你自己」。同仁自己要先判斷，不要把 T3 話題丟進任何分身頻道。
 
@@ -72,7 +72,8 @@ Wave 1 的價值（「用排程資料挑戰並補漏」、「補相似 NCR 與�
 | 格式 | 沒有固定 schema：分身用 `Grep`／`Read` 讀文字檔。建議 UTF-8 CSV、第一列欄名、欄名人看得懂。範例：排程 `work_order,machine,due_date,slack_days,maintenance_window,snapshot_date`；NCR `ncr_no,date,part_family,defect,disposition,snapshot_date`。檔內放 `snapshot_date`（或檔名含日期），回覆才說得出資料多舊 |
 | 多久更新 | 由人決定，分身只讀檔案當下的內容。建議早會前（例如 07:30，早於 07:50 的排程貼文）匯出覆蓋同一檔 |
 | 看得到的範圍 | 這個資料夾對**該 gateway 服務的所有分身與頻道**都可見。想分開，就用不同的 gateway 與資料夾；不要把某個部門才該看的東西放進共用資料夾 |
-| 怎麼確認讀到 | `python3 -m chat_gateway self-check --driver claude-code`（需 `PYTHONPATH=infra/chat-gateway`）會檢查資料夾存在。再問一個答案只在檔案裡的問題（例：「WO-EX-0412 的交期餘裕？」），用 `grep WO-EX-0412 "$MFG_TEAM_DATA_T1"/*.csv` 對照回覆的依據 |
+| 內容掃描 | gateway 啟動時與每次呼叫前掃描資料夾（≤ 2 MB 的文字檔，DLP 字樣＋你的 denylist，只重讀有變動的檔）：T3 命中拒絕啟動（exit 3）或拒絕該次呼叫；T2 命中只告警；超過 5,000 個檔、含 symlink 或 roster 檔一律拒絕。二進位檔與大檔不掃，仍要人抽查 |
+| 怎麼確認讀到 | `python3 -m chat_gateway self-check --driver claude-code`（需 `PYTHONPATH=infra/chat-gateway`）會檢查資料夾存在並掃描內容。再問一個答案只在檔案裡的問題（例：「WO-EX-0412 的交期餘裕？」），用 `grep WO-EX-0412 "$MFG_TEAM_DATA_T1"/*.csv` 對照回覆的依據 |
 
 ## 8–10 分：三分類、五級 autonomy、不做的事
 

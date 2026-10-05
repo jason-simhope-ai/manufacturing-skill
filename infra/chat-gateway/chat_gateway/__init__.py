@@ -33,6 +33,11 @@ class ConfigRefused(Exception):
         self.exit = exit
 
 
+class UsageError(ValueError):
+    """A deliberate usage message (unknown adapter or driver name, missing script file). Its text is
+    written by this package, so the CLI prints it; any other ValueError prints its class name only."""
+
+
 def autonomy_rank(level: str) -> int:
     return AUTONOMY.index(level)
 

@@ -20,6 +20,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -704,6 +705,172 @@ class TestExtFollowUp(Base):
                     self.driver().run(self.inv())
                 self.assertIn("symlink", str(cm.exception))
                 d.unlink()
+
+
+class TestPilotDriver(Base):
+    """R-01 (credential dirs under HOME), S10 (data-root content scan), S12 (CLI version reported)."""
+
+    def problems(self, **kw):
+        return self.driver(**kw).self_check()
+
+    # R-01
+    def test_r01_data_root_inside_home_credential_dirs_refused(self):
+        home = Path(self.env["HOME"])
+        for rel in (".claude", ".ssh", ".aws/sub", ".config", ".gnupg"):
+            (home / rel).mkdir(parents=True, exist_ok=True)
+        for rel, needle in ((".claude", "~/.claude"), (".ssh", "~/.ssh"), (".aws/sub", "~/.aws"),
+                            (".config", "~/.config"), (".gnupg", "~/.gnupg")):
+            with self.subTest(rel=rel):
+                msgs = self.problems(data_root=str(home / rel))
+                self.assertTrue(any("MFG_TEAM_DATA_T1 must not" in m and needle in m for m in msgs), msgs)
+                with self.assertRaises(DriverError):
+                    self.driver(data_root=str(home / rel)).run(self.inv(read_roots=(str(home / rel),)))
+        self.assertFalse((self.rec / "call.json").exists())
+        (home / "exports").mkdir()
+        self.assertEqual(self.problems(data_root=str(home / "exports")), [])   # a plain dir under HOME is fine
+
+    def test_r01_claude_dir_symlinked_elsewhere_and_the_account_home_are_checked(self):
+        root = Path(self._tmp.name)
+        home = Path(self.env["HOME"])
+        home.mkdir()
+        elsewhere = root / "claude-real"
+        elsewhere.mkdir()
+        (home / ".claude").symlink_to(elsewhere)
+        msgs = self.problems(data_root=str(elsewhere))
+        self.assertTrue(any("~/.claude" in m for m in msgs), msgs)
+        acct = root / "acct-home"
+        (acct / ".ssh").mkdir(parents=True)
+        from chat_gateway_ext import claude_code as cc
+        with unittest.mock.patch.object(cc, "_account_home", return_value=str(acct)):
+            msgs = self.problems(data_root=str(acct / ".ssh"))       # $HOME points elsewhere
+            self.assertTrue(any("~/.ssh" in m for m in msgs), msgs)
+            msgs = self.problems(data_root=str(root))                # contains the account home
+            self.assertTrue(any("$HOME" in m for m in msgs), msgs)
+
+    # S12
+    def test_s12_describe_reports_cli_version_and_flag_check(self):
+        drv = self.driver()
+        self.assertEqual(drv.describe(), {"cli_version": None, "flag_check": "not_run"})
+        self.assertEqual(drv.self_check(), [])
+        self.assertEqual(drv.describe(), {"cli_version": "2.1.289 (Claude Code)", "flag_check": "ok"})
+        self.set_help(FULL_HELP.replace("--restricted", "--other"))
+        drv = self.driver()
+        drv.self_check()
+        self.assertEqual(drv.describe()["flag_check"], "missing:--restricted")
+
+    # S10
+    def write(self, rel, text, encoding="utf-8"):
+        path = self.data / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode(encoding) if isinstance(text, str) else text)
+        return path
+
+    def test_s10_t3_file_refuses_start_with_exit_3(self):
+        self.write("ok/schedule.csv", "工單,站別,數量\nWO-1,CNC,30\n")
+        self.write("deep/x/ncr.txt", "客戶航太件的 NCR")
+        with self.assertRaises(ConfigRefused) as cm:
+            self.problems(data_root=str(self.data))
+        self.assertEqual(cm.exception.exit, 3)
+        self.assertIn("deep/x/ncr.txt (aerospace-zh)", str(cm.exception))
+        self.assertNotIn("NCR", str(cm.exception).replace("ncr.txt", ""))      # names, never content
+
+    def test_s10_t2_file_is_a_warning_and_binaries_or_big_files_are_listed(self):
+        import contextlib
+        import io
+        self.write("contacts.csv", "窗口,mail\nA,someone@example.com\n")
+        self.write("big5.txt", "這份是機密", encoding="cp950")
+        self.write("img.png", b"\x89PNG\x00\x00binary")
+        self.write("huge.log", "a" * 2_000_001)
+        err = io.StringIO()
+        drv = self.driver(data_root=str(self.data))
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(drv.self_check(), [])
+        self.assertIn("2 file(s) carry T2 markers", err.getvalue())
+        self.assertIn("big5.txt (confidential-zh)", err.getvalue())
+        self.assertIn("1 binary file(s) and 1 file(s) over 2 MB", err.getvalue())
+        self.assertNotIn("someone", err.getvalue())
+        self.assertEqual(drv.describe()["data_root_scan"], {"files": 4, "t2_files": 2, "t3_files": 0, "unscanned": 2})
+        cache = Path(os.path.realpath(self.state)) / "data-scan.json"
+        self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+        self.assertNotIn("someone", cache.read_text(encoding="utf-8"))
+        drv.run(self.inv(read_roots=(str(self.data),)))               # T2 at T1: warned, not refused
+        self.assertIn("--add-dir", self.call()["argv"])
+
+    def test_s10_changes_after_start_are_rescanned_before_each_call(self):
+        import contextlib
+        import io
+        from chat_gateway.drivers.base import DriverPolicyDenied
+        clean = self.write("notes.txt", "今日排程正常")
+        drv = self.driver(data_root=str(self.data))
+        self.assertEqual(drv.self_check(), [])
+        drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(drv.last_scan.reread, 0)                    # unchanged: served from the cache
+        (self.rec / "call.json").unlink()
+        st = clean.stat()
+        clean.write_text("今日排程醫材", encoding="utf-8")           # same size class, mtime put back
+        os.utime(clean, ns=(st.st_atime_ns, st.st_mtime_ns))
+        err = io.StringIO()
+        with self.assertRaises(DriverPolicyDenied) as cm, contextlib.redirect_stderr(err):
+            drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(cm.exception.reason, "data_root:T3")
+        self.assertIn("notes.txt", err.getvalue())
+        self.assertFalse((self.rec / "call.json").exists())          # the model never ran
+        clean.write_text("今日排程正常", encoding="utf-8")
+        drv.run(self.inv(read_roots=(str(self.data),)))
+        (self.rec / "call.json").unlink()
+        (self.data / "escape").symlink_to("/etc")                     # R-05: planted after start
+        with self.assertRaises(DriverPolicyDenied) as cm, contextlib.redirect_stderr(io.StringIO()):
+            drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(cm.exception.reason, "data_root:symlink")
+        self.assertFalse((self.rec / "call.json").exists())
+        (self.data / "escape").unlink()
+        drv.run(self.inv())                                          # not granted: no scan, no --add-dir
+        self.assertNotIn("--add-dir", self.call()["argv"])
+
+    def test_s10_denylist_t3_entries_apply_to_data_files(self):
+        from chat_gateway.sanitize import load_denylist
+        deny = Path(self._tmp.name) / "names.denylist"
+        deny.write_text("T3:PRJ-Q\\d{3}\nCUST-Z\\d{2}\n", encoding="utf-8")
+        self.write("a.txt", "PRJ-Q123 的排程")
+        with self.assertRaises(ConfigRefused) as cm:
+            self.driver(data_root=str(self.data), extra_dlp=load_denylist(deny)).self_check()
+        self.assertEqual(cm.exception.exit, 3)
+        self.assertIn("denylist-t3:1", str(cm.exception))
+        self.assertEqual(self.driver(data_root=str(self.data)).self_check(), [])   # without the list: passes
+
+    def test_s10_entry_cap(self):
+        from chat_gateway.datascan import MAX_FILES
+        for i in range(MAX_FILES + 1):
+            (self.data / f"f{i:05d}.txt").write_bytes(b"")
+        msgs = self.problems(data_root=str(self.data))
+        self.assertTrue(any("more than 5,000 files" in m for m in msgs), msgs)
+
+    def test_s10_cli_self_check_exit_3(self):
+        import contextlib
+        import io
+        import chat_gateway.__main__ as cli
+        self.write("ncr.txt", "ITAR item")
+        roster = REPO_ROOT / "tests" / "gateway" / "fixtures" / "roster.json"
+        env = {**self.env, "MFG_TEAM_CLAUDE_BIN": str(self.bin), "MFG_TEAM_CLAUDE_CONFIG_DIR": str(self.config_dir),
+               "MFG_TEAM_DATA_T1": str(self.data), "MFG_TEAM_AUDIT_HMAC_KEY": "k" * 20,
+               "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20}
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env)
+        self.assertEqual(rc, 3, err.getvalue())
+        self.assertIn("refused to start (exit 3)", err.getvalue())
+        audit = Path(os.path.realpath(self.state)) / "audit" / "sys" / "audit.jsonl"
+        last = json.loads(audit.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(last["action"], "config_refused")
+        self.assertEqual(last["driver_info"]["cli_version"], "2.1.289 (Claude Code)")
+        (self.data / "ncr.txt").unlink()
+        out = io.StringIO()
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env), 0)
+        self.assertIn("self-check: OK", out.getvalue())
+        last = json.loads(audit.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(last["action"], "config_loaded")
+        self.assertEqual(last["driver_info"]["flag_check"], "ok")
 
 
 class TestWiring(unittest.TestCase):

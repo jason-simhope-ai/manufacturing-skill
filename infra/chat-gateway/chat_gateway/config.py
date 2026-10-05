@@ -18,7 +18,8 @@ DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
 DEFAULT_DENYLIST = "team/local/names.denylist"
 STATE_DIR_VAR = "MFG_TEAM_STATE_DIR"
 # All the gateway (and the claude-code driver) ever writes there.
-STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home"})
+STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home", "frozen", "data-scan.json"})
+FREEZE_FILE = "frozen"            # kill switch flag (`chat_gateway freeze` / `unfreeze`)
 DENYLIST_VAR = "MFG_TEAM_DENYLIST"
 AUDIT_KEY_VAR = "MFG_TEAM_AUDIT_HMAC_KEY"
 APPROVAL_KEY_VAR = "MFG_TEAM_APPROVAL_HMAC_KEY"
@@ -144,6 +145,10 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
     if short:
         raise ConfigRefused(f"environment variables shorter than {MIN_KEY_LEN} chars: " + ", ".join(short))
     state = resolve_state_dir(env)
+    # S05: lstat the configured path itself, before resolve() follows the link (ensure_state_dir
+    # only ever sees the resolved path, so its own symlink check cannot catch this case).
+    if state.is_symlink():
+        raise ConfigRefused(f"state directory {state} is a symlink; set {STATE_DIR_VAR} to the real directory")
     deny_raw = env.get(DENYLIST_VAR)
     if deny_raw and not Path(deny_raw).expanduser().is_file():
         raise ConfigRefused(f"{DENYLIST_VAR} is set but is not a file")

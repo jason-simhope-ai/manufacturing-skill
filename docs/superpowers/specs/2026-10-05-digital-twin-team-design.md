@@ -15,6 +15,7 @@
 | v1      | 2026-10-05 | 初稿：Q1–Q9、TEAM 層、schema、chat-ops、安全、pilot、ship list。 |
 | v2      | 2026-10-05 | 依 round-2 裁決重寫：(A1) 全面去識別 — 範例公司改為通用設計假設，pilot 只用通用部門；(A2) capability 加 `today`/`humanStillDoes`，旗艦能力拆成 strengthen + 休眠 outsource；(A3) team/ 預設安裝；(A4) claude-code driver 固定受限旗標集；(A5) wave-1 品保分身降為 T1 + 來源端去識別；(A6) `/team ask` 只是預覽；(A7) 每輪必須 @mention、前綴身分；(A8) 刪 JSON Schema，改手寫驗證 + 錯誤碼；(A9) 分身互相交棒延後。B1–B17 定值（分級 T0–T3、autonomy 名稱制、bytes 預算、TTL 30 分、限流、無長期記憶、`MFG_TEAM_` 前綴、gate 欄位、outsource 每分身 ≤ 1、T3 拒載 exit 3）。新增 §14 Deferred、§15 Known gaps；§18 改為 7 個可平行實作的 WP。 |
 | v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
+| v2.2    | 2026-10-05 | Pilot 準備（IT／資安審查 SCENARIO-SIM-R6 的 P1 項目）：§9.2／§11.3 Slack scope 與 README 一致（不給 `users:read`、`reactions:write`），啟動時檢查實際授予的 scope；§9.5 資料夾內容掃描、資料夾不得在 `~/.claude` 或家目錄的隱藏目錄下、`config_loaded` 記錄 CLI 版本與旗標檢查；§9.6 稽核新增 `frozen` 動作與 `driver_info` 欄位、`audit-verify --heads-out／--anchor`；§11.1 denylist `T3:` 前綴與 starter 清單；§11.6／§13.4 G1 pilot 前置條件（部署檢核表、kill switch、runbook、稽核作業、廠商檢查表、首日驗收）；§14 kill switch 移出延後清單，新增 pilot 後續項目。 |
 
 ## 0. TL;DR
 
@@ -371,7 +372,7 @@ Driver 的 JSON 輸出鍵名（`--json-schema` 由 `claude_code.py` 內的 dict 
 ### 9.2 Adapters
 
 - **mock**：讀 JSONL 劇本（每行一個事件：`{"type":"message"|"approval_click"|"scheduled",...}`），或在無 `--script` 時以 REPL 互動；`hosting=local`、`max_tier=T2`；只用 stdlib。
-- **slack**：Socket Mode（只有出站連線，不開入站 HTTP）；Bot scopes 只給 `app_mentions:read`、`chat:write`、`users:read`、`reactions:write`；**不給** `channels:history`、`chat:write.public`、`chat:write.customize`、`users:read.email`、`im:history`；貼文時設 `unfurl_links=false`、`unfurl_media=false`。
+- **slack**：Socket Mode（只有出站連線，不開入站 HTTP）；Bot scopes 只給 `app_mentions:read`、`chat:write`（app-level token 只給 `connections:write`）；**不給** `channels:history`、`groups:history`、`im:history`、`mpim:history`、`chat:write.public`、`chat:write.customize`、`users:read`、`users:read.email`、`reactions:write`、`incoming-webhook`、`files:read`（與 `infra/chat-gateway/README.md` 的「Never grant」列一致，以 README 為準；bot 與 team 狀態從事件欄位判斷，不需要 `users:read`）。啟動時從 `auth.test` 回應標頭 `x-oauth-scopes` 讀出實際授予的 scope，多於或少於上述兩項、或讀不到標頭 → exit 78。貼文時設 `unfurl_links=false`、`unfurl_media=false`。
 - **discord**：Gateway WebSocket；intents 只開 `GUILDS`、`GUILD_MESSAGES`，不開 `MESSAGE_CONTENT`；`allowed_mentions={"parse": []}`；不建 webhook、不改暱稱；收到非白名單 guild → leave 並記 audit。
 - Slack 與 Discord：SDK 在模組內 lazy import（缺 SDK 時只有選用該 adapter 才會失敗）；每檔 ≤ 200 行；**未在 CI 對真實平台測試、需要憑證**，只以 fake transport 測事件對應。
 
@@ -411,13 +412,14 @@ $MFG_TEAM_CLAUDE_BIN -p --output-format json --restricted --strict-mcp-config --
 子行程環境只放：PATH, HOME, CLAUDE_CONFIG_DIR=$MFG_TEAM_CLAUDE_CONFIG_DIR, ANTHROPIC_API_KEY；prompt 從 stdin 輸入
 ```
 
-`self_check()`：執行 `claude --version` 與 `claude --help`，逐一確認每個旗標都存在（`--system-prompt-file` 在 2.1.289 的 help 中以 `--system-prompt[-file]` 形式出現，要接受這種寫法）；`MFG_TEAM_CLAUDE_CONFIG_DIR` 必須存在、只屬於服務帳號，且不得等於 `~/.claude`；`ANTHROPIC_API_KEY` 必須已設定。任一項失敗 → exit 78。**計費**：這個 driver 從營運者的 Anthropic 帳號／訂閱扣款，Messages API 的快取與定價模型不適用；成本由 `--max-budget-usd` 每次封頂，並在 wave 0 實測。請用服務帳號，不要用個人登入跑共用 bot。Mock driver 從 `fixtures/mock_driver.json` 依 `(twin_id, 訊息關鍵字)` 回傳固定的 `TwinResult`；另有 `compliant_malicious` 模式（看到注入就照做），用來證明 gateway 的確定性控制仍擋得住。
+`self_check()`：執行 `claude --version` 與 `claude --help`，逐一確認每個旗標都存在（`--system-prompt-file` 在 2.1.289 的 help 中以 `--system-prompt[-file]` 形式出現，要接受這種寫法）；`MFG_TEAM_CLAUDE_CONFIG_DIR` 必須存在、只屬於服務帳號，且不得等於 `~/.claude`；`ANTHROPIC_API_KEY` 必須已設定。任一項失敗 → exit 78。**計費**：這個 driver 從營運者的 Anthropic 帳號／訂閱扣款，Messages API 的快取與定價模型不適用；成本由 `--max-budget-usd` 每次封頂，並在 wave 0 實測。請用服務帳號，不要用個人登入跑共用 bot。`claude --version` 的輸出與旗標檢查結果（`ok` 或 `missing:<旗標>`）寫進 `config_loaded`／`config_refused` 稽核紀錄的 `driver_info`；已驗證的 CLI 版本為 2.1.289（`--help` 列出全部固定旗標）。`MFG_TEAM_DATA_T1` 不得與 state dir、config dir、repo 重疊，不得是或包含 `$HOME`，也不得是或位於 `~/.claude` 或家目錄下任何隱藏目錄（`HOME` 變數與帳號資料庫的家目錄都檢查）。資料夾在啟動與每次帶 `--add-dir` 的呼叫前都會掃描（`chat_gateway/datascan.py`）：symlink、roster／identity／binding／prompt 檔、超過 5,000 個檔案 → 拒絕；≤ 2 MB 且自上次掃描後有變動（大小、mtime、ctime、inode）的文字檔用 `DLP_PATTERNS`＋本機 denylist 掃描，T3 命中 → 啟動時 exit 3、呼叫時 `policy_denied`（`data_root:T3`），T2 命中只告警（資料夾是 T1）。Mock driver 從 `fixtures/mock_driver.json` 依 `(twin_id, 訊息關鍵字)` 回傳固定的 `TwinResult`；另有 `compliant_malicious` 模式（看到注入就照做），用來證明 gateway 的確定性控制仍擋得住。
 
 ### 9.6 稽核、限流、錯誤
 
-- **Audit**（`audit.py`）：寫入 `${MFG_TEAM_STATE_DIR}/audit/<tier>/audit.jsonl`，append-only，每行一筆。欄位（snake_case）：`v, ts, seq, event_id, platform, channel, channel_tier, thread, operator`（`role:<position>`，或 `role:unknown`）`, operator_ref`（`HMAC-SHA256(MFG_TEAM_AUDIT_HMAC_KEY, platform+":"+user_id)` 的前 16 個 hex）`, twin, twin_prompt_sha, driver, action, capability, category, effective_autonomy, args_hash, approval_id, decision`（`allow|deny`）`, deny_reason, content_sha256, content_len, redactions{secret,pii,amount}, tainted, usage, latency_ms, prev_hash, hash`。`hash = "hmac-sha256:"+HMAC-SHA256(由 MFG_TEAM_AUDIT_HMAC_KEY 衍生的分級子金鑰, prev_hash+"\n"+canonical_json(該筆去掉 hash 欄位))`；第一筆的 `prev_hash = "sha256:0"`；`content_sha256` 存 HMAC 內容標記（衍生金鑰），不是明文雜湊。每次寫入後以衍生金鑰簽署 `audit/checkpoint.json`（各分級筆數、最後 seq、head）；`audit-verify` 據此偵測竄改、刪除、重排、截尾、整檔刪除與 seq 缺號。把 checkpoint 定期複製到主機外是營運者的責任（它擋不住「log 與 checkpoint 一起回滾」）。alpha 不存訊息全文。`action` 列舉：`msg_in msg_out route_decision tool_proposed tool_denied approval_requested approval_granted approval_denied approval_expired injection_flag policy_denied rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded config_refused post_failed`。所有 deny 與 `injection_flag` 都必須記錄。
+- **Audit**（`audit.py`）：寫入 `${MFG_TEAM_STATE_DIR}/audit/<tier>/audit.jsonl`，append-only，每行一筆。欄位（snake_case）：`v, ts, seq, event_id, platform, channel, channel_tier, thread, operator`（`role:<position>`，或 `role:unknown`）`, operator_ref`（`HMAC-SHA256(MFG_TEAM_AUDIT_HMAC_KEY, platform+":"+user_id)` 的前 16 個 hex）`, twin, twin_prompt_sha, driver, action, capability, category, effective_autonomy, args_hash, approval_id, decision`（`allow|deny`）`, deny_reason, content_sha256, content_len, redactions{secret,pii,amount}, tainted, usage, latency_ms, driver_info, prev_hash, hash`（`driver_info` 只出現在 `config_loaded`／`config_refused`）。`hash = "hmac-sha256:"+HMAC-SHA256(由 MFG_TEAM_AUDIT_HMAC_KEY 衍生的分級子金鑰, prev_hash+"\n"+canonical_json(該筆去掉 hash 欄位))`；第一筆的 `prev_hash = "sha256:0"`；`content_sha256` 存 HMAC 內容標記（衍生金鑰），不是明文雜湊。每次寫入後以衍生金鑰簽署 `audit/checkpoint.json`（各分級筆數、最後 seq、head）；`audit-verify` 據此偵測竄改、刪除、重排、截尾、整檔刪除與 seq 缺號。checkpoint 本身擋不住「log 與 checkpoint 一起回滾」：`audit-verify --heads-out FILE` 在驗證通過後寫出簽章的各分級 heads，營運者每週把它送到主機外；下次以 `--anchor FILE` 比對，任一分級筆數或 seq 變小、或先前的 head 不在現行鏈上即失敗（作業程序見 `docs/audit-operations.md`）。alpha 不存訊息全文。`action` 列舉：`msg_in msg_out route_decision tool_proposed tool_denied approval_requested approval_granted approval_denied approval_expired injection_flag policy_denied rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded config_refused post_failed frozen`。所有 deny 與 `injection_flag` 都必須記錄。
 - **限流**：每人 6 則/分、每頻道 60 則/時、每頻道主動貼文 3 則/日、driver 併發 2、每次呼叫 `--max-budget-usd 0.10`；`MFG_TEAM_DAILY_BUDGET_USD`（每分身每日軟上限）預設關閉。event_id 去重保留 10 分鐘或 1,000 筆。
-- **錯誤**：driver 逾時或失敗 → 回「暫時無法回應（#seq）」，絕不臆測；同一分身連續失敗 3 次 → 自動降為 observe。
+- **錯誤**：driver 逾時或失敗 → 回「暫時無法回應（#seq）」，絕不臆測；同一分身連續失敗 3 次 → 自動降為 observe。driver 以政策理由拒絕（`DriverPolicyDenied`，例如資料夾含 T3）→ 稽核 `policy_denied`，不計入失敗次數。
+- **Kill switch**：`python3 -m chat_gateway freeze` 在 state dir 寫入旗標檔 `frozen`（`unfreeze` 移除）；gateway 每個事件前檢查，凍結時不呼叫 driver、不貼排程、不處理核准，被 @ 時回「分身暫停服務中」（每人每頻道每分鐘一則），每個事件記 `frozen`；旗標讀不到時視為凍結。停服務、撤銷憑證與金鑰輪替見 `infra/chat-gateway/RUNBOOK.md`。
 
 ## 10. Bootstrap：agent 與人
 
@@ -465,7 +467,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 | T2 confidential | 圖紙、BOM、報價、客戶名、個資 | 僅 mock（本機） | 預設地端；放寬到雲端是政策文字，需零留存合約 + 書面核准 + manifest 明列三項 | 只在 mock 可設定；Slack-T2 延後 |
 | T3 restricted | 高安規客製專案的任何資料，包含專案「是否存在」 | 不適用 | 不適用 | **拒載，exit 3** |
 
-超過 T3 的等級不在任何 AI 系統的範圍內，本 repo 也拒絕建模。拿不準就往上一級；頻道 tier 即內容 tier，只能往上升，不能往下降。DLP tripwire（只是告警，不是防線）：「機密 / CONFIDENTIAL」（T2）、「RESTRICTED / 受限 / 國防 / 航太 / 軍工 / 軍規 / 醫材 / 醫療器材 / ITAR / EAR / CUI / 外銷許可 / 管制」（T3；`管制` 排除管制圖、文件管制等品管用語）、統一編號（含檢查碼）、身分證字號 `[A-Z][12]\d{8}`、`NT\$\s?[\d,]{4,}`、`US$`／`USD` 金額與「萬元／千元」（T2），以及本機 denylist 中的圖號與專案代號樣式。命中等級高於頻道 → `dlp_blocked`，提示改到正確頻道，內容不送進模型；命中 T3 樣式 → 回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
+超過 T3 的等級不在任何 AI 系統的範圍內，本 repo 也拒絕建模。拿不準就往上一級；頻道 tier 即內容 tier，只能往上升，不能往下降。DLP tripwire（只是告警，不是防線）：「機密 / CONFIDENTIAL」（T2）、「RESTRICTED / 受限 / 國防 / 航太 / 軍工 / 軍規 / 醫材 / 醫療器材 / ITAR / EAR / CUI / 外銷許可 / 管制」（T3；`管制` 排除管制圖、文件管制等品管用語）、統一編號（含檢查碼）、身分證字號 `[A-Z][12]\d{8}`、`NT\$\s?[\d,]{4,}`、`US$`／`USD` 金額與「萬元／千元」（T2），以及本機 denylist 中的圖號與專案代號樣式（一般行視為 T2；`T3:` 開頭的行視為 T3）。內建清單擋不到英文同義詞與其他寫法：pilot 審查以 7 句實況句子測試，全部通過內建清單；`team/tools/denylist.starter.txt` 提供通用起始清單（中英同義詞、保密約定、金額寫法），載入後 7 句都會被擋，沒載入就照樣通過。命中等級高於頻道 → `dlp_blocked`，提示改到正確頻道，內容不送進模型；命中 T3 樣式 → 回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
 
 ### 11.2 T3 在 alpha 的處理
 
@@ -473,7 +475,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 
 ### 11.3 平台與身分
 
-只有 `identities.local.yaml` 中的平台 user id 才算數，顯示名稱不可信；忽略所有 bot 作者（包含其他分身）；拒絕外部共享頻道、其他 guild 與 DM；`users:read` 只用來判斷 `is_bot` 與所屬 team。
+只有 `identities.local.yaml` 中的平台 user id 才算數，顯示名稱不可信；忽略所有 bot 作者（包含其他分身）；拒絕外部共享頻道、其他 guild 與 DM；bot 與所屬 team 從事件欄位（`bot_id`、`bot_profile`、`subtype`、`user_team`、`is_ext_shared_channel`）判斷，**不**申請 `users:read`（與 §9.2、`infra/chat-gateway/README.md` 一致）。
 
 ### 11.4 Repo 衛生（`teamctl check` + CI）
 
@@ -490,7 +492,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 
 ### 11.6 上線門檻與殘餘風險
 
-G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = 真實 Slack/Discord 測試工作區、最小 scope 稽核、稽核雜湊每週由導入負責人以外的人簽收。G2（T2 上 SaaS）與 G3（T3）見 §14。殘餘風險必須由人的政策涵蓋：影子 AI（員工把資料貼進個人 AI）、工作站被入侵、聊天與雲端供應商端的資料保存、語意型污染（看似合理的錯價或錯規格）、管理員權限過大、設定錯誤。職責分離：AI 導入負責人不擔任核准人，也不保管稽核錨點。
+G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = 真實 Slack/Discord 測試工作區、最小 scope 稽核（啟動時檢查實際授予的 scope）、稽核雜湊每週由導入負責人以外的人簽收（`--heads-out` 送主機外、`--anchor` 比對），並完成 §13.4 的前置條件。G2（T2 上 SaaS）與 G3（T3）見 §14。殘餘風險必須由人的政策涵蓋：影子 AI（員工把資料貼進個人 AI）、工作站被入侵、聊天與雲端供應商端的資料保存、語意型污染（看似合理的錯價或錯規格）、管理員權限過大、設定錯誤。職責分離：AI 導入負責人不擔任核准人，也不保管稽核錨點。
 
 ## 12. 設計決策紀錄（Q1–Q9）
 
@@ -537,6 +539,22 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 | 管理部主管（IT／人資） | 決定 wave 1 用哪個平台（沿用公司既有的；沒有就先用 mock）；用服務帳號建 bot 與環境變數；安裝 pre-commit 名單 hook；審閱 FAQ「會不會取代我？」的用語 | 部署檢核表 |
 | 高安規專案窗口（若有此類專案） | 把文件類型對應到 T2/T3；確認 T3 不進 SaaS 與雲端；alpha 不導入，只做規劃 | 分級對照表（本機保存） |
 
+### 13.4 G1 pilot 前置條件（IT／資安審查的條件，通用化）
+
+一次 IT／資安角色審查（4 週、測試 workspace、2 個分身、T0/T1）的結論是「附條件放行」。repo 端已補的：
+
+| 條件 | repo 提供 | 仍由導入方完成 |
+| ---- | --------- | -------------- |
+| 部署環境 | `infra/chat-gateway/DEPLOY.md`：專用主機與帳號、systemd 單元（`DynamicUser=`、`ProtectSystem=strict`、出口只到 proxy）、`EnvironmentFile` 0600、日誌、更新與回滾 | 實際主機、proxy 網域規則、`systemd-analyze security` 結果 |
+| 停機與外洩 | `chat_gateway freeze`／`unfreeze`、`/team freeze` 說明、`infra/chat-gateway/RUNBOOK.md`（凍結、停服務、撤銷 token、輪替 HMAC、封存稽核鏈、通報） | 通報名單（本機）、演練一次 |
+| 稽核證據 | `audit-verify --heads-out／--anchor`、`docs/audit-operations.md`（週 SOP、簽收單、金鑰輪替與遺失、ISO 27001 對應） | 金鑰保管人與簽收人分離、主機外唯讀儲存 |
+| 字詞告警 | `T3:` denylist 前綴、`team/tools/denylist.starter.txt`、資料夾內容掃描 | 填入自己的客戶與專案代號、季覆核 |
+| 平台最小權限 | 啟動時 scope 檢查、README 與常數一致性測試 | Slack 管理設定（不開 Slack Connect、只准管理員裝 app 與加人） |
+| 廠商條款 | DEPLOY.md 第 8 節廠商檢查表 | 書面回覆、DPA、客戶合約確認 |
+| 首日驗收 | DEPLOY.md 第 9 節清單與固定回報格式（含 `claude` 旗標是否存在） | 當天回報 |
+
+人員與流程條件（試用者名單、離職回收、教育簽署、退出準則）留在導入方的 `team/local/playbook.local.md`。
+
 ## 14. Deferred from alpha（全部不在 v0.2.0-alpha）
 
 | 項目 | 延後原因／前提 |
@@ -550,7 +568,13 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 | 分身互相交棒、DM、每則訊息自訂顯示名稱、附件解析 | 安全與平台權限（A7、A9） |
 | `openai-compatible`／`anthropic-messages` driver | 介面已預留 |
 | 加工部主管分身、profile 提供的分身、LINE／Teams／Mattermost adapter、hook 事件橋接到聊天 | 尚無需求驗證 |
-| JSON Schema 檔；SBOM、`pip-audit`、`--require-hashes`、CODEOWNERS；kill switch `/team freeze`（SEC-15） | 上 pilot（G1）前再做 |
+| JSON Schema 檔；SBOM、`pip-audit`、`--require-hashes` 的 `requirements-pilot.lock`、CODEOWNERS（S04） | 需要網路取得 hash 與漏洞資料庫；pilot 期間以「釘 commit＋`pip freeze` 存檔＋內部鏡像審過 `slack_sdk`」代替（DEPLOY.md 第 7 節）。kill switch 的最小版已在 v2.2 交付（§9.6） |
+| 稽核改用非對稱簽章，或每筆 head 即時轉送 syslog／WORM（S09） | stdlib 沒有非對稱簽章；目前以每週 `--heads-out` 主機外錨點與職責分離補強 |
+| `deid.py` 無 denylist 時預設失敗（需 `--no-denylist` 明示）、中文姓名＋職稱規則補強、`--allow-residual` 需附理由並寫 log（S11） | pilot 期間以禁用 `--allow-residual`、人工抽查 ≥ 10 列代替 |
+| `teamctl identities --review`：列出 user id、職位、`actingFor` 到期日，配合離職回收時限（S13） | pilot 期間由 IT 每週人工核對名單 |
+| 可關閉 T1 稽核的 `content_len`；文件化事故調查時向 Slack 取證的程序（S17） | 取捨待 pilot 回饋 |
+| 頻道登記簿範本（用途、成員、標示、覆核日）與 `teamctl roster` 簽核輸出（S19） | pilot 只有 1–2 個頻道，先人工登記 |
+| 程式審查其餘項目：state dir 每次呼叫以 realpath 檢查（R-03）、state dir 上層目錄權限（R-04）、SaaS inbox 只計原始事件且丟最新（R-06）、禁用檔名大小寫與 hard link（R-07）等 | 低於 pilot 門檻；資料夾 symlink 的每次呼叫重掃（R-05）已隨 S10 交付 |
 | 設備接單設計（ETO）profile | v0.3 需求 |
 
 ## 15. Known gaps in existing repo（D15/D16；只記錄，除標註外不在本版修正）

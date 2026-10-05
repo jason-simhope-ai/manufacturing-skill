@@ -16,8 +16,14 @@ Pinned argv (never widened, never built from chat text):
   path, ignoring empty and relative PATH entries, so a file planted in cwd never runs.
 * Paths: CLAUDE_CONFIG_DIR, the data root and cwd must be absolute and are realpath-resolved;
   the driver refuses to run if anything under cwd is a symlink. The data root must not overlap
-  the state dir, CLAUDE_CONFIG_DIR, the repository or another data root, nor contain $HOME;
-  `self_check` walks it once and refuses any symlink or roster/identity/binding file inside.
+  the state dir, CLAUDE_CONFIG_DIR, the repository or another data root, nor contain $HOME, nor
+  be or sit inside `~/.claude` or any dot-directory directly under $HOME (`~/.ssh`, `~/.aws`,
+  `~/.config` …), checked against both the `HOME` variable and the account's home (R-01).
+* Data-root content (S10, `chat_gateway.datascan`): at startup and before every call the tree is
+  walked; a symlink, a roster/identity/binding/prompt file or more than 5,000 files refuses, and
+  text files ≤ 2 MB that changed since the last scan are run through DLP_PATTERNS + the local
+  denylist. A T3 hit refuses to start (exit 3) or refuses the call (`DriverPolicyDenied`, audited
+  `policy_denied`); a T2 hit is a warning on stderr (the data root is T1).
 * The state dir must not be group/other-writable; `driver-tmp/` and `driver-home/` under it are
   0700, owned by the gateway user and never symlinks (checked on every call).
 * The child runs in its own process group, which is killed on every exit path. Stdout is
@@ -53,14 +59,16 @@ import shutil
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Mapping
+from typing import Iterable, Mapping
 
-from chat_gateway import EXIT_USAGE, ConfigRefused
+from chat_gateway import EXIT_T3, EXIT_USAGE, ConfigRefused
 from chat_gateway.config import ensure_state_dir
-from chat_gateway.drivers.base import DriverError, TwinInvocation, TwinResult, result_from_json
+from chat_gateway.datascan import CACHE_NAME, MAX_FILES, ScanResult, scan_tree
+from chat_gateway.drivers.base import DriverError, DriverPolicyDenied, TwinInvocation, TwinResult, result_from_json
 
 _STR_LIST = {"type": "array", "items": {"type": "string"}}
 TWIN_RESULT_SCHEMA: dict = {
@@ -139,6 +147,20 @@ def _abs_real(raw: str | os.PathLike | None) -> str | None:
 def _overlaps(a: str, b: str) -> bool:
     """True if one realpath is the other or contains it."""
     return os.path.commonpath([a, b]) in (a, b)
+
+
+def _account_home() -> str | None:
+    """The running account's home from the password database (not from $HOME), if available."""
+    try:
+        import pwd  # noqa: PLC0415 - POSIX only
+        return pwd.getpwuid(os.getuid()).pw_dir or None
+    except (ImportError, KeyError, AttributeError, OSError):
+        return None
+
+
+def _clean_line(text: str, limit: int = 80) -> str:
+    line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+    return "".join(ch for ch in line if ch.isprintable())[:limit]
 
 
 def _private_dir(path: Path) -> Path:
@@ -241,7 +263,8 @@ class ClaudeCodeDriver:
 
     def __init__(self, bin: str, config_dir: str, max_budget_usd: float, timeout_s: int,  # noqa: A002
                  data_root: str | None = None, *, state_dir: str | os.PathLike | None = None,
-                 env: Mapping[str, str] | None = None, repo_root: str | os.PathLike | None = None):
+                 env: Mapping[str, str] | None = None, repo_root: str | os.PathLike | None = None,
+                 extra_dlp: Iterable[tuple[str, re.Pattern]] = ()):
         if not _finite_in(max_budget_usd, MAX_CALL_BUDGET_USD):
             raise ConfigRefused(f"max_budget_usd must be a finite number > 0 and at most {MAX_CALL_BUDGET_USD:g}",
                                 exit=EXIT_USAGE)
@@ -256,6 +279,10 @@ class ClaudeCodeDriver:
         self._env = os.environ if env is None else env
         self.state_dir = Path(state_dir or self._env.get("MFG_TEAM_STATE_DIR") or DEFAULT_STATE_DIR).expanduser()
         self.repo_root = Path(repo_root or REPO_ROOT)
+        self.extra_dlp = tuple(extra_dlp)             # local denylist, also applied to data-root files
+        self.cli_version: str | None = None           # S12: recorded in the config_loaded audit record
+        self.flag_check = "not_run"
+        self.last_scan: ScanResult | None = None
 
     # ── startup check ──
     def _key_var(self) -> str | None:
@@ -314,32 +341,75 @@ class ClaudeCodeDriver:
             for what, other in guarded:
                 if other and _overlaps(real, other):
                     problems.append(f"{var} must not overlap {what}")
-            home = _abs_real(self._env.get("HOME") or os.path.expanduser("~"))
-            if home and os.path.commonpath([real, home]) == real:
-                problems.append(f"{var} must not be $HOME or contain it")
+            problems += self._home_problems(var, real)
         return problems
 
-    def _scan_data_roots(self) -> list[str]:
-        """EXT-05 (startup only): no symlink and no roster/identity/binding file in a data root."""
+    def _homes(self) -> list[str]:
+        """Realpaths of $HOME (variable) and the account's home (password database), deduplicated."""
+        homes: list[str] = []
+        for raw in (self._env.get("HOME") or os.path.expanduser("~"), _account_home()):
+            real = _abs_real(raw)
+            if real and real not in homes:
+                homes.append(real)
+        return homes
+
+    def _home_problems(self, var: str, real: str) -> list[str]:
+        """R-01: a data root must not be or contain a home directory, and must not be or sit inside
+        `~/.claude` (also when that is a symlink elsewhere) or any dot-directory directly under a home
+        (`~/.ssh`, `~/.aws`, `~/.config`, `~/.gnupg` …): those hold credentials the model must not read."""
         problems: list[str] = []
+        for home in self._homes():
+            if os.path.commonpath([real, home]) == real:
+                problems.append(f"{var} must not be $HOME or contain it")
+                continue
+            claude = os.path.realpath(os.path.join(home, ".claude"))
+            if _overlaps(real, claude):
+                problems.append(f"{var} must not be or be inside ~/.claude")
+                continue
+            if _overlaps(real, home):
+                first = os.path.relpath(real, home).split(os.sep)[0]
+                if first.startswith("."):
+                    problems.append(f"{var} must not be or be inside a hidden directory of $HOME (~/{first})")
+        return list(dict.fromkeys(problems))
+
+    def _scan_cache_path(self) -> Path | None:
+        state = Path(os.path.realpath(self.state_dir))
+        return state / CACHE_NAME if state.is_dir() else None
+
+    def _scan_data_roots(self, only_fresh_t2: bool = False) -> tuple[list[str], list[str], list[str]]:
+        """EXT-05 + S10: walk each data root (symlinks, forbidden files, entry cap) and DLP-scan the
+        text files that changed since the last scan. Returns (problems, t3_messages, t2_messages);
+        messages name files and pattern names, never content. With `only_fresh_t2`, T2 messages
+        cover only files read in this scan (a warning per change, not per call)."""
+        problems: list[str] = []
+        t3: list[str] = []
+        t2: list[str] = []
         for var, real in self._data_roots():
             if not os.path.isdir(real):
                 continue
-
-            def walk_error(exc: OSError, var: str = var) -> None:
-                problems.append(f"{var} is not fully readable ({type(exc).__name__})")
-
-            for root, dirs, files in os.walk(real, onerror=walk_error, followlinks=False):
-                bad = next((n for n in dirs + files if os.path.islink(os.path.join(root, n))), None)
-                if bad is not None:
-                    rel = os.path.relpath(os.path.join(root, bad), real)
-                    problems.append(f"{var} contains a symlink ({rel}); copy the data in instead")
-                    break
-                bad = next((n for n in files if n in FORBIDDEN_IN_CWD or n.endswith(".prompt.md")), None)
-                if bad is not None:
-                    problems.append(f"{var} contains roster, identity, binding or prompt files ({bad})")
-                    break
-        return problems
+            res = scan_tree(real, self.extra_dlp, cache_path=self._scan_cache_path())
+            self.last_scan = res
+            for kind, detail in res.problems:
+                problems.append({
+                    "symlink": f"{var} contains a symlink ({detail}); copy the data in instead",
+                    "forbidden": f"{var} contains roster, identity, binding or prompt files ({detail})",
+                    "too_many_files": f"{var} holds more than {MAX_FILES:,} files; refused (the data scan is capped: "
+                                      "keep only the de-identified exports the twins need)",
+                }.get(kind, f"{var} is not fully readable ({detail})"))
+            for tier, out in (("T3", t3), ("T2", t2)):
+                files = res.tier_files(tier)
+                if tier == "T2" and only_fresh_t2:
+                    files = [rel for rel in files if rel in res.fresh]
+                if files:
+                    shown = "; ".join(f"{rel} ({', '.join(res.hits[rel][1][:3])})" for rel in files[:5])
+                    more = f" and {len(files) - 5} more" if len(files) > 5 else ""
+                    out.append(f"{var}: {len(files)} file(s) carry {tier} markers: {shown}{more}")
+            if res.unscanned and res.fresh & set(res.unscanned):
+                n_bin = sum(v == "binary" for v in res.unscanned.values())
+                n_big = len(res.unscanned) - n_bin
+                t2.append(f"{var}: not scanned: {n_bin} binary file(s) and {n_big} file(s) over 2 MB "
+                          "(the model may still read them; keep only checked text exports there)")
+        return problems, t3, t2
 
     def _private_dirs(self) -> tuple[Path, Path]:
         """(driver-tmp, driver-home) under the state dir, created 0700 and verified on each call."""
@@ -366,26 +436,61 @@ class ClaudeCodeDriver:
             return [str(exc)]
         if self._resolve_bin() is None:
             problems.append(f"claude binary not found: {self.bin}")
+            self.flag_check = "binary_not_found"
         else:
             try:
-                rc, _ = self._probe(["--version"])
+                rc, text = self._probe(["--version"])
+                self.cli_version = _clean_line(text) or None
                 if rc != 0:
                     problems.append("`claude --version` failed")
                 rc, text = self._probe(["--help"])
                 if rc != 0:
                     problems.append("`claude --help` failed")
+                    self.flag_check = "help_failed"
                 else:
                     missing = [flag for flag, spellings in REQUIRED_FLAGS if not _has_flag(text, spellings)]
                     problems += [f"installed claude CLI does not support {flag}" for flag in missing]
+                    self.flag_check = "missing:" + ",".join(missing) if missing else "ok"
             except subprocess.TimeoutExpired:
                 problems.append("`claude --help` timed out")
+                self.flag_check = "timeout"
             except OSError as exc:
                 problems.append(f"cannot execute claude binary ({type(exc).__name__})")
+                self.flag_check = "exec_failed"
         problems += self._path_problems()
-        problems += self._scan_data_roots()
+        if not any("MFG_TEAM_DATA_T1" in p for p in problems):     # never walk a root already refused
+            scan_problems, t3, t2 = self._scan_data_roots()
+            problems += scan_problems
+            for line in t2:
+                print(f"claude-code: warning: {line}", file=sys.stderr)
+            if t3:
+                raise ConfigRefused("; ".join(t3) + "; T3 content must not be in a data root a cloud model reads. "
+                                    "Remove those files, then start again", exit=EXIT_T3)
         if self._key_var() is None:
             problems.append("ANTHROPIC_API_KEY (or MFG_TEAM_ANTHROPIC_API_KEY) is not set")
         return problems
+
+    def describe(self) -> dict:
+        """S12: recorded in the gateway's `config_loaded` / `config_refused` audit record."""
+        info: dict = {"cli_version": self.cli_version, "flag_check": self.flag_check}
+        if self.last_scan is not None:
+            info["data_root_scan"] = self.last_scan.summary()
+        return info
+
+    def _check_data_root_for_call(self) -> None:
+        """S10 + R-05: before a call that gets `--add-dir`, rescan (only changed files are re-read).
+        Anything wrong refuses this call as policy, without running the model."""
+        problems, t3, t2 = self._scan_data_roots(only_fresh_t2=True)
+        for line in t2:
+            print(f"claude-code: warning: {line}", file=sys.stderr)
+        if t3:
+            print(f"claude-code: refused a call: {'; '.join(t3)}", file=sys.stderr)
+            raise DriverPolicyDenied("data_root:T3")
+        if problems:
+            print(f"claude-code: refused a call: {problems[0]}", file=sys.stderr)
+            kinds = [k for k, _ in self.last_scan.problems] if self.last_scan else []
+            kind = {"forbidden": "forbidden_file"}.get(kinds[0], kinds[0]) if kinds else "unreadable"
+            raise DriverPolicyDenied(f"data_root:{kind}")
 
     # ── invocation ──
     def _child_path(self) -> str:
@@ -412,10 +517,17 @@ class ClaudeCodeDriver:
                 "--tools", TOOLS, "--system-prompt-file", prompt_file,
                 "--json-schema", json.dumps(TWIN_RESULT_SCHEMA, ensure_ascii=False, separators=(",", ":")),
                 "--no-session-persistence", "--max-budget-usd", _fmt_budget(budget)]
-        data = _abs_real(self.data_root)
-        if data and any(isinstance(r, str) and _abs_real(r) == data for r in inv.read_roots):
+        data = self._granted_data_root(inv)
+        if data:
             argv += ["--add-dir", data]
         return argv
+
+    def _granted_data_root(self, inv: TwinInvocation) -> str | None:
+        """The data root's realpath when it is configured and granted to this invocation."""
+        data = _abs_real(self.data_root)
+        if data and any(isinstance(r, str) and _abs_real(r) == data for r in inv.read_roots):
+            return data
+        return None
 
     @staticmethod
     def _cwd(inv: TwinInvocation) -> Path:
@@ -486,6 +598,8 @@ class ClaudeCodeDriver:
             raise DriverError("invocation timeout must be a finite number > 0")
         timeout = max(1, min(self.timeout_s, int(inv.timeout_s)))
         tmp_dir, _home = self._private_dirs()
+        if self._granted_data_root(inv):
+            self._check_data_root_for_call()          # before anything is written or started
         fd, tmp_path = -1, ""
         try:
             fd, tmp_path = tempfile.mkstemp(prefix=TMP_PREFIX, suffix=".prompt.md", dir=str(tmp_dir))

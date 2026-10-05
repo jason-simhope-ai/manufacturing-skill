@@ -7,12 +7,16 @@ Minimal app config: bot scopes `app_mentions:read`, `chat:write`; app-level toke
 `connections:write` (Socket Mode); event subscription `app_mention` only; Interactivity on
 (button clicks arrive over the socket). No webhooks, no `chat:write.customize`.
 
+At startup the adapter reads the bot token's granted scopes from the `x-oauth-scopes` header of
+the `auth.test` response and refuses to start (exit 78) if any scope beyond `BOT_SCOPES` is
+granted, if a required one is missing, or if the header is absent (S06).
+
 `slack_to_event(envelope, bot_user_id, refs)` is the pure, SDK-free mapping under test.
 """
 from __future__ import annotations
 
 import re
-from typing import Any, Collection
+from typing import Any, Collection, Mapping
 
 from chat_gateway import ConfigRefused
 from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
@@ -23,8 +27,11 @@ APP_TOKEN_VAR = "MFG_TEAM_SLACK_APP_TOKEN"
 BOT_SCOPES = ("app_mentions:read", "chat:write")
 APP_TOKEN_SCOPES = ("connections:write",)
 EVENT_SUBSCRIPTIONS = ("app_mention",)
+# Same list as the README "Never grant" row (a test keeps them in sync).
 FORBIDDEN_SCOPES = ("channels:history", "groups:history", "im:history", "mpim:history", "chat:write.public",
-                    "chat:write.customize", "users:read.email", "incoming-webhook", "files:read")
+                    "chat:write.customize", "users:read", "users:read.email", "reactions:write",
+                    "incoming-webhook", "files:read")
+SCOPES_HEADER = "x-oauth-scopes"
 ACTION_IDS = {"mfg_approve": "approve", "mfg_deny": "deny"}
 POST_FLAGS = {"unfurl_links": False, "unfurl_media": False, "link_names": False, "parse": "none"}
 _UNESCAPE = (("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"))
@@ -37,6 +44,32 @@ TRUNCATED = "…（已截斷）"
 def _escape(text: str) -> str:
     """Slack control sequences (<@U…>, <!here>, <url|label>) cannot survive this."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def scopes_from_headers(headers: Mapping[str, Any] | None) -> list[str] | None:
+    """The comma-separated `x-oauth-scopes` response header as a list (case-insensitive name), or None."""
+    for name, value in (headers or {}).items():
+        if str(name).lower() == SCOPES_HEADER:
+            if isinstance(value, (list, tuple)):
+                value = ",".join(str(v) for v in value)
+            return [s.strip() for s in str(value).split(",") if s.strip()]
+    return None
+
+
+def check_granted_scopes(granted: Collection[str] | None) -> None:
+    """Refuse (exit 78) unless the bot token holds exactly BOT_SCOPES. Scope names are not secrets,
+    so the refusal names them."""
+    if granted is None:
+        raise ConfigRefused(f"Slack auth.test returned no {SCOPES_HEADER} header; cannot verify the bot "
+                            "token's scopes, refusing to start")
+    got = {str(s).strip() for s in granted if str(s).strip()}
+    extra, missing = sorted(got - set(BOT_SCOPES)), sorted(set(BOT_SCOPES) - got)
+    if extra:
+        flagged = [s + (" (never grant)" if s in FORBIDDEN_SCOPES else "") for s in extra]
+        raise ConfigRefused("the Slack bot token has scopes beyond " + ", ".join(BOT_SCOPES) + ": "
+                            + ", ".join(flagged) + "; remove them under OAuth & Permissions and reinstall the app")
+    if missing:
+        raise ConfigRefused("the Slack bot token lacks required scopes: " + ", ".join(missing))
 
 
 def slack_event_to_inbound(payload: dict, bot_user_id: str) -> InboundMessage | None:
@@ -133,6 +166,8 @@ class SlackAdapter(SaasAdapterBase):
 
     def __init__(self, bindings: dict, transport: Any = None, **kw: Any):
         super().__init__(bindings, transport, **kw)
+        probe = getattr(self._transport, "granted_scopes", None)     # S06: before any event is served
+        check_granted_scopes(probe() if callable(probe) else None)
 
     def _real_transport(self) -> Any:                # pragma: no cover - needs SDK + credentials
         bot, app = self._secrets
@@ -164,9 +199,19 @@ class _SlackSdkTransport:                            # pragma: no cover - needs 
         self._ack = SocketModeResponse
         self.web = WebClient(token=bot_token)
         self.sm = SocketModeClient(app_token=app_token, web_client=self.web)
+        self._auth: tuple[str, list[str] | None] | None = None
+
+    def _auth_test(self) -> tuple[str, list[str] | None]:
+        if self._auth is None:
+            resp = self.web.auth_test()
+            self._auth = (str(resp["user_id"]), scopes_from_headers(getattr(resp, "headers", None)))
+        return self._auth
 
     def identity(self) -> str:
-        return str(self.web.auth_test()["user_id"])
+        return self._auth_test()[0]
+
+    def granted_scopes(self) -> list[str] | None:
+        return self._auth_test()[1]
 
     def listen(self, sink) -> None:
         def on_request(client, req) -> None:

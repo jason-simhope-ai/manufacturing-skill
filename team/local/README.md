@@ -8,7 +8,7 @@
 | `identities.local.yaml` | 平台 user id → 職位；只有這裡列出的 id 算數 |
 | `bindings.local.yaml` | 邏輯頻道 → 平台頻道 id |
 | `deid-map.local.yaml` | `deid.py` 的客戶名對照表（`CUST-xx`） |
-| `names.denylist` | 真名、客戶名、圖號、專案代號（每行一個 regex）；供 `deid.py`、pre-commit hook 與 gateway（輸入 DLP、輸出過濾，視為 T2）掃描 |
+| `names.denylist` | 真名、客戶名、圖號、專案代號（每行一個 Python regex）；供 `deid.py`、pre-commit hook 與 gateway（輸入 DLP、輸出過濾、資料夾掃描）使用。一般行命中視為 T2，`T3:` 開頭的行命中視為 T3。起始內容可從 `team/tools/denylist.starter.txt` 複製 |
 | `playbook.local.md` | 逐人導入筆記 |
 | `personal/<twin-id>.local.md` | 在職者偏好（白名單欄位，本文 ≤ 900 B） |
 
@@ -53,10 +53,14 @@ retention: { predictFirst: true, teachBack: false }
 `names.denylist`（每行一個 regex，`#` 開頭為註解）：
 
 ```
-# 範例：客戶代號樣式、圖號樣式
+# 範例：客戶代號樣式、圖號樣式（命中視為 T2）
 ACME-\d{4}
 DWG-[A-Z]{2}\d{5}
+# 命中視為 T3（和內建 T3 字詞一樣擋下）：高安規專案代號
+T3:PRJ-SP\d{3}
 ```
+
+先放通用起始清單，再加自己的：`cat team/tools/denylist.starter.txt >> team/local/names.denylist`。起始清單補的是內建字詞擋不到的中英同義詞與金額寫法（pilot 審查的 7 句實測句子，沒載入時全部通過、載入後全部擋下）；它仍是字詞告警，誤擋時改寫該行的排除條件，每季覆核一次。
 
 `deid-map.local.yaml` 由 `team/tools/deid.py` 自動建立與更新。**來源匯出檔與輸出檔都放在 repo 外**（`/tmp` 或 `$MFG_TEAM_DATA_T1`），不要放在 clone 裡；對照表放 `team/local/`（已被 `.gitignore` 擋）：
 

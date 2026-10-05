@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib
 
+from .. import UsageError
 from .base import ChatAdapter
 
 KNOWN = {
@@ -17,7 +18,7 @@ KNOWN = {
 def load_adapter_class(name: str) -> type:
     """Return the adapter class for `name` (absolute module path from KNOWN)."""
     if name not in KNOWN:
-        raise ValueError(f"unknown adapter {name!r}; choose one of {', '.join(KNOWN)}")
+        raise UsageError(f"unknown adapter {name!r}; choose one of {', '.join(KNOWN)}")
     module, cls = KNOWN[name]
     return getattr(importlib.import_module(module), cls)
 

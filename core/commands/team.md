@@ -1,8 +1,8 @@
 ---
 name: team
-description: 數位分身團隊 — 查看狀態、預覽分身回答、檢查設定、新增分身（需過閘門）、離線 demo
+description: 數位分身團隊 — 查看狀態、預覽分身回答、檢查設定、新增分身（需過閘門）、離線 demo、凍結 gateway
 allowed-tools: [Read, Grep, Glob, Bash]
-argument-hint: "status | ask <twin> <訊息> | add <position> | check | gate <position> | demo"
+argument-hint: "status | ask <twin> <訊息> | add <position> | check | gate <position> | demo | freeze | unfreeze"
 ---
 
 # /team — 數位分身團隊
@@ -69,6 +69,16 @@ python3 infra/chat-gateway/demo.py
 ```
 
 離線 mock 劇本（合成資料、不連網、使用 demo 金鑰）。原樣呈現輸出，不要改寫。
+
+### `/team freeze`、`/team unfreeze`
+
+Kill switch：在 gateway 的 state dir 寫入（或移除）旗標檔 `frozen`。執行中的 gateway 每個事件前都檢查它：凍結時不呼叫模型、不排程貼文、不處理核准，被 @ 的人收到「分身暫停服務中」，每個事件記稽核 `frozen`。
+
+```bash
+PYTHONPATH=infra/chat-gateway python3 -m chat_gateway freeze      # 解除：... unfreeze
+```
+
+必須以 gateway 的服務帳號、同一個 `MFG_TEAM_STATE_DIR` 執行；你沒有那個環境時，只把上面的指令與 `infra/chat-gateway/RUNBOOK.md` 交給 IT，不要自己猜路徑。聊天訊息本身不能凍結或解凍。凍結是軟停：要完全切斷，照 RUNBOOK 停服務並撤銷 token。
 
 ## 不做的事
 

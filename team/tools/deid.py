@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""De-identify a CSV export at the source (spec 11.1 / 13.3). Fails closed.
+r"""De-identify a CSV export at the source (spec 11.1 / 13.3). Fails closed.
 
     deid.py --in FILE.csv --out FILE.csv --map team/local/deid-map.local.yaml
             [--drop COL,...] [--keep COL,...] [--text COL,...]
@@ -100,6 +100,8 @@ def _load_denylist(path: Path):
             s = line.strip()
             if not s or s.startswith("#"):
                 continue
+            if s.startswith("T3:"):      # gateway tier marker; any hit is a residual here
+                s = s[3:].strip()
             try:
                 pats.append(re.compile(s))
             except re.error as e:

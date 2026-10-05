@@ -7,6 +7,7 @@ NOT exercised against the real platforms in CI; the real adapters need credentia
 * Events reach the adapter through a `transport` (real SDK wrapper, or a test fake):
   `listen(sink)` delivers raw platform dicts to `sink` (None = disconnected),
   `send(kind, payload) -> str`, `identity() -> str` (bot user id), `close()`.
+  The Slack transport also has `granted_scopes() -> list[str] | None` (the bot token's scopes).
 """
 from __future__ import annotations
 

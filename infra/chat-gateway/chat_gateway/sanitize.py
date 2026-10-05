@@ -150,8 +150,17 @@ _WORD_MARKERS = frozenset({"confidential-zh", "restricted-zh", "defense-zh", "co
 _WS = re.compile(r"\s+")
 
 
+DENYLIST_T3_PREFIX = "T3:"
+_DENY_T3_NAME = "denylist-t3:"
+
+
+def denylist_tier(name: str) -> str:
+    """Tier of a local denylist entry: T3 for lines written `T3:<regex>`, else T2."""
+    return "T3" if name.startswith(_DENY_T3_NAME) else "T2"
+
+
 def dlp_hits(text: str, extra: Iterable[tuple[str, re.Pattern]] = ()) -> list[tuple[str, str]]:
-    """[(pattern_name, tier)] for every DLP hit. `extra` = local denylist (tier T2).
+    """[(pattern_name, tier)] for every DLP hit. `extra` = local denylist (T2, or T3 for `T3:` lines).
 
     Scans the normalized text; word markers and the denylist are also matched on a
     whitespace-free copy so "機 密" or "DWG- 123" still trip."""
@@ -165,20 +174,27 @@ def dlp_hits(text: str, extra: Iterable[tuple[str, re.Pattern]] = ()) -> list[tu
             if m:
                 hits.append((name, DLP_TIERS[name]))
                 break
-    hits.extend((name, "T2") for name, pat in extra if pat.search(folded) or pat.search(squeezed))
+    hits.extend((name, denylist_tier(name)) for name, pat in extra if pat.search(folded) or pat.search(squeezed))
     return hits
 
 
 def load_denylist(path: str | Path) -> list[tuple[str, re.Pattern]]:
-    """Local denylist (`team/local/names.denylist`): one regex per line, `#` comments.
+    """Local denylist (`team/local/names.denylist`): one regex per line, `#` comments. A hit is T2;
+    a line written `T3:<regex>` makes its hits T3 (refused like the T3 word tripwire). Starter
+    entries: `team/tools/denylist.starter.txt`.
     Raises ValueError naming the line number only (never the line's content)."""
     pats: list[tuple[str, re.Pattern]] = []
     for n, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         s = line.strip()
         if not s or s.startswith("#"):
             continue
+        name = f"denylist:{n}"
+        if s.startswith(DENYLIST_T3_PREFIX):
+            s, name = s[len(DENYLIST_T3_PREFIX):].strip(), f"{_DENY_T3_NAME}{n}"
+            if not s:
+                raise ValueError(f"denylist line {n}: empty T3: entry")
         try:
-            pats.append((f"denylist:{n}", re.compile(unicodedata.normalize("NFKC", s))))
+            pats.append((name, re.compile(unicodedata.normalize("NFKC", s))))
         except re.error:
             raise ValueError(f"denylist line {n}: bad regex") from None
     return pats
@@ -202,7 +218,7 @@ MAX_REPLY_CHARS = 3000
 def filter_output(text: str, channel_tier: str,
                   extra: Iterable[tuple[str, re.Pattern]] = ()) -> tuple[str, dict]:
     """Strip URLs/images → neutralise mass mentions → mask secrets, emails, phones → tier block → cap length.
-    `extra` = local denylist (tier T2), same as inbound DLP."""
+    `extra` = local denylist (T2, or T3 for `T3:` lines), same as inbound DLP."""
     stats = {"urls": 0, "mentions": 0, "secret": 0, "pii": 0, "blocked": None, "truncated": False}
     text, n1 = _MD_IMAGE.subn("[圖片已移除]", text)
     text, n2 = _MD_LINK.subn(lambda m: m.group(1), text)

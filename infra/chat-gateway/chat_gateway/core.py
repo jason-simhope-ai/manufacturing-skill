@@ -31,7 +31,7 @@ from .adapters.base import (ApprovalCard, ApprovalClick, ChatAdapter, Event, Inb
                             Reply, ScheduledPost)
 from .approvals import ApprovalBook, Executor, NoopExecutor, args_hash
 from .audit import AuditLog
-from .drivers.base import DriverError, HarnessDriver, TwinInvocation, TwinResult
+from .drivers.base import DriverError, DriverPolicyDenied, HarnessDriver, TwinInvocation, TwinResult
 from .formatter import format_reply, notice
 from .patterns import find_secrets
 from .prompt import PROMPT_BUDGET_BYTES
@@ -48,6 +48,8 @@ LOCAL_DRIVERS = frozenset({"mock"})
 ALPHA_MAX_OFFPREM_TIER = "T1"     # SaaS chat platforms and cloud models: T1 at most in alpha
 T3_DOC = "docs/superpowers/specs/2026-10-05-digital-twin-team-design.md §11.2"
 T3_REPLY = "此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理"
+FROZEN_REPLY = "分身暫停服務中"
+DATA_ROOT_REPLY = "資料夾內有不符本頻道分級或規則的檔案，本次沒有呼叫模型；請通知管理者"
 # Same patterns as team/tools/teamlib/schema.py `_ID_RE` / `_CAPID_RE` (the linter). Duplicated, not
 # imported: the gateway core is stdlib-only and never imports team/tools. Re-checked at load
 # because ids reach file names (the claude-code driver's temp files) and audit records.
@@ -274,13 +276,14 @@ class Gateway:
     DEDUPE = (600.0, 1000)            # event_id kept 10 min or 1,000 entries
     CLICK_NOTICE_CAP = 1000           # (approval, outcome) pairs already answered with a notice
     FAILURES_TO_DEGRADE = 3
+    FROZEN_NOTICE_S = 60.0            # while frozen: one notice per user per channel per minute
 
     def __init__(self, roster: dict, adapter: ChatAdapter, driver: HarnessDriver, audit: AuditLog,
                  clock: Callable[[], float] = time.time, *, approvals: ApprovalBook | None = None,
                  executor: Executor | None = None, token_hex: Callable[[int], str] = secrets.token_hex,
                  read_roots: tuple[str, ...] = (), daily_budget_usd: float | None = None,
                  extra_dlp: Iterable[tuple[str, re.Pattern]] = (), max_budget_usd: float = 0.10,
-                 timeout_s: int = 60):
+                 timeout_s: int = 60, frozen_flag: str | Path | None = None):
         self.roster, self.adapter, self.driver, self.audit, self.clock = roster, adapter, driver, audit, clock
         self.policy = roster["policy"]
         self.twins = {t["id"]: t for t in roster["twins"]}
@@ -312,6 +315,8 @@ class Gateway:
         self._failures: dict[str, int] = {}
         self._spend: dict[tuple[str, str], float] = {}
         self.last_deny: tuple[str, str, int] | None = None
+        self.frozen_flag = Path(frozen_flag) if frozen_flag else None
+        self._frozen_noticed: dict[tuple[str, str], float] = {}
         self._startup_checks()
 
     # ── startup ──
@@ -325,11 +330,68 @@ class Gateway:
                 problems.append(f"channel {cid} tier {c['tier']} > saasTierCeiling")
             if cloud and tier_rank(c["tier"]) > tier_rank(self.policy["cloudTierCeiling"]):
                 problems.append(f"channel {cid} tier {c['tier']} > cloudTierCeiling for driver {self.driver.name}")
-        problems += [f"driver self_check: {p}" for p in self.driver.self_check()]
+        try:
+            driver_problems = self.driver.self_check()
+        except ConfigRefused as exc:                 # e.g. T3 content in a data root (exit 3)
+            self._audit("config_refused", None, decision="deny", deny_reason=str(exc)[:500],
+                        **self._driver_info())
+            raise
+        problems += [f"driver self_check: {p}" for p in driver_problems]
         if problems:
-            self._audit("config_refused", None, decision="deny", deny_reason="; ".join(problems)[:500])
+            self._audit("config_refused", None, decision="deny", deny_reason="; ".join(problems)[:500],
+                        **self._driver_info())
             raise ConfigRefused("; ".join(problems))
-        self._audit("config_loaded", None, decision="allow")
+        self._audit("config_loaded", None, decision="allow", **self._driver_info())
+
+    def _driver_info(self) -> dict:
+        """S12: what the driver reports about itself (CLI version, flag check, data-root scan)."""
+        describe = getattr(self.driver, "describe", None)
+        info = describe() if callable(describe) else None
+        return {"driver_info": info} if isinstance(info, dict) and info else {}
+
+    # ── kill switch (S03) ──
+    def frozen(self) -> bool:
+        """True while the freeze flag file exists. Fails closed: an unreadable flag counts as frozen."""
+        if self.frozen_flag is None:
+            return False
+        try:
+            self.frozen_flag.lstat()
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+        return True
+
+    def _on_frozen(self, event: Event) -> list[Reply | ApprovalCard]:
+        """Every event while frozen: audit `frozen`, call nothing. A bound, @-mentioned message from
+        a person gets 「分身暫停服務中」 (at most once per user and channel per minute)."""
+        now = self.clock()
+        if isinstance(event, InboundMessage):
+            ctx = _Ctx(event_id=event.event_id, platform=event.platform, thread=event.thread_ref or event.event_id,
+                       operator_ref=self.audit.operator_ref(event.platform, event.user_ref))
+            cid = self._channel_for(event.platform, event.channel_ref)
+            if cid is not None:
+                ctx.channel_id, ctx.channel_ref, ctx.tier = cid, event.channel_ref, self.channels[cid]["tier"]
+            self._deny(ctx, "frozen", action="frozen")
+            person = not (event.author_is_bot or event.is_dm or event.external_shared)
+            key = (cid or "", f"{event.platform}:{event.user_ref}")
+            if cid is None or not event.mentions_bot or not person or \
+                    now - self._frozen_noticed.get(key, -1e18) < self.FROZEN_NOTICE_S:
+                return []
+            self._frozen_noticed[key] = now
+            return [self._notice(ctx, "", FROZEN_REPLY, decision="deny")]
+        if isinstance(event, ApprovalClick):
+            self._deny(_Ctx(event_id=event.event_id, platform=event.platform), "frozen", action="frozen",
+                       approval_id=event.approval_id)
+            return []
+        if isinstance(event, ScheduledPost):
+            channel = self.channels.get(event.channel_id)
+            ctx = _Ctx(event_id=f"post:{event.twin_id}:{event.capability_id}", platform=self.adapter.name,
+                       operator="role:scheduler", channel_id=event.channel_id if channel else None,
+                       tier=channel["tier"] if channel else None)
+            self._deny(ctx, "frozen", action="frozen", twin=event.twin_id if event.twin_id in self.twins else None)
+            return []
+        raise TypeError(f"unknown event type {type(event).__name__}")
 
     # ── helpers ──
     def _audit(self, action: str, ctx: _Ctx | None, **kw) -> int:
@@ -392,6 +454,8 @@ class Gateway:
 
     # ── dispatch ──
     def handle(self, event: Event) -> list[Reply | ApprovalCard]:
+        if self.frozen():                            # S03: checked before every event
+            return self._on_frozen(event)
         if isinstance(event, InboundMessage):
             return self._message(event)
         if isinstance(event, ApprovalClick):
@@ -566,6 +630,9 @@ class Gateway:
             result = self.driver.run(inv)
             if not isinstance(result, TwinResult):
                 raise DriverError("driver returned a non-TwinResult")
+        except DriverPolicyDenied as exc:            # refused before the model ran (S10): not a failure
+            self._audit("policy_denied", ctx, decision="deny", deny_reason=str(exc.reason)[:200], **common)
+            return [self._notice(ctx, tid, DATA_ROOT_REPLY, decision="deny")]
         except Exception as exc:  # noqa: BLE001 - any driver failure is reported, never guessed
             self._failures[tid] = self._failures.get(tid, 0) + 1
             self._audit("driver_error", ctx, decision="deny", deny_reason=type(exc).__name__, **common)
