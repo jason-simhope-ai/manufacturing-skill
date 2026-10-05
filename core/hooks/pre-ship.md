@@ -45,5 +45,5 @@ OQC 通過後、出貨前最後一道閘門。一旦東西出去就追不回來�
 
 - 寫入出貨紀錄到 ERP
 - 發出貨通知給客戶（email / Telegram）
-- 更新 manufacturing-scheduler，將 SO 標 closed
+- 提醒生管 / ERP 操作員在 ERP / MES 將 SO 標 closed（`manufacturing-scheduler` 唯讀，AI 不代為關單）
 - 觸發應收帳款開立流程（依付款條件）

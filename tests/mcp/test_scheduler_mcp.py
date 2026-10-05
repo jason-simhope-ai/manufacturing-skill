@@ -344,6 +344,46 @@ class ErrorMappingTest(unittest.TestCase):
         self.assertIn("boolean", bad["result"]["content"][0]["text"])
 
 
+class HostileInputSurvivalTest(unittest.TestCase):
+    """One bad line must never end the session: each case is followed by a ping that must be answered."""
+
+    @staticmethod
+    def call_line(name, args):
+        return json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                           "params": {"name": name, "arguments": args}}).encode()
+
+    def cases(self):
+        deep = b"[" * 5000 + b"]" * 5000
+        return {
+            "non-utf8 bytes": b"\xff\xfe garbage",
+            "deeply nested array": b"[" * 100000 + b"]" * 100000,
+            "deeply nested arguments":
+                b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_work_orders",'
+                b'"arguments":{"status":' + deep + b"}}}",
+            "lone surrogate in method": b'{"jsonrpc":"2.0","id":1,"method":"\\ud800"}',
+            "lone surrogate in wo_id": self.call_line("get_work_order_status", {"wo_id": "\ud800"}),
+            "lone surrogate in tool name": b'{"jsonrpc":"2.0","id":1,"method":"tools/call",'
+                                           b'"params":{"name":"\\ud800"}}',
+            "lone surrogate in id": b'{"jsonrpc":"2.0","id":"\\udc00","method":"ping"}',
+            "NaN id": b'{"jsonrpc":"2.0","id":NaN,"method":"ping"}',
+        }
+
+    def test_server_keeps_answering_after_each_bad_line(self):
+        for label, bad in self.cases().items():
+            data = bad + b"\n" + b'{"jsonrpc":"2.0","id":"after","method":"ping"}\n'
+            r = subprocess.run([sys.executable, str(SERVER)], input=data, capture_output=True, timeout=60)
+            self.assertEqual(r.returncode, 0, (label, r.stderr[-300:]))
+            replies = [json.loads(line) for line in r.stdout.decode("utf-8").splitlines()]  # strict UTF-8 + JSON
+            self.assertEqual(replies[-1], {"jsonrpc": "2.0", "id": "after", "result": {}}, label)
+
+    def test_unparseable_lines_get_parse_error(self):
+        for label in ("non-utf8 bytes", "deeply nested array"):
+            data = self.cases()[label] + b"\n"
+            r = subprocess.run([sys.executable, str(SERVER)], input=data, capture_output=True, timeout=60)
+            reply = json.loads(r.stdout.decode("utf-8").splitlines()[0])
+            self.assertEqual(reply["error"]["code"], -32700, label)
+
+
 class ReusablePlumbingTest(unittest.TestCase):
     def test_sibling_server_gets_its_own_identity(self):
         m = load_server_module()
@@ -374,20 +414,31 @@ class ServerNameConsistencyTest(unittest.TestCase):
         prefix = f"mcp__{SERVER_NAME}__"
         planner = self.frontmatter_tools("core/agents/production-planner.md", "tools")
         status = self.frontmatter_tools("core/commands/order-status.md", "allowed-tools")
-        self.assertLessEqual({"Read", "Grep", "Glob", "Bash"}, planner)  # existing tools kept
-        self.assertLessEqual({"Read", "Grep", "Glob", "Bash"}, status)
+        briefing = self.frontmatter_tools("core/commands/morning-briefing.md", "allowed-tools")
+        self.assertLessEqual({"Read", "Grep", "Glob"}, planner)  # existing read tools kept
+        self.assertLessEqual({"Read", "Grep", "Glob"}, status)
+        self.assertLessEqual({"Read", "Grep", "Glob"}, briefing)
         self.assertLessEqual({prefix + t for t in TOOL_NAMES}, planner)
         self.assertLessEqual({prefix + "list_work_orders", prefix + "get_work_order_status"}, status)
-        for allowed in (planner, status):
+        self.assertLessEqual({prefix + t for t in ("list_work_orders", "get_machine_load",
+                                                    "find_bottlenecks", "get_capacity_summary")}, briefing)
+        for allowed in (planner, status, briefing):
             for t in allowed:
                 if t.startswith("mcp__"):
                     self.assertTrue(t.startswith(prefix) and t[len(prefix):] in TOOL_NAMES, t)
 
     def test_no_other_server_name_spellings_in_core_and_profiles(self):
         stale = re.compile(r"mcp__scheduler__|claude mcp add scheduler\b|\"scheduler-mcp\"")
-        for path in list((REPO / "core").rglob("*.md")) + list((REPO / "profiles").rglob("*")):
+        # bare `scheduler-mcp` (backticked or in prose) used as a server name; the directory
+        # path infra/mcp-servers/scheduler-mcp is fine (preceded by "/")
+        bare = re.compile(r"(?<![/\w-])scheduler-mcp(?![\w/-])")
+        paths = (list((REPO / "core").rglob("*.md")) + list((REPO / "profiles").rglob("*"))
+                 + list((REPO / "examples").rglob("*.md")))
+        for path in paths:
             if path.is_file() and path.suffix in (".md", ".json"):
-                self.assertIsNone(stale.search(path.read_text(encoding="utf-8")), path)
+                text = path.read_text(encoding="utf-8")
+                self.assertIsNone(stale.search(text), path)
+                self.assertIsNone(bare.search(text), f"{path}: use `manufacturing-scheduler` as the server name")
         for profile in (REPO / "profiles").glob("*/profile.json"):
             rec = json.loads(profile.read_text(encoding="utf-8")).get("mcp", {}).get("recommended", [])
             self.assertNotIn("scheduler-mcp", rec, profile)

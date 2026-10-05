@@ -19,7 +19,7 @@ You should get a response within 5 working days. If you don't, send a follow-up 
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | `core/` and `profiles/*/` agent prompts and skills                             | Prompt-injection, role-confusion, data-exfiltration via crafted user input                                                    |
 | `adapters/claude-code/install.sh`                                              | Path-traversal, accidental file overwrite, unsafe handling of unusual inputs                                                  |
-| `infra/mcp-servers/scheduler-mcp/server.py` (the stub)                         | Memory-safety, input validation — though the stub is not intended for production                                              |
+| `infra/mcp-servers/scheduler-mcp/server.py` (read-only stdio MCP server)       | Input validation, no write tools — runs on mock data; connecting it to a real MES/ERP is the adopter's responsibility         |
 | `infra/mcp-servers/erp-connector/contract.py`                                  | Interface design that would make secure implementation hard                                                                   |
 | Example data in `examples/`                                                    | Accidental inclusion of real customer data                                                                                    |
 | The four `docs/explainers/*.html` and `docs/demo/*.html` and `docs/index.html` | Cross-site scripting via injected content (currently no JS executes user-controlled data, but if that changes, file an issue) |

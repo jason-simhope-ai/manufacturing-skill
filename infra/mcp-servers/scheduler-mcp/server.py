@@ -378,12 +378,25 @@ class McpServer:
             if not line.strip():
                 continue
             try:
-                reply = self.handle(json.loads(line), ds)
-            except ValueError:
+                msg = json.loads(line)
+            except Exception:  # ValueError, or RecursionError on pathologically nested input
                 reply = err(None, -32700, "parse error")
-            if reply is not None:
-                stdout.write(json.dumps(reply, ensure_ascii=False) + "\n")
-                stdout.flush()
+            else:
+                try:
+                    reply = self.handle(msg, ds)
+                except Exception as exc:  # last resort: never let one message end the session
+                    print(f"{self.info['name']}: request crashed: {exc!r}", file=sys.stderr)
+                    reply = err(None, -32603, f"internal error: {type(exc).__name__}")
+            if reply is None:
+                continue
+            try:
+                # ensure_ascii: lone surrogates or odd bytes echoed from the request can never
+                # make the (UTF-8) write fail; allow_nan=False: never emit invalid JSON.
+                payload = json.dumps(reply, allow_nan=False)
+            except Exception:  # e.g. an echoed id that cannot be serialised
+                payload = json.dumps(err(None, -32603, "internal error: unserialisable reply"))
+            stdout.write(payload + "\n")
+            stdout.flush()
         return 0
 
 
@@ -403,7 +416,8 @@ def main() -> int:
     except RuntimeError as exc:
         print(f"{SERVER_NAME}: {exc}", file=sys.stderr)
         return 1
-    sys.stdin.reconfigure(encoding="utf-8")
+    # undecodable bytes become U+FFFD (-> a normal parse error) instead of killing the server
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
     sys.stdout.reconfigure(encoding="utf-8")
     return build_server().serve(ds)
 
