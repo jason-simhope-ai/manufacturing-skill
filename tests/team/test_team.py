@@ -778,5 +778,33 @@ class CliExitCodes(unittest.TestCase):
                          "example-machinery-co")
 
 
+class AgentFacingPathsAreRooted(unittest.TestCase):
+    """`/team` runs from the user's project dir, and the installed copy has no `infra/`, so every
+    tool or gateway path in the agent-facing files must be `$ROOT/...` (the repo checkout holding
+    TEAM.md), never cwd-relative. Markdown link targets `](...)` resolve against the file itself
+    (TEAM.md sits at the root) and stay as they are, so the link checker keeps working."""
+
+    BARE = re.compile(r"(team/tools/|infra/chat-gateway/)")
+    FILES = ("TEAM.md", "core/commands/team.md")
+
+    def test_no_bare_tool_or_gateway_paths(self):
+        bad = []
+        for rel in self.FILES:
+            for n, line in enumerate((REPO / rel).read_text(encoding="utf-8").splitlines(), 1):
+                for m in self.BARE.finditer(line):
+                    before = line[:m.start()]
+                    if before.endswith("$ROOT/") or before.endswith("]("):
+                        continue
+                    bad.append(f"{rel}:{n}: {line.strip()}")
+        self.assertEqual(bad, [], "use $ROOT/<path> (see the root section of core/commands/team.md)")
+
+    def test_root_is_resolved_before_use(self):
+        cmd = (REPO / "core/commands/team.md").read_text(encoding="utf-8")
+        first_use = cmd.index('"$ROOT/team/tools/')
+        self.assertLess(cmd.index('echo "ROOT=$d"'), first_use)
+        self.assertIn("CHECKOUT=no", cmd)            # installed copy: no infra/, say so
+        self.assertIn("repo checkout", cmd[cmd.index("### `/team demo`"):])
+        self.assertIn("$ROOT", (REPO / "TEAM.md").read_text(encoding="utf-8"))
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

@@ -864,7 +864,7 @@ class TestPilotDriver(Base):
         roster = REPO_ROOT / "tests" / "gateway" / "fixtures" / "roster.json"
         env = {**self.env, "MFG_TEAM_CLAUDE_BIN": str(self.bin), "MFG_TEAM_CLAUDE_CONFIG_DIR": str(self.config_dir),
                "MFG_TEAM_DATA_T1": str(self.data), "MFG_TEAM_AUDIT_HMAC_KEY": "k" * 20,
-               "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20}
+               "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20, "MFG_TEAM_DAILY_BUDGET_USD": "5"}
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             rc = cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env)
@@ -879,6 +879,8 @@ class TestPilotDriver(Base):
         with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(out):
             self.assertEqual(cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env), 0)
         self.assertIn("self-check: OK", out.getvalue())
+        self.assertIn("self-check: daily budget: 5 USD per twin per UTC day", out.getvalue())
+        self.assertIn("self-check: denylist: ", out.getvalue())
         last = json.loads(audit.read_text(encoding="utf-8").splitlines()[-1])
         self.assertEqual(last["action"], "config_loaded")
         self.assertEqual(last["driver_info"]["flag_check"], "ok")

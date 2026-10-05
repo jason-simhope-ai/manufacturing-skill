@@ -4,6 +4,8 @@
 >
 > 規模：v0.1.5 + Unreleased（v0.2.0-alpha 數位分身團隊，實驗性）· MIT
 > 最後更新：2026-10-05
+>
+> 只列本分支 tree 內實際存在的檔案（以 `git ls-files` 為準）；其他分支或未合併 PR 新增的檔案，合併後再補進來。
 
 ---
 
@@ -14,6 +16,7 @@
 | 第一次看到、完全不懂          | [docs/quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                              |
 | 想 5 分鐘看懂這玩意           | [docs/explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                                          |
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
+| 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
 | AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
@@ -46,7 +49,7 @@
 
 ## 完整檔案地圖
 
-### 頂層 (5)
+### 頂層 (12)
 
 ```
 manufacturing.md          ← 靈魂入口文件，先讀
@@ -56,11 +59,16 @@ plugin.json               ← Claude Code plugin manifest
 TEAM.md                   ← 數位分身團隊 agent 啟動檔（v0.2.0-alpha，見 Team tier）
 LICENSE                   ← MIT
 INVENTORY.md              ← 這份
+CHANGELOG.md              ← 版本紀錄（Keep a Changelog；[Unreleased] 在最上面）
+CONTRIBUTING.md           ← 貢獻指南
+SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
+.gitignore                ← 含 team/local/*、team/.build/
+.gitattributes            ← 強制 LF（install.sh / *.py 在 CRLF checkout 下會壞）
 ```
 
 ### `core/` — 普世製造業（任何工廠都用得到）
 
-#### `core/commands/` — 7 個 slash commands
+#### `core/commands/` — 11 個 slash commands
 
 | 指令                                                     | 用途                                                             |
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -74,6 +82,7 @@ INVENTORY.md              ← 這份
 | [`/manufacturing init`](core/commands/init.md)           | 第一次用的 4 問題引導                                            |
 | [`/morning-briefing`](core/commands/morning-briefing.md) | 廠長每日 8 AM 早會懶人包                                         |
 | [`/8d`](core/commands/8d.md)                             | 啟動 8D 客訴 / 重大不良處理                                      |
+| [`/team`](core/commands/team.md)                         | 數位分身團隊（v0.2.0-alpha）：status / ask / add / check / gate / demo |
 
 #### `core/agents/` — 6 隻 universal persona
 
@@ -102,7 +111,7 @@ INVENTORY.md              ← 這份
 | [8d-report-writing](core/skills/8d-report-writing.md)                   | 8D 八步驟 + customer-deliverable template     |
 | [engineering-change-process](core/skills/engineering-change-process.md) | ECN/ECO 5 步驟 SOP + 13-item impact checklist |
 
-#### `core/know-how/` — 7 份普世知識
+#### `core/know-how/` — 8 份普世知識
 
 | 檔                                        | 內容                                            |
 | ----------------------------------------- | ----------------------------------------------- |
@@ -189,6 +198,7 @@ INVENTORY.md              ← 這份
 | [mcp-servers/erp-connector/](infra/mcp-servers/erp-connector/)                                                                                                                                         | ERP 整合介面契約（template，實作交給用戶） |
 | `mcp-servers/erp-connector/`[contract.py](infra/mcp-servers/erp-connector/contract.py) · [README.md](infra/mcp-servers/erp-connector/README.md)                                                        |                                            |
 | [on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md)                                                                                                                                                   | NVIDIA GB10 + Ollama 地端 LLM 安裝指南     |
+| [chat-gateway/](infra/chat-gateway/)                                                                                                                                                                   | 數位分身聊天 gateway（見下方 Team tier）；`install.sh` 不安裝 `infra/` |
 
 ---
 
@@ -202,12 +212,13 @@ INVENTORY.md              ← 這份
 | -- | ---- |
 | [TEAM.md](TEAM.md) | agent 啟動檔（≤ 6,000 B）：六條規則、啟動演算法、漸進揭露地圖 |
 | [team/README.zh-TW.md](team/README.zh-TW.md) | 人讀的 10 分鐘說明 |
+| [team/for-frontline.zh-TW.md](team/for-frontline.zh-TW.md) | 給前線同仁的一頁說明 |
 | [team/roster.example.yaml](team/roster.example.yaml) | 範例 roster（synthetic：7 個通用部門、7 個職位、3 個頻道） |
 | [team/twins/](team/twins/) | `_template.md` + 3 個範例分身：[production-manager](team/twins/production-manager.md) · [qa-manager](team/twins/qa-manager.md) · [engineering-manager](team/twins/engineering-manager.md) |
 | [team/policies/core-rules.md](team/policies/core-rules.md) · [restricted.md](team/policies/restricted.md) | 所有分身共用 preamble · T3 政策 |
 | [team/gate/need-a-twin.md](team/gate/need-a-twin.md) | 「需要分身嗎？」閘門問卷與季複審清單 |
-| [team/local/README.md](team/local/README.md) | 本機專屬設定說明（`team/local/*` 與 `team/.build/` 皆 gitignored） |
-| [core/commands/team.md](core/commands/team.md) | `/team status \| ask \| check \| gate \| demo`（預覽用，不經 gateway） |
+| [team/local/README.md](team/local/README.md) · `team/local/.gitkeep` | 本機專屬設定說明（`team/local/*` 與 `team/.build/` 皆 gitignored） |
+| [core/commands/team.md](core/commands/team.md) | `/team status \| ask \| add \| check \| gate \| demo`（預覽用，不經 gateway；先找 `$ROOT` 再用 `$ROOT/…` 路徑） |
 
 **工具（`team/tools/`）**
 
@@ -224,23 +235,26 @@ INVENTORY.md              ← 這份
 
 | 路徑 | 用途 |
 | ---- | ---- |
-| [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證） |
+| [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) · `requirements-optional.txt` | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證；`--plain` 前線版）· 選用相依（Slack／Discord SDK） |
 | [DEPLOY.md](infra/chat-gateway/DEPLOY.md) · [RUNBOOK.md](infra/chat-gateway/RUNBOOK.md) | Pilot 部署檢核表（主機、帳號、systemd、出口、祕密、廠商檢查表、首日驗收）· 停機與外洩處置（凍結、撤銷、輪替、封存） |
+| `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify`、`freeze`／`unfreeze`（`state-reset` 在 `team/tools/teamctl.py`） |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
 | `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint＋主機外錨點（`--heads-out`／`--anchor`）· secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
 | `chat_gateway/datascan.py` | `MFG_TEAM_DATA_T1` 資料夾內容掃描（DLP＋denylist，只重讀變動檔，5,000 檔上限） |
+| `chat_gateway/spend.py` | 每分身每日費用累計（`$MFG_TEAM_STATE_DIR/daily-spend.json`，0600、UTC 日期、檔案鎖，重啟不歸零） |
+| `audit-weekly.sh` | 每週稽核 systemd timer 用的腳本（`audit-verify --anchor` → `--heads-out` → 推到主機外） |
 | `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
-| `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py` |
+| `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py`、`twin_result.schema.json` |
 | `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
-| `fixtures/` | 範例 roster 快照、`demo.jsonl` 劇本、`mock_driver.json` |
+| `fixtures/` | 範例 roster 快照（`roster/`）、`demo.jsonl` 劇本、`mock_driver.json` |
 
 **測試**
 
 | 套件 | 內容 | 怎麼跑（CI Step） |
 | ---- | ---- | ----------------- |
-| [tests/team/](tests/team/) | `fixtures.yaml` 110 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 42 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code） | `python3 tests/team/run.py`（Step 19）· `python3 -m unittest tests/team/test_team.py` |
-| [tests/gateway/](tests/gateway/) | `test_gateway.py` 129 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 50 個 unittest（Slack／Discord 事件對應、T1 上限、Slack scope 檢查與 README 一致性，假 transport）；`test_claude_code_driver.py` 68 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`、資料夾掃描、家目錄隱藏目錄）；`test_pilot.py` 19 個 unittest（starter denylist 與 7 句實測、kill switch、稽核錨點、symlink state dir、錯誤訊息）；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
+| [tests/team/](tests/team/) | `fixtures.yaml` 135 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 58 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code、agent 檔的 `$ROOT` 路徑） | `python3 tests/team/run.py`（Step 19）· `python3 tests/team/test_team.py` |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、每日費用上限與 `daily-spend.json`、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 50 個 unittest（Slack／Discord 事件對應、T1 上限、Slack scope 檢查與 README 一致性，假 transport）；`test_claude_code_driver.py` 90 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`、資料夾掃描、家目錄隱藏目錄）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`test_pilot.py` 40 個 unittest（starter denylist 與 7 句實測、kill switch（含凍結先於預算檢查、凍結中丟棄的回覆仍計費）、稽核錨點、symlink state dir、錯誤訊息）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
 
@@ -250,7 +264,8 @@ INVENTORY.md              ← 這份
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
 | [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
-| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
+| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算；分身 4 週 pilot、原則與核准範本 |
+| [owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)                                                                       | 董事長：簽三件事前的一頁（費用、最壞情況、停機、第 4 週決策表） |
 | [audit-operations.md](docs/audit-operations.md) | IT／稽核：分身 gateway 稽核週作業、簽收單、金鑰輪替與遺失、ISO 27001 對應 |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
@@ -262,8 +277,10 @@ INVENTORY.md              ← 這份
 | [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 4 張的 PNG 版本（給 LinkedIn / 簡報用）                    |
 | [quickstart-screenshots/](docs/quickstart-screenshots/)                                                                       | 6 步驟安裝實機截圖 + mockup（含 CAPTURE-GUIDE.md 紀錄產出方式） |
 | [demo/quote-demo.gif](docs/demo/quote-demo.gif) · [demo/quote-demo-en.gif](docs/demo/quote-demo-en.gif)                       | `/quote` 19 秒實錄 GIF（雙語版）                                |
+| [demo/quote-demo.html](docs/demo/quote-demo.html) · [quote-real.html](docs/demo/quote-real.html)（含 `-en` 版）· [real-claude-response.md](docs/demo/real-claude-response.md) · [screenshots/](docs/demo/screenshots/) | GIF 的 HTML 原稿、真實 Claude 回覆紀錄與截圖 |
 | [demo/slides/](docs/demo/slides/)                                                                                             | 6-capability 介紹簡報（HTML + retina PNG）                      |
 | [superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md) | 設計史：v0.1 spec 完整版                                        |
+| [superpowers/specs/](docs/superpowers/specs/)                                                                                 | 其餘 5 份設計 spec：v0.1.1、v0.1.2、profile 繼承、多 profile、數位分身團隊 |
 
 ---
 
@@ -275,6 +292,14 @@ INVENTORY.md              ← 這份
 | [sample-drawing/bracket.md](examples/sample-drawing/bracket.md)   | 模擬 CNC 件圖紙 metadata       |
 | [sample-bom/bracket-bom.csv](examples/sample-bom/bracket-bom.csv) | 對應的 BOM                     |
 | [sample-quote-output.md](examples/sample-quote-output.md)         | `/quote` 預期輸出範例          |
+
+---
+
+### `scripts/` — 維護腳本
+
+| 檔 | 用途 |
+| -- | ---- |
+| [regen_explainers.py](scripts/regen_explainers.py) | 重生 `docs/explainers/*.html` 的 `AUTO-START`／`AUTO-END` 區塊（計數、版本、分身數）；`--check` 供 CI Step 11 |
 
 ---
 
@@ -298,35 +323,44 @@ INVENTORY.md              ← 這份
 | `~/.claude/CLAUDE.md`                    | Global 個人 conventions（包括 commit signature）                                                                        |
 | `.claude/` (本 repo)                     | Claude Code 本機 session state，整個 gitignored                                                                         |
 | GitHub Releases                          | v0.1.3 起開始 tag（見 CHANGELOG.md）                                                                                    |
-| GitHub Actions CI                        | [.github/workflows/ci.yml](.github/workflows/ci.yml)（v0.1.1 起；JSON / plugin schema / frontmatter / install.sh 驗證） |
+| GitHub Actions CI                        | [.github/workflows/ci.yml](.github/workflows/ci.yml)（v0.1.1 起；JSON / plugin schema / frontmatter / install.sh 驗證；Step 18–22 為 team tier 與 chat gateway） |
 
 ---
 
-## Repo metrics（v0.1.3）
+## Repo metrics（本分支，`git ls-files`）
 
 ```
-頂層檔                  : 9 (README × 2, LICENSE, plugin.json, manufacturing.md,
-                              INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY)
+頂層檔                  : 12 (README × 2, LICENSE, plugin.json, manufacturing.md, TEAM.md,
+                              INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY,
+                              .gitignore, .gitattributes)
 core/  agents           : 6
-core/  commands         : 9
+core/  commands         : 11 (含 /team)
 core/  skills           : 11
 core/  know-how         : 8
 core/  hooks            : 4
-CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
-Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
+CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + profile.json + manufacturing.md
+Injection profile (alpha): 1 agent + 1 skill + 2 know-how + profile.json + README + _templates
 Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+Adapters                : claude-code (install.sh + 2 Python helpers + plugin-mapping.md)
+Team tier               : TEAM.md + team/ 24 files (README, for-frontline, gate, policies × 2,
+                              roster.example, 3 example twins + _template, tools 12, local 2)
+Infra                   : 2 MCP servers + 1 on-prem guide + chat-gateway (36 files)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
-                              + 1 hero) + CAPTURE-GUIDE.md
-Demo                    : /quote 19s GIFs (繁中/EN) + 2 styled HTML + 6-capability slide
+                              + 1 hero) + 4 mockup HTML + CAPTURE-GUIDE.md
+Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-claude-response.md
+                              + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 5 (architecture / adoption-guide / profile-dev / ROADMAP
-                              / quickstart-for-beginners)
-Infra                   : 2 MCP servers + 1 on-prem guide
+Docs                    : 7 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page / audit-operations)
+                              + 6 design specs
+Scripts                 : 1 (regen_explainers.py)
+Tests                   : 55 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
+                              cases + 58 unittest, gateway 342 unittest + demo golden
 Examples                : 4 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template
-Tracked files           : 139
+Tracked files           : 266
 ```
 
 ---

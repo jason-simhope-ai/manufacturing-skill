@@ -15,6 +15,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -235,6 +236,9 @@ class TestFreeze(HarnessCase):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn(FREEZE_FILE, STATE_ENTRIES)                     # state-reset may move a frozen dir aside
         self.assertIn("frozen.last", STATE_ENTRIES)
+        for name in ("data-scan.json", "data-scan.json.tmp", "daily-spend.json", "daily-spend.json.tmp",
+                     "daily-spend.json.lock"):
+            self.assertIn(name, STATE_ENTRIES)                    # both PR #15 and PR #38 state files
 
     def test_freeze_refuses_a_symlinked_state_dir(self):
         tmp = tmpdir(self, "gw-freeze-")
@@ -282,6 +286,26 @@ class TestFreezeInFlightAndApprovals(HarnessCase):
         self.assertEqual([x["action"] for x in h.records].count("msg_out"), 1)    # only the notice
         h.clock.t += 61
         self.assertEqual(len(h.msg("@品保 again")), 1)                  # still frozen, a notice
+        self.assertEqual(len(h.driver.calls), 1)
+
+    def test_reply_dropped_while_frozen_is_still_charged(self):
+        # The reply is dropped but the model ran: its cost counts toward the day's budget.
+        h, flag = self.harness(daily_budget_usd=5.0)
+        orig = h.driver.run
+        h.driver.run = lambda inv: (flag.write_text("{}", encoding="utf-8"), orig(inv))[1]
+        h.msg("@品保 spc-watch")
+        self.assertIn("frozen_in_flight", h.reasons())
+        day = time.strftime("%Y-%m-%d", time.gmtime(h.clock()))
+        self.assertGreater(h.gw.spend.get("qa-manager", day), 0)
+
+    def test_freeze_is_checked_before_the_budget(self):
+        h, flag = self.harness(daily_budget_usd=0.000001)
+        h.msg("@品保 spc-watch")                                   # spends the whole budget
+        flag.write_text("{}", encoding="utf-8")
+        h.clock.t += 61
+        [r] = h.msg("@品保 spc-watch")
+        self.assertIn(FROZEN_REPLY, r.text)
+        self.assertNotIn("daily_budget", h.reasons())
         self.assertEqual(len(h.driver.calls), 1)
 
     def test_scheduled_post_in_flight_is_dropped_silently(self):

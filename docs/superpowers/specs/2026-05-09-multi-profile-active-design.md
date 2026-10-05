@@ -307,7 +307,7 @@ The error is **specific to the file**, lists **all conflicts at once** (not just
       "UL 94 (flame rating)"
     ],
     "mcp": {
-      "recommended": ["scheduler-mcp", "erp-connector"],
+      "recommended": ["manufacturing-scheduler", "erp-connector"],
       "optional": ["cam-software-bridge", "tool-database"]
     }
   }

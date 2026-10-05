@@ -23,7 +23,7 @@ sudo useradd --system --user-group --home-dir /var/lib/mfg-twin --shell /usr/sbi
 | 路徑 | 擁有者／權限 | 內容 |
 | ---- | ------------ | ---- |
 | `/opt/mfg-twin/releases/<commit>/` | root，唯讀 | 審過的 repo 版本（含 `team/.build/`）。`/opt/mfg-twin/current` 指向目前版本 |
-| `/var/lib/mfg-twin/state/` | 服務帳號，`0700` | `MFG_TEAM_STATE_DIR`：稽核鏈、限流、driver 暫存、凍結旗標、資料夾掃描快取。**不可是 symlink**（啟動拒絕，exit 78），上層目錄不可讓其他帳號寫入（程式只檢查 state dir 本身，上層由管理員負責） |
+| `/var/lib/mfg-twin/state/` | 服務帳號，`0700` | `MFG_TEAM_STATE_DIR`：稽核鏈、限流、driver 暫存、凍結旗標、資料夾掃描快取、每日費用累計 `daily-spend.json`（重啟不歸零，不要手動刪除或修改）。**不可是 symlink**（啟動拒絕，exit 78），上層目錄不可讓其他帳號寫入（程式只檢查 state dir 本身，上層由管理員負責） |
 | `/var/lib/mfg-twin/claude-config/` | 服務帳號，`0700` | `MFG_TEAM_CLAUDE_CONFIG_DIR`：服務帳號專用，不可是任何人的 `~/.claude` |
 | `/var/lib/mfg-twin/heads/` | 服務帳號，`0750` | 每週稽核 heads（`latest.json`、`heads-<週>.json`）；正本在主機外 |
 | `/etc/mfg-twin/names.denylist` | root:mfg-twin，`0640` | `MFG_TEAM_DENYLIST`：本機 denylist，從 `team/tools/denylist.starter.txt` 起步，再加自己的客戶與專案代號（不進 repo）。非 mock adapter 沒有載入 denylist 會拒絕啟動（exit 64） |
@@ -182,6 +182,7 @@ MFG_TEAM_SLACK_APP_TOKEN=...
 ANTHROPIC_API_KEY=...
 MFG_TEAM_AUDIT_HMAC_KEY=...        # ≥ 32 字元隨機值；保管人 = IT（不是導入負責人、不是簽收人）
 MFG_TEAM_APPROVAL_HMAC_KEY=...     # 另一把，≥ 32 字元
+MFG_TEAM_DAILY_BUDGET_USD=...      # 不是祕密，但 gateway 與排程貼文都讀這個檔：每分身每 UTC 日費用上限（USD），= 董事長核准的預算；claude-code driver 沒設就拒絕啟動（exit 64）
 HTTPS_PROXY=http://10.0.0.10:3128
 NO_PROXY=localhost,127.0.0.1
 ```
@@ -246,7 +247,7 @@ NO_PROXY=localhost,127.0.0.1
 | # | 項目 | 做法 | 通過條件 |
 | - | ---- | ---- | -------- |
 | D1 | 版本固定 | 記錄 `git rev-parse HEAD`、`pip freeze`、`claude --version` | 與核准的版本清單一致 |
-| D2 | 旗標檢查 | `systemctl start` 後讀 `/var/lib/mfg-twin/state/audit/sys/audit.jsonl` 最後一筆 `config_loaded`；`journalctl -u mfg-twin-gateway` 有 `self-check: denylist: /etc/mfg-twin/names.denylist (N entries)` | `driver_info.flag_check` = `ok`，`cli_version` 與 D1 相同（repo 驗證過的版本：2.1.289），`driver_info.denylist.entries` > 0 |
+| D2 | 旗標檢查 | `systemctl start` 後讀 `/var/lib/mfg-twin/state/audit/sys/audit.jsonl` 最後一筆 `config_loaded`；`journalctl -u mfg-twin-gateway` 有 `self-check: denylist: /etc/mfg-twin/names.denylist (N entries)` 與 `self-check: daily budget: <核准金額> USD per twin per UTC day, spend kept in /var/lib/mfg-twin/state/daily-spend.json` | `driver_info.flag_check` = `ok`，`cli_version` 與 D1 相同（repo 驗證過的版本：2.1.289），`driver_info.denylist.entries` > 0，每日上限與預算核准單上的金額相同 |
 | D3 | Scope 檢查 | 正常啟動；再暫時多加 `reactions:write` 並重裝 app、重啟 | 正常時啟動；多給 scope 時 exit 78 並列出該 scope；移除後恢復 |
 | D4 | 連線與回答 | 試用者在綁定頻道 @分身 問一個 T1 問題 | 回覆在 thread 內、有前綴與 `稽核 #seq` 頁尾 |
 | D5 | 被拒事件 | 依序：DM 機器人、在未綁定頻道 @、不 @ 直接說話、貼 P7「這張單報價 125 萬、成本 98 萬，要不要接」、貼 P2「The defense program fixture drawing DWG-4471 needs an export license before we send it to the subcontractor」 | DM／未綁定／未 @ 無回覆但有 `policy_denied`；P7 `dlp_blocked dlp:T2`；P2 回「此內容可能屬 T3…」（需 D2 的 denylist 已載入） |

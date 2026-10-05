@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上、不外流圖紙。
+> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上。圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不出公司（要讓 AI 讀圖紙請用地端模型，見 [Cloud first, on-prem later](#cloud-first-on-prem-later)）；分身只處理 T0/T1，T1 會經聊天平台與雲端模型。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 **這份 README 給三種人看：**
 
-- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)
+- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；**要簽字導入分身前，先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判、給客戶稽核員的三行）
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
@@ -40,7 +40,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ## 這能做什麼
 
-簡單說：**裝起來後你會多 5 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
+簡單說：**裝起來後你會多 6 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
 
 | #   | 場景                  | AI 同事幫你做                                                                |
 | --- | --------------------- | ---------------------------------------------------------------------------- |
@@ -51,9 +51,9 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
 | 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥都有起點範本）  |
 
-**5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
+**6 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管、工程變更 — 各司其職、會互相接力（看下面 Mermaid 圖）。
 
-**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 5 隻 AI 同事，**你不用每次重講一遍**。
+**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 6 隻 AI 同事，**你不用每次重講一遍**。
 
 ---
 
@@ -62,7 +62,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 > 每個職位一個**副駕分身**，住在公司的聊天工作區。**副駕不是替身**：判斷永遠由人做，分身只負責補資料、挑戰假設、定時提醒。
 
 - **分身是什麼**：一個職位一個分身（例：品保部主管分身），由既有的 agents、skills、know-how 以 id **組合**而成，不複製、不覆寫。只在被 @ 時回答，回覆一律標明「【某某分身】」，遇到決策點就停下來把選項交還給人（`🧭 需要你判斷`）。
-- **三分類**：分身的每項能力必標 `strengthen`（強化既有優勢：人仍親手判斷）、`create`（創造新能力：以前沒人做）或 `outsource`（外包既有工作：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。`outsource` 預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判 `outsource`。
+- **三分類**：分身的每項能力必標強化既有優勢（`strengthen`：人仍親手判斷）、創造新能力（`create`：以前沒人做）或外包既有工作（`outsource`：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。外包既有工作預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判外包既有工作。
 - **先過閘門**：流程修正或既有 `/command` 能解決的，就不開分身（`team/gate/need-a-twin.md`）。
 
 **2 分鐘離線試玩**（零憑證、零網路、純 Python 標準庫）：
@@ -97,7 +97,7 @@ python3 infra/chat-gateway/demo.py
 
 採用「**core + profile overlay**」架構：
 
-- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
+- **Core 層** — 普世製造業基本功：6 段流程 + 6 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
 - **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
@@ -108,7 +108,7 @@ python3 infra/chat-gateway/demo.py
 
 ## Agent 之間怎麼協作
 
-看完 demo 最常被問的問題：「5 隻 AI 同事是怎麼接力的？」一張圖說明。
+看完 demo 最常被問的問題：「6 隻 AI 同事是怎麼接力的？」一張圖說明。
 
 ### 流程：以 `/quote` 為例
 
@@ -130,7 +130,7 @@ sequenceDiagram
     Quote->>User: 完整報價單（含交期 + 檢驗成本）
 ```
 
-### 5 隻通用 agent · 各司其職
+### 6 隻通用 agent · 各司其職
 
 | Agent       | 角色             | 何時被呼叫              | 主要接力對象       |
 | ----------- | ---------------- | ----------------------- | ------------------ |
@@ -139,6 +139,7 @@ sequenceDiagram
 | 📅 生管     | 排程、產能評估   | 排單、交期確認          | 報價師、倉管       |
 | 🔍 品管     | 檢驗計畫、不良追蹤 | `/inspect`、`/8d`       | 業助、倉管         |
 | 📦 倉管     | 庫存、BOM 對帳   | `/bom-check`、缺料      | 生管、品管         |
+| 🛠️ 工程變更 | ECN / ECO 影響分析、變更追溯 | 圖紙或 BOM 改版     | 生管、品管、倉管   |
 
 > CNC 產業包再加 4 隻（CAM 工程師、刀具管理、量測技師、首件確認），詳見 [profiles/cnc-machining/](profiles/cnc-machining/)。
 
@@ -150,9 +151,9 @@ sequenceDiagram
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 6 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
-| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
+| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 需要時改走地端 GB10/Ollama：圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不出公司；分身只處理 T0/T1，T1 會經聊天平台與雲端模型 |
 
 ---
 
@@ -171,7 +172,7 @@ sequenceDiagram
 
 ## 💰 成本預期
 
-**最便宜路徑：先用雲端試一個月，總成本約 NT$650**
+**最便宜路徑：先用雲端試一個月，總成本約 NT$650**（一個人在自己電腦試 Claude Code plugin 的個人訂閱；**不是分身 pilot 的費用**——分身走 API 金鑰計費，另有聊天平台與人力，見 [董事長一頁](docs/owner-one-page.zh-TW.md)）
 
 | 階段                       | 月成本                | 一次性                 |
 | -------------------------- | --------------------- | ---------------------- |
@@ -226,7 +227,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
-1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
+1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 6 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
 2. **Stub 加碼客製** — 若你是 PCB / 射出 / 食品 / 製藥，那個產業包是 stub 但有 starter template，照著填內容就能用。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
@@ -257,7 +258,7 @@ manufacturing-skill/
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # 普世製造業基本功
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
-│   ├── agents/               # 5 隻 universal persona
+│   ├── agents/               # 6 隻 universal persona
 │   ├── skills/               # 6 段流程 + 通用 skill
 │   ├── know-how/             # ISO 9001、Lean、OEE、MRP
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
@@ -276,6 +277,7 @@ manufacturing-skill/
 │   ├── explainers/           # 三張可印 A3 的繁中說明卡
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
+│   ├── owner-one-page.zh-TW.md  # 董事長一頁：簽什麼、花多少、怎麼停
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
 ├── tests/
@@ -301,7 +303,7 @@ manufacturing-skill/
 
 ## 我要在自己的工廠導入
 
-→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。
+→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。要導入分身、需要董事長簽字的，先給董事長 [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)。
 
 裡面有 Jason 用過的導入順序、踩雷清單、客製化指引。
 

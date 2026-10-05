@@ -7,7 +7,7 @@ argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 
 # /morning-briefing — 廠長 / 生管 / 業務每日早會懶人包
 
-每天早上 8 點打這個。AI 自動爬 ERP / scheduler-mcp / 昨日 inspection log，整理成 5 分鐘看完的早會稿。
+每天早上 8 點打這個。AI 自動爬 ERP / manufacturing-scheduler / 昨日 inspection log，整理成 5 分鐘看完的早會稿。
 
 ## 使用範例
 
@@ -66,7 +66,7 @@ argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 
 ## 沒接 ERP / MCP 時的降級行為
 
-如果 `scheduler-mcp` 沒回應（mock data 也沒設定），AI 會：
+如果 `manufacturing-scheduler` 沒回應（mock data 也沒設定），AI 會：
 
 1. 標明「⚠️ 即時資料未連線，以下基於上次手動更新」
 2. 嘗試讀 `examples/` 或最近的 git commit log 推測狀態

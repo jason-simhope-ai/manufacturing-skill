@@ -25,11 +25,12 @@ from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
 from .audit import (AuditLog, action_totals, check_anchor, counts, foreign_key_chain, heads, heads_document, newer_heads,
                     verify_report, write_heads)
-from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, DENYLIST_VAR, FREEZE_FILE, FREEZE_LAST, NO_DENYLIST_VAR,
-                     STATE_DIR_VAR, GatewayConfig, config_from_env, ensure_state_dir, resolve_state_dir,
+from .config import (AUDIT_KEY_VAR, DAILY_BUDGET_VAR, DEMO_AUDIT_KEY, DENYLIST_VAR, FREEZE_FILE, FREEZE_LAST,
+                     NO_DENYLIST_VAR, STATE_DIR_VAR, GatewayConfig, config_from_env, ensure_state_dir, resolve_state_dir,
                      stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
 from .sanitize import load_denylist
+from .spend import SPEND_FILE
 from .drivers import load_driver_class
 
 
@@ -104,6 +105,7 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
     return Gateway(roster, adapter, driver, audit, clock, approvals=ApprovalBook(cfg.approval_key, clock=clock),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,
                    max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp,
+                   spend_path=cfg.state_dir / SPEND_FILE if cfg.daily_budget_usd is not None else None,
                    frozen_flag=cfg.state_dir / FREEZE_FILE, config_info={"denylist": deny_info})
 
 
@@ -268,6 +270,9 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
             print(f"self-check: denylist: {deny.get('path')} ({deny.get('entries', 0)} entries)" if deny.get("entries")
                   else f"self-check: denylist: NOT LOADED (set {DENYLIST_VAR}"
                        + (f"; {NO_DENYLIST_VAR}=1 is set)" if cfg.no_denylist else ")"))
+            print(f"self-check: daily budget: {cfg.daily_budget_usd:g} USD per twin per UTC day, spend kept in "
+                  f"{gw.spend.path}" if cfg.daily_budget_usd is not None
+                  else f"self-check: daily budget: none ({DAILY_BUDGET_VAR} not set; required with --driver claude-code)")
             if had_chain:
                 print(f"self-check: note: {cfg.state_dir / 'audit'} already held an audit chain; this check "
                       f"appended to it (now seq {gw.audit.next_seq - 1})", file=sys.stderr)

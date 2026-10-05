@@ -36,6 +36,7 @@ from .drivers.base import DriverError, DriverPolicyDenied, HarnessDriver, TwinIn
 from .formatter import format_reply, notice
 from .patterns import find_secrets
 from .prompt import PROMPT_BUDGET_BYTES
+from .spend import DailySpend, SpendPersistError
 
 __all__ = [
     "ApprovalCard", "ApprovalClick", "ConfigRefused", "Event", "Gateway", "InboundMessage",
@@ -303,7 +304,8 @@ class Gateway:
                  executor: Executor | None = None, token_hex: Callable[[int], str] = secrets.token_hex,
                  read_roots: tuple[str, ...] = (), daily_budget_usd: float | None = None,
                  extra_dlp: Iterable[tuple[str, re.Pattern]] = (), max_budget_usd: float = 0.10,
-                 timeout_s: int = 60, frozen_flag: str | Path | None = None, config_info: dict | None = None):
+                 timeout_s: int = 60, spend_path: str | Path | None = None,
+                 frozen_flag: str | Path | None = None, config_info: dict | None = None):
         self.roster, self.adapter, self.driver, self.audit, self.clock = roster, adapter, driver, audit, clock
         self.policy = roster["policy"]
         self.twins = {t["id"]: t for t in roster["twins"]}
@@ -333,7 +335,11 @@ class Gateway:
         self.post_rl = RateLimiter(*self.POST_LIMIT)
         self._rl_noticed: dict[str, float] = {}
         self._failures: dict[str, int] = {}
-        self._spend: dict[tuple[str, str], float] = {}
+        # Day's spend per twin (UTC). With `spend_path` (the CLI passes `<state>/daily-spend.json`
+        # whenever MFG_TEAM_DAILY_BUDGET_USD is set) it survives restarts and is shared with cron
+        # `post` processes; a bad file refuses start. Once a write fails, no more model calls.
+        self.spend = DailySpend(spend_path)
+        self._spend_broken = False
         self._thread_cap: OrderedDict[tuple[str, str], tuple[str, str]] = OrderedDict()
         self.last_deny: tuple[str, str, int] | None = None
         self.frozen_flag = Path(frozen_flag) if frozen_flag else None
@@ -782,6 +788,21 @@ class Gateway:
         text = f"[排程] {cap['id']}"
         return self._invoke(ctx, twin, channel, text, False, text, cap=cap)
 
+    # ── spend ──
+    def _charge(self, ctx: _Ctx, tid: str, day: str, usage: dict, common: dict) -> None:
+        """Add one call's cost to the day's total. A cost the driver did not report (or reported as
+        negative / non-finite) is charged at the per-call cap `max_budget_usd`, so the daily budget
+        stays a ceiling even when the CLI omits `total_cost_usd`."""
+        cost = usage.get("cost_usd")
+        if not (isinstance(cost, (int, float)) and not isinstance(cost, bool) and math.isfinite(cost) and cost >= 0):
+            cost = self.max_budget_usd
+        try:
+            self.spend.add(tid, day, float(cost))
+        except SpendPersistError as exc:
+            self._spend_broken = True
+            self._audit("driver_error", ctx, decision="deny", deny_reason=f"spend_not_saved:{type(exc).__name__}",
+                        **common)
+
     # ── driver invocation (shared) ──
     def _invoke(self, ctx: _Ctx, twin: dict, channel: dict, user_text: str, own_taint: bool,
                 plain: str, cap: dict | None = None, learner: bool = False) -> list[Reply | ApprovalCard]:
@@ -797,7 +818,8 @@ class Gateway:
         level = effective_autonomy(cap, twin, self.policy, channel, tainted=tainted, degraded=degraded,
                                    learner=learner)
         day = _dt.datetime.fromtimestamp(self.clock(), _dt.timezone.utc).date().isoformat()
-        if self.daily_budget_usd is not None and self._spend.get((tid, day), 0.0) >= self.daily_budget_usd:
+        if self.daily_budget_usd is not None and (
+                self._spend_broken or self.spend.get(tid, day) >= self.daily_budget_usd):
             self._deny(ctx, "daily_budget", twin=tid)
             return [self._notice(ctx, tid, "今日預算已用完，明天再問", decision="deny")]
         common = dict(twin=tid, twin_prompt_sha=twin.get("promptSha"), capability=cap["id"],
@@ -822,12 +844,14 @@ class Gateway:
         except Exception as exc:  # noqa: BLE001 - any driver failure is reported, never guessed
             self._failures[tid] = self._failures.get(tid, 0) + 1
             self._audit("driver_error", ctx, decision="deny", deny_reason=type(exc).__name__, **common)
+            # A failed or timed-out call may still have been billed: charge the per-call cap.
+            self._charge(ctx, tid, day, {}, common)
             return [self._notice(ctx, tid, "暫時無法回應", decision="deny")]
         latency = int((time.perf_counter() - started) * 1000)
         self._failures[tid] = 0
         if self.frozen():                             # P-03: frozen while the model ran: drop the reply
             usage = dict(result.usage) if isinstance(result.usage, dict) else {}
-            self._spend[(tid, day)] = self._spend.get((tid, day), 0.0) + float(usage.get("cost_usd", 0.0) or 0.0)
+            self._charge(ctx, tid, day, usage, common)   # the reply is dropped, the cost was incurred
             self._deny(ctx, "frozen_in_flight", action="frozen", usage=usage, latency_ms=latency, **common)
             self._void_pending_approvals(ctx)
             if not ctx.user_ref:                      # scheduled post: nobody to tell
@@ -850,8 +874,7 @@ class Gateway:
             self._audit("dlp_blocked", ctx, decision="deny", deny_reason=f"output:{stats['blocked']}", **common)
             text = None
         usage = dict(result.usage) if isinstance(result.usage, dict) else {}
-        cost = float(usage.get("cost_usd", 0.0) or 0.0)
-        self._spend[(tid, day)] = self._spend.get((tid, day), 0.0) + cost
+        self._charge(ctx, tid, day, usage, common)
         redactions = {"secret": stats["secret"], "pii": stats["pii"], "amount": 0}
         if text is None:
             reply = self._say(ctx, tid, lambda s: notice(twin["title"], "回覆含高於本頻道分級的標記，已整則攔截", s),
