@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **`infra/mcp-servers/erp-connector/contract.py`** — every tool now takes a typed, frozen `CallContext` (`operator_id`, `role`, `channel`, `request_id`, `classification` T0–T3, tz-aware `timestamp`, optional `approval_token`) as its first argument. The free-string `operator` parameter is removed (it could be forged). **Breaking for existing connector implementations.**
+- Write tools (`create_sales_order`, `create_purchase_request`, `update_inventory_movement`, `close_sales_order`) now require a keyword-only `idempotency_key` and return a `WriteResult` (status `committed` / `replayed` / `refused`, plus audit fields) instead of a bare `str` / `bool`, so a refusal is no longer conflated with a failure.
+- Read tools return typed results with price and customer-contact fields masked by role (`masked_fields` lists what was hidden); inventory quantities and ledger `qty` are `Decimal`, timestamps are timezone-aware (CODE-AUDIT F26).
+- `infra/mcp-servers/erp-connector/README.md` — rewritten for the new interface: `CallContext` fields, masking defaults, approval-token flow, implementation checklist, security notes (read-only service account for queries, write tools gated by approval token + role, log every call with the `CallContext`).
+- `SECURITY.md` — ERP bullet now names the `CallContext` / `idempotency_key` fields instead of `operator`.
+
+### Added
+
+- `verify_approval(token, action_hash)` hook plus `authorize_write()` helper on the ERP contract: implementations must verify an approval token bound to the action hash (signature, expiry, approver different from requester) before any write. Vendor-neutral; the chat gateway in `infra/chat-gateway/` is the intended issuer.
+- `max_rows` (default 200, hard cap 1000) and `fields` (allowlist) on the new list tools `list_customers`, `list_parts`, `list_inventory`; default masking of `price` and `customer_contact` field groups unless the role is granted them (deny by default).
+- `infra/mcp-servers/erp-connector/mock_connector.py` and `mock-data/erp_mock.json` — reference `MockErpConnector` over synthetic data demonstrating masking, row caps, idempotent writes and refusal without a valid approval token.
+- `tests/mcp/test_erp_contract.py` (stdlib `unittest`) and a CI step "erp-connector — contract tests".
 
 ## [0.1.5] — 2026-05-09
 

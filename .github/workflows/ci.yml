@@ -327,6 +327,9 @@ jobs:
       - name: Multi-profile — helper unit tests
         run: python3 tests/multiprofile/test_multiprofile.py
 
+      - name: erp-connector — contract tests
+        run: python3 tests/mcp/test_erp_contract.py
+
       # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
       # file. Validates extends path, mode marker presence (exactly
