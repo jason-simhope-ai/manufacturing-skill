@@ -50,11 +50,15 @@ positions:
         result: twin
         rationale: 晨會簡報每日耗時；生管已訪談；排程資料已數位化
         reviewedOn: "2026-10-05"
+  - { id: qa-inspector, department: qa, title: 品保檢驗員, incumbent: LOCAL }
   - { id: machining-manager, department: machining, title: 加工部主管, incumbent: LOCAL }
   - { id: sales-manager, department: sales, title: 業務部主管, incumbent: VACANT }
   - { id: admin-manager, department: admin, title: 管理部主管, incumbent: LOCAL }
   - { id: chair-head, department: chair, title: 董事長室主管, incumbent: LOCAL }
 channels:
-  - { id: qa-floor, department: qa, tier: T1, adapter: mock, twins: [qa-manager], defaultTwin: qa-manager, autonomyCeiling: draft, askers: [qa-manager] }
+  - { id: qa-floor, department: qa, tier: T1, adapter: mock, twins: [qa-manager], defaultTwin: qa-manager, autonomyCeiling: draft, askers: [qa-manager], twinFreeDays: [15] }
+  # learners: may @ the twin, get only similar cases and counter-examples (never a verdict);
+  # their turns stay out of the channel window. Keep the manager out of this channel.
+  - { id: qa-learn, department: qa, tier: T1, adapter: mock, twins: [qa-manager], defaultTwin: qa-manager, autonomyCeiling: suggest, askers: [], learners: [qa-inspector], predictFirstDefault: true }
   - { id: production-floor, department: production, tier: T1, adapter: mock, twins: [production-manager], defaultTwin: production-manager, autonomyCeiling: draft, askers: [production-manager] }
   - { id: daily-ops, department: production, tier: T1, adapter: mock, twins: [production-manager, qa-manager], defaultTwin: production-manager, autonomyCeiling: draft, askers: [production-manager, qa-manager, machining-manager] }

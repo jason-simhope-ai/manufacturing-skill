@@ -2,7 +2,7 @@
 
 > 每個職位有一個副駕分身。**副駕不是替身**：判斷永遠是人做，分身讓你看得更多、更快發現漏洞。
 >
-> **人類讀者從這份開始。** 根目錄的 [TEAM.md](../TEAM.md) 是給 AI agent 的啟動檔（位元組預算、錯誤碼、演算法），不必讀。
+> **人類讀者從這份開始。** 根目錄的 [TEAM.md](../TEAM.md) 是給 AI agent 的啟動檔（位元組預算、錯誤碼、演算法），不必讀。前線同仁（檢驗員、業助、生管）請看一頁版：[分身與我](for-frontline.zh-TW.md)。
 > 狀態：v0.2.0-alpha，實驗性；只在測試工作區與合成／已去識別資料上試。
 
 ## 先看這裡：誰不該現在導入
@@ -16,8 +16,9 @@
 | 至少兩位主管，每週各 15 分鐘 review | 沒有 review，分身只是多一個沒人檢查的訊息來源 |
 | 資料已數位化，且能先去識別成 T1 | 見下方「資料餵入」。流程還在紙本，先做流程修正 |
 | 公司接受「T1 內容送到雲端模型」 | 見下方「T0–T3」。客戶合約（NDA、客戶規範）不允許第三方 AI 看的資料，先查合約，不要先試 |
+| 「AI 賦能原則」已簽署，簽署日期貼在分身頻道的說明 | 範本見導入指南。**沒有簽就不要導入**：前線同仁沒有任何依據相信「不會取代我」 |
 
-另外：老闆期待「裝了就省人力」的，不要導入；分身的指標不是省時間（見 [導入指南](../docs/adoption-guide.md) 的團隊段）。
+另外：老闆期待「裝了就省人力」的，不要導入；分身的指標不是省時間（見 [導入指南](../docs/adoption-guide.md) 的團隊段）。**分身也不是空缺的替代**：職位空著就去補人；空缺職位的分身只到 `observe`，要啟用還得由升級梯上的人簽 `vacancyApprovedBy`／`vacancyApprovedOn`（`E064`）。
 
 ## 0–2 分：一張圖
 
@@ -93,7 +94,20 @@ outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一�
 
 **分身永遠不做**：替你做決定、寫入任何系統、對外發送、冒充你、評比個人、讀整個頻道、保留長期記憶（只帶入本頻道最近 10 則被 @ 的問答，**含他人的提問**，重啟即清空）。
 
-**FAQ：會不會取代我？** 不會。每項能力都寫明「上線後你還親手做什麼」；分身指標與技能保留紀錄不作為人力或績效依據；你可以隨時用「我先說」讓自己先判斷。
+**FAQ：會不會取代我？** 以公司簽署的「AI 賦能原則」為準；沒有簽就不要導入。工具這邊做得到的是：每項能力都寫明「今天誰在做」與「上線後你還親手做什麼」，做事的人不是本職位時要本人簽 `doerAckedOn`；你可以隨時用「我先說」讓自己先判斷。
+
+**FAQ：分身答錯，誰負責？** 分身的答案是參考。沒有人會因為「分身這樣說」而被追責，也沒有人會因為沒用分身而被追責；簽字採用結論的人負責結論。
+
+## 前線同仁能做的事（gateway 程式支援）
+
+| 在頻道裡說（先 @ 分身） | 系統做什麼 | 限制 |
+| ----------------------- | ---------- | ---- |
+| 「我不同意」／「分身錯了」 | 不再呼叫模型；回一句收到；稽核寫 `human_override`，**只記頻道、分身、能力**，不記 event、thread、使用者 | 聊天平台本身仍看得到誰發的；只認這兩個字串 |
+| 「我親手做了」 | 稽核寫 `practice_checkin`（同樣不記人），給 `manualRepsPerMonth` 對帳 | **自報**，只計數，系統無法驗證真的做了 |
+| 不用分身日 | roster `channels[].twinFreeDays: [15]`（每月第幾天，依 `org.timezone`）：非緊急的提問回「今天請自己判斷」，稽核寫 `twin_free_day`；排程貼文也停。訊息含「緊急」照常回答 | 只是「每月幾號」的清單，沒有工作日曆、假日判斷 |
+| 學習者 `learners` | roster `channels[].learners: [職位 id]`：可 @ 分身但不在 `askers`；回覆標「學習模式」，上限 `suggest`，只給相似案與反例（prompt 規則，非程式保證）；他們的對話不進頻道窗，主管的回答看不到 | 學習頻道請不要加主管；`predictFirstDefault: true` 讓學習者預設「我先說」，說「這次直接給」可跳過一次 |
+
+`teamctl audit-verify` 會印出這三種計數（依頻道／能力加總，**不按人拆**），季複審時讀。
 
 ## 這些承諾，工具擋得住什麼
 
@@ -101,13 +115,25 @@ outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一�
 
 | 承諾 | 工具實際做的 | 擋不住的 |
 | ---- | ------------ | -------- |
-| 每項能力標分類、寫 `today`／`humanStillDoes` | 缺漏是硬錯誤；`strengthen` 的 `humanStillDoes` 只剩「審閱／確認／核准／蓋章」會被擋（`E038`） | 標錯：把 outsource 標成 strengthen 再寫一句「親手核對」就能過；`today` 寫「無」也過。真偽靠季審與「有爭議判 outsource」 |
+| 每項能力標分類、寫 `today`／`humanStillDoes` | 缺漏是硬錯誤；`strengthen`／`create` 的 `humanStillDoes` 任一職位那行只剩審閱類字眼（`REVIEW_ONLY_WORDS`：審閱、確認、看過、沒問題就送出、若有意見再補充…）會被擋（`E038`）；`today` 有人在做卻沒列 `affectedRoles`（`E061`）；`today` 寫「無人」只准 `create`（`E062`）；`affectedRoles` 有本職位以外的人，就要那個人簽 `doerAckedOn`（`E063`，喚醒 outsource 時也查） | 字表可以換說法繞過；`affectedRoles` 可以亂填本職位（`today` 提到「工程師」「生管」等時只會 `W009` 警告）；做事的人簽了之後再改分類，lint 也看不出來。真偽靠做事的人簽名、季審與「有爭議判 outsource」 |
 | outsource 休眠、≤ 1 項、≤ `draft`、90 天複審 | lint 檢查結構；gateway 不會呼叫休眠能力，並把 outsource 限制在 `draft` | **`reviewBy` 到期由 lint 發現，不是執行期強制**：只有人跑 `teamctl check` 才看得到（本機 roster 過期是錯誤，CI 只警告，且 CI 看不到你的本機 roster）；gateway 執行期不看 `reviewBy` |
-| teach-back 與人工練習 | `manualRepsPerMonth` 只驗證是 ≥ 1 的整數 | **自報制**：沒有提醒、沒有記錄、沒有驗證，由在職者在週 review 自己說。文件寫「要求」，不是系統強制 |
+| teach-back 與人工練習 | `manualRepsPerMonth` 只驗證是 ≥ 1 的整數；當事人在頻道說「我親手做了」會記一筆 `practice_checkin`（只計數） | **自報制**：沒有提醒、沒有驗證，計數不記是誰，也無法證明真的做了。文件寫「要求」，不是系統強制 |
 | 決策點 🧭、信心只有「中／低」 | gateway 程式強制（模型沒列決策點時補上通用句） | `/team ask` 預覽路徑不經 gateway，沒有頁尾 |
-| 人先寫 D4、「我先說」 | 只寫在 prompt 裡 | 使用者不說就沒有；沒有任何紀錄 |
+| 人先寫 D4、「我先說」 | 「我先說」由 gateway 偵測；學習者在設了 `predictFirstDefault` 的頻道預設先說。人先寫 D4 只寫在 prompt 裡 | 主管不說就沒有；沒有「誰先說了」的紀錄（刻意不記） |
+| 「我不同意」、不用分身日 | gateway 程式：不呼叫模型、匿名計數（見上方「前線同仁能做的事」） | 只認固定字串；不用分身日只是「每月幾號」，沒有假日邏輯 |
 | 成功指標（人修改 🧭 的比例、人先寫 D4 的比例、週 review 出席率） | 無；系統不收集 | 要由導入負責人每週手工記錄（表格見導入指南） |
-| 每分身在 `roster.json` 的項目 ≤ 600 B | 本機 roster 超過是警告 `W008`；只有 CI 檢查出貨範例 roster 時才是錯誤 `E050` | 警告不會擋你，但代表 `roster.json` 越來越肥（出貨的範例品保分身有 3 項能力，已是 586 B）；想再多啟用一項時，縮短能力 id 或職稱，或少啟用一項 |
+| 每分身在 `roster.json` 的項目 ≤ 600 B | 本機 roster 超過是警告 `W008`；只有 CI 檢查出貨範例 roster 時才是錯誤 `E050` | 警告不會擋你，但代表 `roster.json` 越來越肥（出貨的範例品保分身有 3 項啟用能力、3 個頻道，已是 597 B）；想再多啟用一項時，縮短能力 id 或職稱，或少啟用一項。**這是大小預算，不是分類檢查**：曾經只有它在「把 outsource 改標 strengthen」時跳出來，別依賴它 |
+
+分類相關的 lint 碼（完整表在 `team/tools/teamlib/schema.py` 的 `CODES`）：
+
+| 碼 | 什麼時候出現 | 怎麼修 |
+| -- | ------------ | ------ |
+| `E038` | `strengthen`／`create` 的 `humanStillDoes` 某一行只剩看、審、確認、送出 | 寫出那個人仍親手做的事（「先寫下嚴重度與理由」「親手寫 D4」） |
+| `E061` | `today` 有人在做，卻沒有 `affectedRoles` | 列出今天做這件事的職位 id 或稱呼（例：`[品保工程師]`） |
+| `E062` | `strengthen`／`outsource` 的 `today` 寫「無人」 | 真的沒人做就是 `create`；有人做就寫出是誰 |
+| `E063` | `affectedRoles` 有本職位以外的人，卻沒有 `doerAckedOn`（或日期在未來） | 拿 `today`／`humanStillDoes` 給那個人看，同意後填日期；不同意就改寫，或把那一行拆成休眠的 outsource |
+| `E064` | `VACANT` 職位的分身 `enabled: true`，缺 `vacancyApprovedBy`／`vacancyApprovedOn` 或核准人不在升級梯 | 先問為什麼空著；分身不是補人的方法 |
+| `W009` | `today` 提到「工程師」「生管」「檢驗員」等，`affectedRoles` 卻只有本職位 | 確認做事的人是不是漏列了 |
 
 ## 怎麼開始
 
@@ -117,7 +143,14 @@ outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一�
 3. 複製 `team/roster.example.yaml` 到 `team/local/roster.local.yaml`，改成自己的部門與職位（只放職稱，不放姓名；本機設定見 `team/local/README.md`）。
 4. `python3 team/tools/teamctl.py check` 通過後，用 `python3 team/tools/build.py --summary` 編譯；離線試玩：`python3 infra/chat-gateway/demo.py`。
 5. 誰核准？outsource 的核准人必須在該部門的升級梯上、且不是本人。
-6. **兩週與逐日做法**：見 [導入指南](../docs/adoption-guide.md) 團隊段的「兩週逐日表」，含「AI 賦能原則」與部署檢核表範本。
+6. **兩週與逐日做法**：見 [導入指南](../docs/adoption-guide.md) 團隊段的「兩週逐日表」，含「AI 賦能原則」與部署檢核表範本。檢核表第一項是：原則已簽、**簽署日期已貼在分身頻道的說明**。
+7. 把 [分身與我](for-frontline.zh-TW.md) 印給會被分身影響的同仁（不只是會用它的主管）；`python3 infra/chat-gateway/demo.py --plain` 是給他們看的 3 段精簡示範（中文、沒有 token 與稽核行）。
+
+> **給主管**
+> - 不要用使用次數、修改率、「我不同意」次數去評價任何人；這些數字只用來改善分身。
+> - 報表只到公司層級，或至少 5 人的群組；小廠一個部門 2–3 人時，部門彙總就等於個人，不要做。
+> - `teamctl audit-verify` 的輸出只有分級與「頻道／能力」的計數，不按使用者拆；不要另外寫程式把稽核紀錄的 `operator_ref` 對回人。
+> - 分身答錯不是用的人的錯；簽字採用結論的人負責結論。
 
 **不要把秘密放進任何檔案**：token、金鑰只放環境變數（`MFG_TEAM_*`、`ANTHROPIC_API_KEY`）；真名、平台 id、客戶名只放 `team/local/*`（不進版控）。CI 只掃追蹤檔，`team/local` 靠本機 pre-commit（`team/local/README.md`）。
 

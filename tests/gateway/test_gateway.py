@@ -588,7 +588,7 @@ class TestRateLimits(HarnessCase):
         answered = 0
         for i in range(66):
             out = h.msg(f"@品保 spc-watch {i}", user=f"u{i // 6}")
-            answered += bool(out and "· suggest" in out[0].text)
+            answered += bool(out and "· 建議（草稿）" in out[0].text)
         self.assertEqual(answered, 60)
         self.assertIn("channel_60_per_hour", h.reasons())
 
@@ -671,7 +671,7 @@ class TestTaint(HarnessCase):
         [r] = outs
         self.assertIsInstance(r, Reply)                            # never an ApprovalCard
         self.assertEqual((r.channel_ref, r.thread_ref), ("qa-floor", "e1"))
-        self.assertTrue(r.text.startswith("【品保部主管分身】· suggest"))
+        self.assertTrue(r.text.startswith("【品保部主管分身】· 建議（草稿）"))
         self.assertNotRegex(r.text, r"https?://|www\.")
         self.assertNotIn("@everyone", r.text)
         self.assertNotIn("<!channel>", r.text)
@@ -714,7 +714,7 @@ class TestDLP(HarnessCase):
     def test_t2_marker_allowed_in_t2_channel(self):
         h = self.make(mutate=add_t2_channel)
         [r] = h.msg("@品保 機密 圖面 spc-watch", channel="qa-design")
-        self.assertIn("· suggest", r.text)
+        self.assertIn("· 建議（草稿）", r.text)
         self.assertEqual(len(h.driver.calls), 1)
 
     def test_output_with_higher_tier_marker_blocked(self):
@@ -1117,7 +1117,7 @@ class TestRound2Hardening(HarnessCase):
     def test_cr_f18_draft_output_labelled(self):
         from chat_gateway.formatter import format_reply
         text = format_reply("品保部主管分身", "draft", TwinResult(reply="8D 草稿"), category=None, seq=1)
-        self.assertIn("結論：DRAFT 8D 草稿", text)
+        self.assertIn("分身的看法：DRAFT 8D 草稿", text)
 
 
 # ── prompt assembly budget ───────────────────────────────────────────

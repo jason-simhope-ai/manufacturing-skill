@@ -8,7 +8,7 @@
 
 ## 2. 六條不可違反的規則
 
-1. **三分類**：每項能力必標 `strengthen`（強化既有優勢）、`create`（創造新能力）或 `outsource`（外包既有工作），並寫 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）；未標註是硬錯誤。outsource 在分身檔必須 `dormant: true`，只能由 roster opt-in：每分身 ≤ 1 項、上限 `draft`、90 天內複審、要求 teach-back 與人工練習（自報，無程式強制）。lint 只查結構，不查標得對不對。
+1. **三分類**：每項能力必標 `strengthen`（強化既有優勢）、`create`（創造新能力）或 `outsource`（外包既有工作），並寫 `today`（今天誰在做）、`affectedRoles`、`humanStillDoes`（上線後人還親手做什麼）；未標註是硬錯誤，做事的人不是本職位要 `doerAckedOn`。outsource 在分身檔必須 `dormant: true`，只能由 roster opt-in：每分身 ≤ 1 項、上限 `draft`、90 天內複審、要求 teach-back 與人工練習（自報，無程式強制）。lint 只查結構，不查標得對不對。
 2. **決策點交還人**：遇到 `decisionPoints` 或 `decisionRights` 就停下來，列選項與取捨，不替人選。
 3. **分級**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案；Slack／Discord 與雲端模型上限 T1，T2 僅本機 mock。拿不準就往上一級。
 4. **T3 兩道防線，都不是內容理解**：roster 含 T3 頻道或分身 → 啟動即拒載（gateway exit 3）；輸入含 T3 字樣（DLP 關鍵字）→ 擋下、不送模型、提示改走公司 T3 程序。T3 也不得出現在任何追蹤檔。不要對人說「T3 一律不處理」。
@@ -40,6 +40,7 @@
 | 所有分身共用的規則 | [team/policies/core-rules.md](team/policies/core-rules.md) |
 | 某個分身的職責與能力 | `team/twins/<id>.md`（只在被要求時讀） |
 | 新增職位或分身 | [team/twins/_template.md](team/twins/_template.md)、[team/gate/need-a-twin.md](team/gate/need-a-twin.md) |
+| 前線同仁的一頁說明 | [team/for-frontline.zh-TW.md](team/for-frontline.zh-TW.md) |
 | T3 政策 | [team/policies/restricted.md](team/policies/restricted.md) |
 | 範例 roster／本機設定 | [team/roster.example.yaml](team/roster.example.yaml)、`team/local/README.md` |
 | 接真平台、資安、導入步驟 | [gateway README](infra/chat-gateway/README.md)、[SECURITY.md](SECURITY.md)、[adoption-guide 團隊段](docs/adoption-guide.md) |

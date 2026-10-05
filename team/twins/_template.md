@@ -14,15 +14,21 @@ autonomyCeiling: draft
 decisionRights: [請列出遇到就必須停下來交還給人的決定]
 compose: { agent: quality-inspector, skills: [spc-basics], knowHow: [iso-9001], hooks: [], optional: [] }
 capabilities:
+  # Write today / humanStillDoes per person who actually does the work ("doer vs manager"),
+  # e.g. "品保工程師：…；主管：…". If the doer's line is really outsource, make it a separate
+  # outsource capability (dormant) instead of hiding it inside a strengthen one.
   - id: example-strengthen
     summary: 人先做判斷，分身補資料與反例
     category: strengthen          # strengthen | create | outsource (required)
     autonomy: suggest             # observe < suggest < draft
-    today: 今天實際在做這件事的職位與做法（常是下屬，不是主管）
-    humanStillDoes: 上線後人仍親手做什麼（不能只剩審閱、確認、核准、蓋章）
+    today: 今天實際在做這件事的人與做法；做的人常不是主管
+    affectedRoles: [new-role-manager]   # who does it today: position ids or job labels (E061)
+    # doerAckedOn: "YYYY-MM-DD"   # required when affectedRoles names anyone but this position (E063)
+    humanStillDoes: 主管：上線後仍親手做的事（不能只剩審閱、看過就送出、有意見再補充）
     decisionPoints: [至少一個決策點]
-  # outsource entries must be dormant: true, autonomy <= draft; only the
-  # roster (enableOutsource) may wake one, at most one per twin.
+  # today "無人…" is only valid for create (E062). outsource entries must be dormant: true,
+  # autonomy <= draft; only the roster (enableOutsource) may wake one, at most one per twin,
+  # and waking one whose doer is someone else needs their doerAckedOn too.
 ---
 
 ## 角色定位

@@ -362,6 +362,14 @@ class TestRun(Base):
         self.assertFalse(pf.exists())
         self.assertEqual(list((self.state / "driver-tmp").iterdir()), [])
 
+    def test_learner_header_forbids_verdicts(self):
+        self.driver().run(self.inv(learner=True))
+        text = self.call()["prompt_text"]
+        self.assertIn("predictFirst=no learner=yes", text)
+        self.assertIn("學習模式：只給相似案、反例與出處", text)
+        self.driver().run(self.inv())
+        self.assertNotIn("learner=yes", self.call()["prompt_text"])
+
     def test_temp_file_removed_on_failure_too(self):
         for mode in ("fail", "badjson"):
             self.set_mode(mode)

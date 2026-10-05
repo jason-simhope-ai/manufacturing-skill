@@ -131,6 +131,8 @@ base:
         category: strengthen
         autonomy: suggest
         today: 品保工程師人工翻查
+        affectedRoles: [qa-engineer]
+        doerAckedOn: "2026-09-20"
         humanStillDoes: 先寫下嚴重度與理由
         decisionPoints: [嚴重度最終判定]
       - id: spc-watch
@@ -146,6 +148,8 @@ base:
         autonomy: draft
         dormant: true
         today: 品保工程師手動排版
+        affectedRoles: [qa-engineer]
+        doerAckedOn: "2026-09-20"
         humanStillDoes: 逐段核對後才送出
         decisionPoints: [是否送出]
     schedule:
@@ -197,6 +201,7 @@ base:
         category: strengthen
         autonomy: suggest
         today: 今天誰在做
+        affectedRoles: [new-role-manager]
         humanStillDoes: 人仍親手做的事
         decisionPoints: [決策點]
     ---
@@ -517,7 +522,8 @@ cases:
     replace:
       team/twins/qa-manager.md: [["    category: strengthen\n", "    category: outsource\n    dormant: true\n"], ["    category: create\n", "    category: outsource\n    dormant: true\n"]]
     args: [check, --ci]
-    expect: { exit: 1, codes: [E035] }
+    # spc-watch keeps today "無人定期做", which only `create` may say (E062)
+    expect: { exit: 1, codes: [E035, E062] }
   - id: e036-outsource-autonomy-above-draft
     replace:
       team/twins/qa-manager.md: [["    autonomy: draft\n", "    autonomy: act\n"]]
@@ -548,6 +554,137 @@ cases:
       team/twins/qa-manager.md: [["    decisionPoints: [嚴重度最終判定]\n", ""]]
     args: [check, --ci]
     expect: { exit: 1, codes: [E039] }
+
+  # ---- E038 review family, E061-E064, W009 (SCENARIO-SIM-R7 E02/E03/E12/E15) ----
+  # The two mislabel experiments of the R7 report must fail the linter, not only a size budget.
+  - id: r7-experiment-a-outsource-relabelled-strengthen
+    replace:
+      team/twins/qa-manager.md: [["    doerAckedOn: \"2026-09-20\"\n    humanStillDoes: 逐段核對後才送出", "    humanStillDoes: 逐段核對後才送出"], ["    category: outsource\n    autonomy: draft\n    dormant: true\n", "    category: strengthen\n    autonomy: suggest\n"], ["humanStillDoes: 逐段核對後才送出", "humanStillDoes: 親手逐段核對數值與措辭後才送出"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E063] }
+  - id: r7-experiment-a-original-file-shape
+    replace:
+      team/twins/qa-manager.md: [["    affectedRoles: [qa-engineer]\n    doerAckedOn: \"2026-09-20\"\n    humanStillDoes: 逐段核對後才送出", "    humanStillDoes: 逐段核對後才送出"], ["    category: outsource\n    autonomy: draft\n    dormant: true\n", "    category: strengthen\n    autonomy: suggest\n"], ["humanStillDoes: 逐段核對後才送出", "humanStillDoes: 親手逐段核對數值與措辭後才送出"]]
+    args: [check]
+    expect: { exit: 1, codes: [E061] }
+  - id: r7-experiment-b-severity-on-the-managers-behalf
+    replace:
+      team/twins/qa-manager.md: [["schedule:\n", "  - id: severity-call\n    summary: 代品保主管判嚴重度\n    category: strengthen\n    autonomy: suggest\n    today: 品保部主管判嚴重度\n    affectedRoles: [qa-manager]\n    humanStillDoes: 看分身結論後，若有意見再補充\n    decisionPoints: [嚴重度]\nschedule:\n"]]
+    args: [check]
+    expect: { exit: 1, codes: [E038] }
+  - id: r7-experiment-b-original-file-shape
+    replace:
+      team/twins/qa-manager.md: [["schedule:\n", "  - id: severity-call\n    summary: 代品保主管判嚴重度\n    category: strengthen\n    autonomy: suggest\n    today: 品保部主管判嚴重度\n    humanStillDoes: 看分身結論後，若有意見再補充\n    decisionPoints: [嚴重度]\nschedule:\n"]]
+    args: [check]
+    expect: { exit: 1, codes: [E038, E061] }
+  - id: r7-experiment-d-looked-and-sent
+    replace:
+      team/twins/qa-manager.md: [["humanStillDoes: 先寫下嚴重度與理由", "humanStillDoes: 看過沒問題就送出"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E038] }
+  - id: e038-create-only-review
+    replace:
+      team/twins/qa-manager.md: [["humanStillDoes: 決定是否加嚴抽樣", "humanStillDoes: 若有意見再補充"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E038] }
+  - id: e038-one-role-line-only-review
+    replace:
+      team/twins/qa-manager.md: [["humanStillDoes: 先寫下嚴重度與理由", "humanStillDoes: 主管：先寫下嚴重度與理由；品保工程師：看完確認後送出"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E038] }
+  - id: e038-per-role-lines-with-real-acts-ok
+    replace:
+      team/twins/qa-manager.md: [["humanStillDoes: 先寫下嚴重度與理由", "humanStillDoes: 主管：先寫下嚴重度與理由；品保工程師：先親手翻查 3 件相似案"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [] }
+  - id: e061-someone-does-it-but-no-affected-roles
+    replace:
+      team/twins/qa-manager.md: [["    affectedRoles: [qa-engineer]\n    doerAckedOn: \"2026-09-20\"\n", ""]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E061] }
+  - id: e062-nobody-today-only-for-create
+    replace:
+      team/twins/qa-manager.md: [["today: 品保工程師人工翻查", "today: 無人做"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E062] }
+  - id: e063-doer-has-not-signed
+    replace:
+      team/twins/qa-manager.md: [["    doerAckedOn: \"2026-09-20\"\n", ""]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E063] }
+  - id: e063-ack-date-in-future
+    replace:
+      team/twins/qa-manager.md: [["doerAckedOn: \"2026-09-20\"", "doerAckedOn: \"2026-12-01\""]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E063] }
+  - id: e063-waking-outsource-needs-the-doers-ack
+    replace:
+      team/twins/qa-manager.md: [["    doerAckedOn: \"2026-09-20\"\n    humanStillDoes: 逐段核對後才送出", "    humanStillDoes: 逐段核對後才送出"]]
+      team/roster.example.yaml: [["reviewedOn: \"2026-09-20\" }\n", "reviewedOn: \"2026-09-20\" }\n      enableOutsource:\n        - { capability: 8d-formatting, approvedBy: chair-head, reason: 測試, reviewBy: \"2026-11-01\", manualRepsPerMonth: 2 }\n"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E063, W003] }
+  - id: dormant-outsource-without-ack-is-ok
+    replace:
+      team/twins/qa-manager.md: [["    doerAckedOn: \"2026-09-20\"\n    humanStillDoes: 逐段核對後才送出", "    humanStillDoes: 逐段核對後才送出"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [] }
+  - id: own-position-title-needs-no-ack
+    replace:
+      team/twins/qa-manager.md: [["    today: 品保工程師人工翻查\n    affectedRoles: [qa-engineer]\n    doerAckedOn: \"2026-09-20\"\n", "    today: 品保部主管依相似案判嚴重度\n    affectedRoles: [品保部主管]\n"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [] }
+  - id: w009-today-names-another-job-but-only-own-role-listed
+    replace:
+      team/twins/qa-manager.md: [["    affectedRoles: [qa-engineer]\n    doerAckedOn: \"2026-09-20\"\n", "    affectedRoles: [qa-manager]\n"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [W009] }
+  - id: e064-vacant-position-twin-without-approval
+    replace:
+      team/roster.example.yaml: [["    incumbent: LOCAL\n    twin:", "    incumbent: VACANT\n    twin:"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E064] }
+  - id: e064-vacancy-approved-by-the-position-itself
+    replace:
+      team/roster.example.yaml: [["    incumbent: LOCAL\n    twin:", "    incumbent: VACANT\n    twin:"], ["      enabled: true\n", "      enabled: true\n      vacancyApprovedBy: qa-manager\n      vacancyApprovedOn: \"2026-09-20\"\n"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E064] }
+  - id: vacancy-approved-on-the-ladder-ok
+    replace:
+      team/roster.example.yaml: [["    incumbent: LOCAL\n    twin:", "    incumbent: VACANT\n    twin:"], ["      enabled: true\n", "      enabled: true\n      vacancyApprovedBy: chair-head\n      vacancyApprovedOn: \"2026-09-20\"\n"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [] }
+
+  # ---- learners, predictFirstDefault, twinFreeDays (E07/E10/E11) ---------
+  - id: learner-channel-ok
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], learners: [chair-head], predictFirstDefault: true, twinFreeDays: [1, 15] }"]]
+    args: [check, --ci]
+    expect: { exit: 0, codes: [] }
+  - id: learner-who-is-also-an-asker
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], learners: [qa-manager] }"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E004] }
+  - id: learner-not-a-position
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], learners: [ghost-learner] }"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E004] }
+  - id: predict-first-default-without-learners
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], predictFirstDefault: true }"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E004] }
+  - id: twin-free-days-out-of-range
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], twinFreeDays: [0, 32] }"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E004] }
+  - id: twin-free-days-duplicate
+    replace:
+      team/roster.example.yaml: [["askers: [qa-manager] }", "askers: [qa-manager], twinFreeDays: [15, 15] }"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E004] }
 
   # ---- E040-E046 gate, tiers, autonomy, overlays -------------------------
   - id: e040-enabled-but-gate-not-twin

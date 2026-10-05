@@ -15,6 +15,7 @@
 | v1      | 2026-10-05 | 初稿：Q1–Q9、TEAM 層、schema、chat-ops、安全、pilot、ship list。 |
 | v2      | 2026-10-05 | 依 round-2 裁決重寫：(A1) 全面去識別 — 範例公司改為通用設計假設，pilot 只用通用部門；(A2) capability 加 `today`/`humanStillDoes`，旗艦能力拆成 strengthen + 休眠 outsource；(A3) team/ 預設安裝；(A4) claude-code driver 固定受限旗標集；(A5) wave-1 品保分身降為 T1 + 來源端去識別；(A6) `/team ask` 只是預覽；(A7) 每輪必須 @mention、前綴身分；(A8) 刪 JSON Schema，改手寫驗證 + 錯誤碼；(A9) 分身互相交棒延後。B1–B17 定值（分級 T0–T3、autonomy 名稱制、bytes 預算、TTL 30 分、限流、無長期記憶、`MFG_TEAM_` 前綴、gate 欄位、outsource 每分身 ≤ 1、T3 拒載 exit 3）。新增 §14 Deferred、§15 Known gaps；§18 改為 7 個可平行實作的 WP。 |
 | v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
+| v2.2    | 2026-10-05 | 前線情境模擬（R7）修訂：§5.3 capability 加 `affectedRoles`、`doerAckedOn`，`E038` 改用 `REVIEW_ONLY_WORDS` 並涵蓋 `create`、逐職位行判斷，新增 `E061`–`E063`、`W009`；§5.1 position twin 加 `vacancyApprovedBy`／`vacancyApprovedOn`（`E064`），channel 加 `learners`、`predictFirstDefault`、`twinFreeDays`；§5.4 roster.json 的 `policy.timezone` 與上述 channel 欄位；§5.5 專業參考只供對照、不出判定；§9.4 回覆標頭改中文、固定「這是參考，不是指示」行、「結論」改「分身的看法」；gateway 新增 `human_override`／`practice_checkin`／`twin_free_day` 匿名計數與學習模式。 |
 
 ## 0. TL;DR
 
@@ -145,7 +146,8 @@ YAML 一律用 `yaml.SafeLoader` 載入，`date`/`datetime` 轉成 ISO 字串；
 | `twin.needsTwinGate.result` | `twin\|process-fix\|use-command\|defer\|retire` | ✔ | `enabled: true` 時必須是 `twin`（`E040`） |
 | `twin.needsTwinGate.rationale` / `.reviewedOn` | str / date | ✔ | rationale 非空；reviewedOn 超過 120 天 → `W004` |
 | `twin.disable` | id[] | — | 關閉分身檔中的能力 |
-| `twin.enableOutsource[]` | map[] | — | 每分身最多 1 筆（`E034`）；欄位：`capability`(id)、`approvedBy`(id；必須在該部門 escalation 中、且不是本職位)、`reason`(str)、`reviewBy`(date，≤ 今天 + 90 天)、`manualRepsPerMonth`(int ≥ 1) |
+| `twin.enableOutsource[]` | map[] | — | 每分身最多 1 筆（`E034`）；欄位：`capability`(id)、`approvedBy`(id；必須在該部門 escalation 中、且不是本職位)、`reason`(str)、`reviewBy`(date，≤ 今天 + 90 天)、`manualRepsPerMonth`(int ≥ 1；達成靠當事人在頻道說「我親手做了」記 `practice_checkin`，自報、只計數)。被喚醒能力的 `affectedRoles` 含本職位以外的人時，該能力必須有 `doerAckedOn`（`E063`） |
+| `twin.vacancyApprovedBy` / `.vacancyApprovedOn` | id / date | 條件 | `incumbent: VACANT` 且 `enabled: true` 時必填；核准人須在該部門 escalation 上、且不是本職位（`E064`）。分身不是空缺的替代 |
 | `channels[].id` / `.department` | id / id | ✔ | logical 頻道；平台 id 只放 `bindings.local.yaml` |
 | `channels[].tier` | tier | ✔ | 頻道內所有內容都以此分級處理；> 所列分身的 `tierCeiling` → `E042` |
 | `channels[].adapter` | `mock\|slack\|discord` | ✔ | `tier` > adapter `maxTier`（§9.2）→ `E041` |
@@ -153,6 +155,9 @@ YAML 一律用 `yaml.SafeLoader` 載入，`date`/`datetime` 轉成 ISO 字串；
 | `channels[].autonomyCeiling` | autonomy | ✔ | |
 | `channels[].askers` | `members` \| id[] | ✔ | 誰能提問；example 預設為職位清單 |
 | `channels[].requesters` / `.approvers` | id[] | — | 預設 `[]`；alpha 沒有可執行動作，僅保留給核准模組 |
+| `channels[].learners` | id[] | — | 學習者：可 @ 分身但不是 asker（同一職位不可兩者都是，`E004`）；回覆為學習模式（≤ `suggest`、只給相似案與反例），其對話不進頻道窗。學習頻道不要放主管 |
+| `channels[].predictFirstDefault` | bool | — | 學習者在 `predictFirstEligible` 能力上預設「我先說」；「這次直接給」跳過一次。沒有 `learners` 卻設 true → `E004` |
+| `channels[].twinFreeDays` | int[] | — | 不用分身日（每月第幾天，1–31、不重複，依 `org.timezone`）：非緊急提問回「今天請自己判斷」並匿名計數 `twin_free_day`，排程貼文也停；含「緊急」照常回答。只是日期清單，無工作日曆 |
 
 本機 overlay（同樣用 SafeLoader；build 時編譯成 `.build/identities.json`、`.build/bindings.json`）：
 - `identities.local.yaml`：`users[]: {platform: slack|discord|mock, userId: str, positions: id[], actingFor?: [{role: id, until: date(≤ 今天+30), grantedBy: id}]}`。每人 `positions + actingFor` ≤ 2（`E045`）；代理人不得啟用 outsource，也不得核准自己的請求。
@@ -176,26 +181,37 @@ decisionRights: [不良判定, 處置（重工/特採/報廢）, 是否開立 8D
 compose: { agent: quality-inspector, skills: [8d-report-writing, spc-basics], knowHow: [iso-9001, fmea-pfmea], hooks: [on-error], optional: [] }
 capabilities:
   - id: ncr-triage
-    summary: 人先判嚴重度，分身補相似案與反例
+    summary: 主管先判嚴重度，分身只對照反例；相似案仍由工程師親手翻查
     category: strengthen
     autonomy: suggest
-    today: 品保工程師人工翻查歷史 NCR
-    humanStillDoes: 先寫下嚴重度與理由；決定是否升級 8D
+    today: 主管：依翻查到的相似案判嚴重度
+    affectedRoles: [qa-manager]
+    humanStillDoes: 主管：先寫下嚴重度與理由；決定是否升級 8D
     decisionPoints: [嚴重度最終判定, 是否升級 8D]
     predictFirstEligible: true
+  - id: ncr-lookup
+    summary: 代翻查歷史 NCR 的相似案（休眠：對做翻查的人是外包）
+    category: outsource
+    autonomy: suggest
+    dormant: true
+    today: 品保工程師人工翻查歷史 NCR，整理相似案給主管
+    affectedRoles: [品保工程師]
+    humanStillDoes: 品保工程師：每月仍親手翻查並寫下理由，再對照分身找到的
+    decisionPoints: [採用哪幾件相似案]
   - id: 8d-challenge
-    summary: 人寫 D2/D4，分身檢查 5-why 缺口與歷史反例
+    summary: 工程師寫 D2/D4，主管先自己圈缺口，分身再補 5-why 缺口與歷史反例
     category: strengthen
     autonomy: suggest
-    today: 品保工程師撰寫，主管審閱
-    humanStillDoes: 親手寫 D2 問題描述與 D4 根因假說
+    today: 主管：審閱 8D 並圈出 5-why 缺口
+    affectedRoles: [qa-manager]
+    humanStillDoes: 主管：先自己圈出缺口再看分身的，決定採信哪個根因；品保工程師：照舊親手寫 D2 與 D4
     decisionPoints: [採信哪個根因假說, 永久對策]
   - id: spc-watch
     summary: 每日掃描 SPC，連續趨勢時在品保頻道提醒
     category: create
     autonomy: suggest
-    today: 無人定期做
-    humanStillDoes: 決定是否加嚴抽樣或停線
+    today: 無人每日看趨勢（檢驗員照常填 SPC 表）
+    humanStillDoes: 主管：決定是否加嚴抽樣或停線；檢驗員：照常量測與填表
     decisionPoints: [是否加嚴抽樣或停線]
   - id: 8d-formatting
     summary: 把人寫好的 8D 內容排成客戶格式
@@ -203,7 +219,8 @@ capabilities:
     autonomy: draft
     dormant: true
     today: 品保工程師手動排版
-    humanStillDoes: 逐段核對數值與措辭後才送出
+    affectedRoles: [品保工程師]
+    humanStillDoes: 品保工程師：逐段核對數值與措辭後才送出
     decisionPoints: [是否送出]
 schedule:
   - { capability: spc-watch, cron: "50 7 * * 1-5", channel: qa-floor }
@@ -233,7 +250,9 @@ Body 必要章節（`E024`）：`## 角色定位`、`## 你會做的事`、`## �
 | `id` / `summary` | ✔ | |
 | `category` | ✔ | `strengthen\|create\|outsource`；缺漏或未知值 → `E030` |
 | `autonomy` | ✔ | outsource 若 > `draft` → `E036`；`act-with-approval`/`act` lint 接受（`W001`），但 gateway 拒載 |
-| `today` / `humanStillDoes` | ✔ | 缺漏 → `E037`；strengthen 的 `humanStillDoes` 若只剩「審閱 / 確認 / 核准 / 蓋章」→ `E038` |
+| `today` / `humanStillDoes` | ✔ | 缺漏 → `E037`。依「做事的人／主管」逐行寫（`主管：…；品保工程師：…`）。strengthen／create 的 `humanStillDoes` 任一職位行去掉 `REVIEW_ONLY_WORDS`（審閱、確認、看過、沒問題、送出、若有意見、補充…）與虛詞後 ≤ 2 字 → `E038`。`today` 寫「無人／無」只准 `create`（`E062`） |
+| `affectedRoles` | 條件 | 今天做這件事的職位 id 或稱呼（str[]）。`today` 不是「無人」時必填（`E061`）；只列本職位、但 `today` 提到工程師／生管／檢驗員等 → `W009` |
+| `doerAckedOn` | 條件 | date。`affectedRoles` 含本職位（分身 id、或 roster 中 `twin.file` 指向它的職位 id／職稱）以外的人時，strengthen／create 必填、休眠 outsource 在被喚醒時必填；不得在未來（`E063`）。做事的人換了或分類改了要重簽 |
 | `decisionPoints` | 條件 | autonomy ≥ `suggest` 時 ≥ 1（`E039`） |
 | `predictFirstEligible` | — | true = 使用者可選「我先說」 |
 | `dormant` | 條件 | 分身檔中的 outsource 必須是 `true`（`E031`）；只能由 roster `enableOutsource` 喚醒 |
@@ -241,18 +260,20 @@ Body 必要章節（`E024`）：`## 角色定位`、`## 你會做的事`、`## �
 ### 5.4 Build 產物 `team/.build/roster.json`（gateway 唯一讀取的設定）
 
 ```json
-{"builtBy":"teamctl 0.2.0-alpha","channels":[{"adapter":"mock","askers":["qa-manager"],"autonomyCeiling":"draft","defaultTwin":"qa-manager","department":"qa","id":"qa-floor","tier":"T1","twins":["qa-manager"]}],
- "org":"example-machinery-co","policy":{"autonomyCeiling":"draft","channelWindow":10,"cloudTierCeiling":"T1","saasTierCeiling":"T1"},
+{"builtBy":"teamctl 0.2.0-alpha","channels":[{"adapter":"mock","askers":["qa-manager"],"autonomyCeiling":"draft","defaultTwin":"qa-manager","department":"qa","id":"qa-floor","tier":"T1","twinFreeDays":[15],"twins":["qa-manager"]}],
+ "org":"example-machinery-co","policy":{"autonomyCeiling":"draft","channelWindow":10,"cloudTierCeiling":"T1","saasTierCeiling":"T1","timezone":"Asia/Taipei"},
  "schema":1,"sourceHash":"sha256:…","twins":[{"aliases":["品保"],"capabilities":[{"autonomy":"suggest","category":"strengthen","id":"ncr-triage","predictFirstEligible":true}],
  "channels":["qa-floor"],"department":"qa","effectiveCeiling":"draft","id":"qa-manager","outsource":{"dormant":1,"enabled":0},
  "prompt":"twins/qa-manager.prompt.md","promptSha":"sha256:…","tierCeiling":"T1","title":"品保部主管分身","vacant":false}]}
 ```
 
+channel 的 `requesters`、`approvers`、`learners`、`twinFreeDays`、`predictFirstDefault` 只在有設定時輸出；`capabilities` 不含 `affectedRoles`／`doerAckedOn`（只在 lint 用）。`roster.json-twin` 的 600 B 是大小預算，不是分類檢查。
+
 規則：以 `json.dumps(sort_keys=True, ensure_ascii=False, separators=(",",":"))` 輸出、不含時間戳；`sourceHash` = 所有輸入檔（roster、用到的分身檔、policies、resolved refs、overlays）依路徑排序後，以 `path\0bytes\0` 串接計算的 sha256。build 兩次雜湊必須相同（`E051`）。gateway 啟動時重算 `promptSha`，不符 → exit 78。
 
 ### 5.5 編譯後分身 prompt `team/.build/twins/<id>.prompt.md`（≤ 12,000 B）
 
-依序：(1) `policies/core-rules.md` 全文（所有分身 byte-identical）；(2) 分身 body + 能力表（每項一行：id / 分類 / autonomy / humanStillDoes / 決策點）；(3) `compose.agent` 的 resolved 本文 —— **只有在總長仍 ≤ 12,000 B 時才內嵌**，否則改為索引行並發出 `W006`（例：`engineering-change-manager` 約 7.8 KB，一定走索引）；(4)「可讀參考」索引：`ref/<kind>/<id>.md — <frontmatter description>`，每個 id 一行；(5) 個人偏好段（如有 personal overlay）；(6) TwinResult 輸出契約（§9.1）。不得包含日期、人名、平台 id、頻道 id。
+依序：(1) `policies/core-rules.md` 全文（所有分身 byte-identical）；(2) 分身 body + 能力表（每項一行：id / 分類 / autonomy / humanStillDoes / 決策點）；(3) `compose.agent` 的 resolved 本文（前加一句：在分身內只提供對照，不輸出合格與否、嚴重度、根因、處置等判定；走索引時這句附在索引行）—— **只有在總長仍 ≤ 12,000 B 時才內嵌**，否則改為索引行並發出 `W006`（例：`engineering-change-manager` 約 7.8 KB，一定走索引）；(4)「可讀參考」索引：`ref/<kind>/<id>.md — <frontmatter description>`，每個 id 一行；(5) 個人偏好段（如有 personal overlay）；(6) TwinResult 輸出契約（§9.1）。不得包含日期、人名、平台 id、頻道 id。
 
 ## 6. Autonomy 與有效權限
 
@@ -391,12 +412,15 @@ Driver 的 JSON 輸出鍵名（`--json-schema` 由 `claude_code.py` 內的 dict 
 ### 9.4 回覆格式（formatter 強制）
 
 ```
-【品保部主管分身】· suggest
-結論：NCR-EX-012 與兩件歷史案（NCR-EX-007、-009）症狀相近；你先前判「中」，以下是可能推翻的兩個反例……
+【品保部主管分身】· 建議（草稿）
+分身的看法：NCR-EX-012 與兩件歷史案（NCR-EX-007、-009）症狀相近；你先前判「中」，以下是可能推翻的兩個反例……
 [ASSUMED] 同一模具批次；未查證：熱處理批號
 🧭 需要你判斷：① 嚴重度最終判定 ② 是否升級 8D
+這是參考，不是指示；不同意可以回「我不同意」
 信心：中 · 分類：強化既有優勢 · 稽核 #1842
 ```
+
+標頭：`observe` →「只答事實」、`suggest` →「建議（草稿）」、`draft` →「草稿（DRAFT）」，學習者 →「學習模式（只給相似案與反例，不給判定）」。「這是參考，不是指示」一行固定出現在最後的資訊行之前。訊息含「我不同意」「分身錯了」「我親手做了」，或在不用分身日的非緊急提問，gateway 不呼叫模型，只回固定短句，並以 `human_override`／`practice_checkin`／`twin_free_day` 寫入稽核（只有頻道、分身、能力；沒有 event_id、thread、operator、operator_ref）。
 
 輸出過濾（依序）：去掉所有 URL 與 markdown 圖片（alpha 不設白名單）→ 中和 `@everyone/@here/<!channel>/<!here>` → 遮罩 secret 樣式 → 若出現高於頻道 tier 的標記則整則攔截 → 長度上限 3,000 字。
 

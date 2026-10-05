@@ -60,7 +60,7 @@ python3 team/tools/teamctl.py check
 
 ### `/team gate <position>`
 
-讀 `team/gate/need-a-twin.md`，依 G1–G6 一題一題問；G2、G3 答「是」就走對應出口，不再往下問。**G7（涉及 T3 嗎）不要問、也不要請使用者在對話裡回答**，只說「G7 請你自己在 roster 片段的註解裡填 yes／no，不要輸入到聊天」。最後輸出可貼進 roster 的 `needsTwinGate` YAML 片段（`result`、`rationale`、`reviewedOn`），片段第一行保留 G7 的 `# …填 yes / no` 註解讓人自己填；若使用者主動說有 T3，不要複述內容，只回「請依貴公司 T3 程序處理，本系統不處理」並停止。
+讀 `team/gate/need-a-twin.md`，依 G1–G6、G8、G9 一題一題問；G2、G3 答「是」就走對應出口，不再往下問。**G7（涉及 T3 嗎）不要問、也不要請使用者在對話裡回答**，只說「G7 請你自己在 roster 片段的註解裡填 yes／no，不要輸入到聊天」。最後輸出可貼進 roster 的 `needsTwinGate` YAML 片段（`result`、`rationale`、`reviewedOn`），片段第一行保留 G7 的 `# …填 yes / no` 註解讓人自己填；若使用者主動說有 T3，不要複述內容，只回「請依貴公司 T3 程序處理，本系統不處理」並停止。
 
 ### `/team demo`
 

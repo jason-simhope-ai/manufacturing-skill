@@ -33,9 +33,10 @@ Runtime: Python 3.11, stdlib only, plus PyYAML (build / validate paths only).
 from __future__ import annotations
 
 from .schema import (ACTING_MAX_DAYS, ADAPTER_MAX_TIER, ADAPTERS, AUTONOMY, BUDGETS, BUILT_BY, CATEGORY_LABEL,
-                     CATEGORY_VALUES, CODES, GATE_RESULTS, GATE_STALE_DAYS, IDENTITY_KEYS, NAME_OTHER, NAME_ZH,
-                     OUTSOURCE_MAX_DAYS, OUTSOURCE_WARN_DAYS, PII_PATTERNS, REF_PREFIX, REQUIRED_GITIGNORE,
-                     REQUIRED_SECTIONS, SAFETY_KEYWORDS, SECRET_PATTERNS, TIER_CAP, TIERS, TOOL_REPO, VERSION,
+                     CATEGORY_VALUES, CODES, DOER_HINT_WORDS, GATE_RESULTS, GATE_STALE_DAYS, IDENTITY_KEYS,
+                     NAME_OTHER, NAME_ZH, NOBODY_TODAY_RE, OUTSOURCE_MAX_DAYS, OUTSOURCE_WARN_DAYS, PII_PATTERNS,
+                     REF_PREFIX, REQUIRED_GITIGNORE, REQUIRED_SECTIONS, REVIEW_FILLER_WORDS, REVIEW_ONLY_WORDS,
+                     SAFETY_KEYWORDS, SECRET_PATTERNS, TIER_CAP, TIERS, TOOL_REPO, VERSION,
                      BuildError, Finding, LoadError, dlp_scan, load_lint_allow, shared_secret_patterns)
 from .io import canon, est_tokens, load_roster, load_twin, split_frontmatter, yaml_load
 from .compile import (BuildResult, Compiled, build, check_deterministic, compile_all, default_roster, find_ref,
@@ -44,9 +45,10 @@ from .validate import effective_autonomy, validate, validate_ex
 
 __all__ = [
     "ACTING_MAX_DAYS", "ADAPTER_MAX_TIER", "ADAPTERS", "AUTONOMY", "BUDGETS", "BUILT_BY", "CATEGORY_LABEL",
-    "CATEGORY_VALUES", "CODES", "GATE_RESULTS", "GATE_STALE_DAYS", "IDENTITY_KEYS", "NAME_OTHER", "NAME_ZH",
-    "OUTSOURCE_MAX_DAYS", "OUTSOURCE_WARN_DAYS", "PII_PATTERNS", "REF_PREFIX", "REQUIRED_GITIGNORE",
-    "REQUIRED_SECTIONS", "SAFETY_KEYWORDS", "SECRET_PATTERNS", "TIER_CAP", "TIERS", "TOOL_REPO", "VERSION",
+    "CATEGORY_VALUES", "CODES", "DOER_HINT_WORDS", "GATE_RESULTS", "GATE_STALE_DAYS", "IDENTITY_KEYS",
+    "NAME_OTHER", "NAME_ZH", "NOBODY_TODAY_RE", "OUTSOURCE_MAX_DAYS", "OUTSOURCE_WARN_DAYS", "PII_PATTERNS",
+    "REF_PREFIX", "REQUIRED_GITIGNORE", "REQUIRED_SECTIONS", "REVIEW_FILLER_WORDS", "REVIEW_ONLY_WORDS",
+    "SAFETY_KEYWORDS", "SECRET_PATTERNS", "TIER_CAP", "TIERS", "TOOL_REPO", "VERSION",
     "BuildError", "BuildResult", "Compiled", "Finding", "LoadError",
     "build", "canon", "check_deterministic", "compile_all", "default_roster", "dlp_scan", "effective_autonomy",
     "est_tokens", "find_ref", "load_lint_allow", "load_roster", "load_twin", "render_summary", "resolved_text",

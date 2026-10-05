@@ -8,8 +8,9 @@ import re
 import subprocess
 from pathlib import Path
 
-from .schema import (ACTING_MAX_DAYS, ADAPTER_MAX_TIER, AUTONOMY, BUDGETS, _CAPID_RE, CATEGORY_VALUES, _EMAIL,
-                     _EMAIL_OK, GATE_RESULTS, GATE_STALE_DAYS, _GENERIC_SECRET, _ID_RE, _IDENTITY_FILE,
+from .schema import (ACTING_MAX_DAYS, ADAPTER_MAX_TIER, AUTONOMY, BUDGETS, _CAPID_RE, CATEGORY_VALUES,
+                     DOER_HINT_WORDS, _EMAIL, _EMAIL_OK, GATE_RESULTS, NOBODY_TODAY_RE, REVIEW_FILLER_WORDS,
+                     REVIEW_ONLY_WORDS, GATE_STALE_DAYS, _GENERIC_SECRET, _ID_RE, _IDENTITY_FILE,
                      IDENTITY_KEYS, NAME_OTHER, NAME_ZH, OUTSOURCE_MAX_DAYS, OUTSOURCE_WARN_DAYS, _PERSONAL,
                      REQUIRED_GITIGNORE, REQUIRED_SECTIONS, SAFETY_KEYWORDS, TIER_CAP, TIERS, _TWIN,
                      BuildError, Finding, LoadError, load_lint_allow, _roster_schema, shared_secret_patterns)
@@ -150,19 +151,41 @@ def effective_autonomy(cap: dict, twin: dict, position: dict, policy: dict,
 # Validator
 # --------------------------------------------------------------------------
 
-_REVIEW_WORDS = ("審閱", "確認", "核准", "蓋章", "審核", "簽核", "最終")
-_FILLER_RE = re.compile(r"[\s、，,。;；/及與和或並後再\-—]+")
+_FILLER_RE = re.compile(r"[\s、，,。;；/:：()（）「」『』\-—]+")
+_ROLE_PREFIX_RE = re.compile(r"^\s*([^\s：:，,；;。]{1,12})[：:]")
+_STRIP_WORDS = tuple(sorted(set(REVIEW_ONLY_WORDS) | set(REVIEW_FILLER_WORDS), key=len, reverse=True))
+
+
+def _role_lines(text: str) -> list[str]:
+    """Split `humanStillDoes` into one text per role: "主管：A；B；品保工程師：C" -> ["A；B", "C"].
+    Text without a `role：` prefix is a single line."""
+    lines: list[str] = []
+    for part in re.split(r"[；;\n]", text):
+        m = _ROLE_PREFIX_RE.match(part)
+        if m or not lines:
+            lines.append(part[m.end():] if m else part)
+        else:
+            lines[-1] += "；" + part
+    return lines
+
+
+def _review_only_line(line: str) -> bool:
+    rest = line
+    for w in _STRIP_WORDS:
+        rest = rest.replace(w, "")
+    return len(_FILLER_RE.sub("", rest)) <= 2
 
 
 def _only_review(text: str) -> bool:
-    rest = text
-    hit = False
-    for w in _REVIEW_WORDS:
-        if w in rest:
-            hit = True
-            rest = rest.replace(w, "")
-    rest = _FILLER_RE.sub("", rest)
-    return hit and len(rest) <= 2
+    """True when some role's line in `humanStillDoes` names no act of its own: after removing
+    REVIEW_ONLY_WORDS, REVIEW_FILLER_WORDS and punctuation, <= 2 characters are left (E038).
+    Lines that never used a review word are not judged (an empty line is E037's job)."""
+    return any(any(w in line for w in REVIEW_ONLY_WORDS) and _review_only_line(line)
+               for line in _role_lines(text) if line.strip())
+
+
+def _nobody_today(text) -> bool:
+    return isinstance(text, str) and bool(NOBODY_TODAY_RE.match(text))
 
 
 class _Validator:
@@ -328,7 +351,7 @@ class _Validator:
                 add("E004", f"twin.department {fm['department']!r} is not a "
                     "roster department")
         self.check_compose(add, fm)
-        self.check_caps(add, fm)
+        self.check_caps(add, fm, self.own_roles(stem, tid))
         self.check_schedule(add, fm, template)
         self.check_body(add, body)
         if fm.get("tierCeiling") in TIERS and fm["tierCeiling"] == "T3":
@@ -336,6 +359,16 @@ class _Validator:
         if fm.get("autonomyCeiling") in ("act-with-approval", "act"):
             add("W001", f"twin.autonomyCeiling is {fm['autonomyCeiling']!r}: "
                 "accepted by lint, refused by the gateway", "warning")
+
+    def own_roles(self, stem, tid) -> set:
+        """Ids and titles that count as "the twin's own position" for E063 / W009: the twin id,
+        and every roster position (id and title) whose twin.file is this twin."""
+        own = {stem} | ({tid} if isinstance(tid, str) else set())
+        for pos in _dicts((self.roster or {}).get("positions")):
+            tw = pos.get("twin")
+            if isinstance(tw, dict) and tw.get("file") in own:
+                own |= {v for v in (pos.get("id"), pos.get("title")) if isinstance(v, str)}
+        return own
 
     def check_compose(self, add, fm):
         comp = fm.get("compose")
@@ -364,7 +397,7 @@ class _Validator:
                        for k in ("agents", "skills", "know-how", "hooks")):
                 add("E023", f"compose.optional {ent!r} not found in profile")
 
-    def check_caps(self, add, fm):
+    def check_caps(self, add, fm, own=frozenset()):
         caps = fm.get("capabilities")
         if not isinstance(caps, list):
             return
@@ -405,14 +438,46 @@ class _Validator:
             elif "dormant" in cap:
                 add("E004", f"{loc}.dormant is only valid on outsource "
                     "capabilities")
-            if cat == "strengthen" and isinstance(cap.get("humanStillDoes"), str):
+            if cat in ("strengthen", "create") and isinstance(cap.get("humanStillDoes"), str):
                 if cap["humanStillDoes"].strip() and _only_review(
                         cap["humanStillDoes"]):
-                    add("E038", f"{loc}.humanStillDoes only says "
-                        "review/confirm/approve/stamp; state what the human "
-                        "still does by hand")
+                    add("E038", f"{loc}.humanStillDoes only says review/look/approve/"
+                        "send (REVIEW_ONLY_WORDS) for at least one role; state what "
+                        "the person still does by hand")
+            self.check_doer(add, cap, cat, loc, own)
         if cats and not any(c in ("strengthen", "create") for c in cats):
             add("E035", "twin has no strengthen or create capability")
+
+    def check_doer(self, add, cap, cat, loc, own):
+        """E061-E063, W009: who does the task today, and did they agree (spec 5.3)."""
+        today = cap.get("today")
+        if not isinstance(today, str) or not today.strip():
+            return  # E037
+        roles = [r for r in _strs(cap.get("affectedRoles")) if r.strip()]
+        nobody = _nobody_today(today)
+        if nobody and cat in ("strengthen", "outsource"):
+            add("E062", f"{loc}.today says nobody does this today ({today!r}); only a "
+                "`create` capability may say so. If someone does it, name them in "
+                "today and affectedRoles")
+        if not nobody and not roles:
+            add("E061", f"{loc}: today ({today!r}) has someone doing the task, but "
+                "affectedRoles is missing; list the positions or job labels that do it today")
+        others = [r for r in roles if r not in own]
+        ack = cap.get("doerAckedOn")
+        if others and cat in ("strengthen", "create"):
+            self.check_ack(add, loc, others, ack)
+        if roles and not others and any(w in today for w in DOER_HINT_WORDS):
+            add("W009", f"{loc}.today mentions another job ({today!r}) but affectedRoles "
+                f"only lists this twin's own position {roles}; check whether the people "
+                "who do it today are missing", "warning")
+
+    def check_ack(self, add, loc, others, ack):
+        if not _valid_date(ack):
+            add("E063", f"{loc}: affectedRoles {others} are not this twin's own position; "
+                "doerAckedOn (YYYY-MM-DD, the day they read `today`/`humanStillDoes` and "
+                "agreed) is required")
+        elif _date(ack) > self.today:
+            add("E063", f"{loc}.doerAckedOn {ack} is in the future")
 
     def check_schedule(self, add, fm, template):
         caps = {c.get("id") for c in _dicts(fm.get("capabilities"))}
@@ -551,6 +616,7 @@ class _Validator:
             if _valid_date(ro) and (self.today - _date(ro)).days > GATE_STALE_DAYS:
                 add("W004", f"{loc}.needsTwinGate.reviewedOn {ro} is more "
                     f"than {GATE_STALE_DAYS} days old", "warning")
+        self.check_vacancy(add, pos, tw, depts, loc)
         if tw.get("enabled") is True and isinstance(fid, str):
             self.declared_enabled.add(fid)
             if tf is not None:
@@ -563,6 +629,21 @@ class _Validator:
                 add("E004", f"{loc}.disable: {cid!r} is not a capability of "
                     f"twin {fid!r}")
         self.check_outsource(add, pos, tw, tf, caps, loc, depts)
+
+    def check_vacancy(self, add, pos, tw, depts, loc):
+        """E064: a twin is not a stand-in for an unfilled position (spec 7.3)."""
+        if not (pos.get("incumbent") == "VACANT" and tw.get("enabled") is True):
+            return
+        by, on = tw.get("vacancyApprovedBy"), tw.get("vacancyApprovedOn")
+        if not isinstance(by, str) or not _valid_date(on):
+            add("E064", f"{loc}: position is VACANT and the twin is enabled; "
+                "vacancyApprovedBy (a position on the escalation ladder) and "
+                "vacancyApprovedOn (YYYY-MM-DD) are required")
+            return
+        esc = _strs((depts.get(pos.get("department")) or {}).get("escalation"))
+        if by not in esc or by == pos.get("id"):
+            add("E064", f"{loc}.vacancyApprovedBy {by!r} must be on the department "
+                "escalation ladder and not the vacant position itself")
 
     def check_outsource(self, add, pos, tw, tf, caps, loc, depts):
         entries = _dicts(tw.get("enableOutsource"))
@@ -582,6 +663,10 @@ class _Validator:
                         "outsource capability of this twin")
                 else:
                     enabled_here += 1
+                    own = self.own_roles(tw.get("file"), tw.get("file"))
+                    others = [r for r in _strs(cap.get("affectedRoles")) if r.strip() and r not in own]
+                    if others:  # waking it takes the task from them: they must have agreed
+                        self.check_ack(add, eloc, others, cap.get("doerAckedOn"))
             ab = e.get("approvedBy")
             if isinstance(ab, str):
                 if ab not in esc:
@@ -651,6 +736,20 @@ class _Validator:
             for v in _strs(vals):
                 if v not in positions:
                     add("E004", f"{loc}.{key}: {v!r} is not a position")
+        learners = _strs(ch.get("learners"))
+        for v in learners:
+            if v not in positions:
+                add("E004", f"{loc}.learners: {v!r} is not a position")
+            elif isinstance(askers, list) and v in askers:
+                add("E004", f"{loc}.learners: {v!r} is also an asker; a position is "
+                    "either an asker or a learner in one channel")
+        if ch.get("predictFirstDefault") is True and not learners:
+            add("E004", f"{loc}.predictFirstDefault applies to learners; the channel has none")
+        days = ch.get("twinFreeDays")
+        if isinstance(days, list):
+            ints = [d for d in days if isinstance(d, int) and not isinstance(d, bool)]
+            if any(not 1 <= d <= 31 for d in ints) or len(set(ints)) != len(ints):
+                add("E004", f"{loc}.twinFreeDays must be distinct days of the month 1..31")
         aut = ch.get("autonomyCeiling")
         if aut in ("act-with-approval", "act"):
             add("W001", f"{loc}.autonomyCeiling is {aut!r}: accepted by "
@@ -921,6 +1020,8 @@ class _Validator:
                 self.add("W007", self.roster_path, f"roster.json is "
                          f"{len(rj)} B (> {BUDGETS['roster.json']} B total)",
                          "warning")
+        # Size only (cold start / per-turn cost). Not a classification check: see the
+        # BUDGETS comment in schema.py and E038 / E061-E063 in check_caps.
         for t in json.loads(rj)["twins"]:
             n = len(canon(t))
             if n > BUDGETS["roster.json-twin"]:

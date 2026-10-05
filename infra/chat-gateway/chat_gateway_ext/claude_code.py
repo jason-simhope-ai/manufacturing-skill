@@ -455,8 +455,11 @@ class ClaudeCodeDriver:
         except UnicodeDecodeError:
             raise DriverError("compiled prompt unreadable") from None
         header = (f"## 本次呼叫\ntier={inv.tier} effectiveAutonomy={inv.effective_autonomy} "
-                  f"tainted={'yes' if inv.tainted else 'no'} predictFirst={'yes' if inv.predict_first else 'no'}\n"
-                  "只能用 Read、Grep、Glob；不要提議任何動作。\n\n")
+                  f"tainted={'yes' if inv.tainted else 'no'} predictFirst={'yes' if inv.predict_first else 'no'}"
+                  f"{' learner=yes' if inv.learner else ''}\n"
+                  "只能用 Read、Grep、Glob；不要提議任何動作。\n"
+                  + ("學習模式：只給相似案、反例與出處；不給嚴重度、合格與否、根因或處置的建議。\n"
+                     if inv.learner else "") + "\n")
         return header + base
 
     @staticmethod

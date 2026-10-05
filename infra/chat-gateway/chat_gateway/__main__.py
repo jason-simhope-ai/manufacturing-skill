@@ -22,7 +22,7 @@ from .adapters import load_adapter_class
 from .adapters.base import ScheduledPost
 from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
-from .audit import AuditLog, heads, verify_report
+from .audit import AuditLog, counts, heads, verify_report
 from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, ensure_state_dir,
                      stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
@@ -123,6 +123,10 @@ def print_verify(path: str, key: bytes) -> bool:
         print(f"  last seq {info['seq']}; checkpoint heads (copy off-host for sign-off):")
         for tier, h in sorted(info["tiers"].items()):
             print(f"    {tier}: count={h['count']} seq={h['seq']} head={h['head']}")
+    # Output is per tier and per channel/capability only, never per user (team README "給主管").
+    for action, by_where in sorted((counts(path, key) if ok else {}).items()):
+        shown = ", ".join(f"{w}={n}" for w, n in sorted(by_where.items()))
+        print(f"  {action} (count only, no per-person breakdown): {shown}")
     return ok
 
 
