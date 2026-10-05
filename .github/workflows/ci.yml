@@ -236,15 +236,52 @@ jobs:
           fi
           echo "ok  swap failure rolls back to the previous install"
 
-          # Stub profile prints a visible warning (core-only content, no HACCP)
+          # Maturity header on the REAL food-processing install, driven by the
+          # status currently in its profile.json (stub here; alpha once the
+          # profile PRs land), so this step does not break when it changes.
+          fp_json=profiles/food-processing/profile.json
+          fp_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("status") or "complete")' "$fp_json")"
+          fp_nwarn="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("warnings") or []))' "$fp_json")"
           out="$(bash adapters/claude-code/install.sh food-processing </dev/null 2>&1)"
+          if [ "$fp_status" = "stub" ]; then
+            want='STUB PROFILE: food-processing'
+          else
+            if printf '%s\n' "$out" | grep -qF 'STUB PROFILE: food-processing'; then
+              echo "::error::food-processing is '$fp_status' but the install printed the STUB header"
+              exit 1
+            fi
+            want=''
+            if [ "$fp_nwarn" -gt 0 ]; then want="food-processing ($fp_status) — read before use"; fi
+          fi
+          if [ -n "$want" ] && ! printf '%s\n' "$out" | grep -qF "$want"; then
+            echo "::error::food-processing ($fp_status) install output is missing: $want"
+            exit 1
+          fi
+          echo "ok  maturity header matches profile.json status for food-processing ($fp_status)"
+
+          # Stub path, deterministically: flip food-processing to "stub" in a
+          # scratch copy of the repo and install from that copy.
+          stubrepo="$(mktemp -d)/repo"
+          mkdir -p "$stubrepo"
+          tar --exclude=.git -cf - . | tar -xf - -C "$stubrepo"
+          python3 - "$stubrepo/$fp_json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          with open(p, encoding="utf-8") as f:
+              d = json.load(f)
+          d["status"] = "stub"
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(d, f, ensure_ascii=False, indent=2)
+          PY
+          stub_home="$(mktemp -d)"; mkdir -p "$stub_home/.claude"
+          out="$(HOME="$stub_home" bash "$stubrepo/adapters/claude-code/install.sh" food-processing </dev/null 2>&1)"
           for want in 'STUB PROFILE: food-processing' 'generic core layer only' 'HACCP / food-safety content is NOT included'; do
             if ! printf '%s\n' "$out" | grep -qF "$want"; then
-              echo "::error::food-processing install output is missing: $want"
+              echo "::error::food-processing (stub, scratch copy) install output is missing: $want"
               exit 1
             fi
           done
-          echo "ok  stub warning shown for food-processing"
+          echo "ok  stub warning shown for food-processing flipped to stub in a scratch copy"
 
           # ~/.claude missing + stdin not a TTY: exit 2, nothing created
           empty_home="$(mktemp -d)"
