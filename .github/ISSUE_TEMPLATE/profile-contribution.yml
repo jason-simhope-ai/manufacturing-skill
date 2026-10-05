@@ -16,7 +16,7 @@ body:
         - pcb-assembly (currently stub)
         - injection-molding (currently alpha)
         - food-processing (currently stub)
-        - pharma (currently stub)
+        - pharma (currently alpha)
         - sheet-metal (new)
         - mold-making (new)
         - textile (new)

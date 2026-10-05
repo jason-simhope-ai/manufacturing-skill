@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`profiles/pharma/` promoted from stub to alpha** (`0.1.0-alpha`, GMP / GxP for API, drug product and medical devices): 2 agents (`deviation-capa-coordinator` — deviation fact summary, classification suggestion, investigation structure, impact-assessment prompts, CAPA and effectiveness-check drafts; `batch-record-reviewer` — completeness / signature / calculation / chronology / ALCOA+ pre-check before QA review), 2 skills (`deviation-investigation-5whys-fishbone` — Is / Is-not, 6M fishbone, evidence plan, 5 Whys to a system-level cause, CAPA with predefined effectiveness criteria; `batch-record-completeness-review` — reviewer checklist, ALCOA+ data-integrity signals, top-10 common findings), 2 know-how docs (`gmp-gxp-basics` — ICH Q10 pillars, documentation hierarchy, GDP, deviation vs OOS vs OOT, ALCOA+, common inspection findings; `validation-and-change-control` — DQ/IQ/OQ/PQ, process validation lifecycle, CSV, change-control flow, revalidation triggers), and a new `pre-batch-release` hook (QA release document-completeness check: batch record reviewed, CoA, deviations / OOS closed, change controls approved). The hook uses its own name rather than overriding core `pre-ship`, so it cannot collide with another profile's `pre-ship` override. Every file carries an alpha header and labels numbers 範例 / 需驗證. Every output is marked `AI-DRAFT — 非 GMP 紀錄`: agents never close a deviation, approve a CAPA, invalidate an OOS or release a batch.
+- `profiles/pharma/profile.json` gains `warnings` (does not replace the QA / QP release decision, regulatory affairs, or a validated system; AI output is never a GMP record; the plugin itself is not CSV-validated), expanded `complianceFrameworks` (PIC/S GMP incl. Annex 11 / 15, EU GMP, 21 CFR 210 / 211 / 820, ICH Q7 / Q9(R1) / Q10, 21 CFR Part 11, ALCOA+ data integrity, ISO 13485, Taiwan PIC/S GMP and medical-device QMS regulations — specifics marked 需驗證) and updated `wantedContributions`.
+- `profiles/pharma/README.md` rewritten in zh-TW for non-technical successors, with LINE-oriented usage tips (de-identify first, never paste AI output into a GMP record) and a does / does-not table.
+
+### Changed
+
+- `plugin.json`: `pharma` moved from `profiles.stub` to `profiles.alpha`.
+- `scripts/regen_explainers.py`: alpha counts now sum over every profile in `profiles.alpha` (was hard-coded to injection-molding); hooks stat shows the alpha share when non-zero. Explainer 01 stat panel regenerated.
+- `INVENTORY.md`, `README.md`, `README.zh-TW.md`, `core/commands/install-profile.md`, `.github/ISSUE_TEMPLATE/profile-contribution.yml`: pharma (and the previously stale injection-molding README tree comment) shown as alpha.
 
 ## [0.1.5] — 2026-05-09
 

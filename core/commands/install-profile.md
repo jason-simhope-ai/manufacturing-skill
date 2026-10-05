@@ -19,7 +19,7 @@ argument-hint: "<profile> 或 <p1>,<p2>,..."
 | `injection-molding` | 🧪 alpha | 塑膠射出成型            |
 | `pcb-assembly`      | 🚧 stub  | PCB 組裝                |
 | `food-processing`   | 🚧 stub  | 食品加工                |
-| `pharma`            | 🚧 stub  | 製藥（GMP）             |
+| `pharma`            | 🧪 alpha | 製藥 / 醫材（GMP）      |
 
 ## 使用範例
 
