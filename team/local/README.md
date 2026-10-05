@@ -12,6 +12,8 @@
 | `playbook.local.md` | 逐人導入筆記 |
 | `personal/<twin-id>.local.md` | 在職者偏好（白名單欄位，本文 ≤ 900 B） |
 
+**token、金鑰也不放這裡**：只放環境變數（`MFG_TEAM_*`、`ANTHROPIC_API_KEY`），gateway 看到設定檔裡像 token 的內容會拒絕啟動（exit 78）。分身要讀的排程／NCR 資料放在 repo 外的資料夾（`MFG_TEAM_DATA_T1`），做法見 [team/README.zh-TW.md](../README.zh-TW.md) 的「資料餵入」。
+
 公開 CI 看不到這些檔案，所以真名的防線是本機 pre-commit：`cp team/tools/pre-commit-names.sample .git/hooks/pre-commit`。
 
 ## 範本

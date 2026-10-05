@@ -80,11 +80,27 @@ DLP_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("tw-ubn", _P(r"(?<!\d)\d{8}(?!\d)")),          # 統一編號; checksum in valid_ubn()
     ("tw-national-id", _P(r"(?<![A-Za-z0-9])[A-Z][12]\d{8}(?!\d)")),
     ("amount-ntd", _P(r"NT\$\s?[\d,]{4,}")),
+    # Other currency forms (T2): US$ / USD followed or preceded by digits, "125 萬元", "3千元".
+    ("amount-usd", _P(r"(?i)(?:US\$|USD)\s?\d|\d\s?USD(?![A-Za-z])")),
+    ("amount-zh", _P(r"[\d,.零〇一二三四五六七八九十百兩幾數]\s?(?:萬|千)元")),
+    # Defence / aerospace / medical-device / export-control wording (T3 tripwire). A word match,
+    # not understanding: it cannot know what a message is about, only that it contains the word.
+    ("aerospace-zh", _P(r"航太")),
+    ("military-zh", _P(r"軍工|軍規")),
+    ("medical-device-zh", _P(r"醫材|醫療器材")),
+    ("export-permit-zh", _P(r"外銷許可")),
+    ("export-control-en", _P(r"(?<![A-Za-z])(?:(?i:itar)|EAR|CUI)(?![A-Za-z])")),
+    # 管制 alone is also everyday QC / production vocabulary (管制圖, 文件管制, 製程管制 ...), so the
+    # common compounds are excluded; export-control phrasing (出口管制, 管制品, 受管制) still hits.
+    ("control-zh", _P(r"(?<!品質|製程|生產|物料|庫存|進度|文件|變更|溫度|標示|流程|成本|數量|校正|版本|資料|製造|現場|外觀|不良|異常|程序|作業|倉庫|設備)"
+                      r"管制(?!圖|界限|上限|下限|線|計畫|計劃|點|特性|參數|項目|標準|程序|流程|表|卡|站|中心|人員|員|措施|方法|範圍|區)")),
 ]
 DLP_TIERS: dict[str, str] = {
     "confidential-zh": "T2", "confidential-en": "T2", "tw-ubn": "T2",
-    "tw-national-id": "T2", "amount-ntd": "T2",
+    "tw-national-id": "T2", "amount-ntd": "T2", "amount-usd": "T2", "amount-zh": "T2",
     "restricted-en": "T3", "restricted-zh": "T3", "defense-zh": "T3",
+    "aerospace-zh": "T3", "military-zh": "T3", "medical-device-zh": "T3",
+    "export-permit-zh": "T3", "export-control-en": "T3", "control-zh": "T3",
 }
 
 

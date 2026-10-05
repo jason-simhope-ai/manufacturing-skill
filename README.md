@@ -60,9 +60,9 @@ It replays 8 beats (scheduled post, @-routing, "I go first", an injection attemp
 | You are | Path |
 | ------- | ---- |
 | **An AI agent** | Read [TEAM.md](TEAM.md) (≤ 6,000 B): run `teamctl check`, then `build`, read the roster, and follow the progressive-disclosure map |
-| **A human (10 minutes)** | [TEAM.md](TEAM.md) → [team/README.zh-TW.md](team/README.zh-TW.md) (Traditional Chinese) → one twin file, e.g. [team/twins/qa-manager.md](team/twins/qa-manager.md) |
+| **A human (10 minutes)** | [team/README.zh-TW.md](team/README.zh-TW.md) (Traditional Chinese; start here) → one twin file, e.g. [team/twins/qa-manager.md](team/twins/qa-manager.md) → optionally [TEAM.md](TEAM.md), which is the agent's entry file |
 
-**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (high-assurance custom projects). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is never processed** (the gateway refuses to start, exit 3). When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (enforced in CI).
+**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (high-assurance custom projects). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is refused, not understood**: the gateway refuses to start if the roster has a T3 channel or twin (exit 3), and a keyword tripwire blocks messages that contain obvious T3 wording (e.g. defence, aerospace, ITAR) and advises the company's own T3 procedure. It cannot recognise T3 content that avoids those words, so people and process must keep T3 out. When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (CI scans tracked files; `team/local` relies on a local pre-commit hook).
 
 **Honest status (alpha)**
 

@@ -136,7 +136,8 @@ def tripwire(text: str) -> bool:
 
 
 # ── DLP ──────────────────────────────────────────────────────────────
-_WORD_MARKERS = frozenset({"confidential-zh", "restricted-zh", "defense-zh", "confidential-en", "restricted-en"})
+_WORD_MARKERS = frozenset({"confidential-zh", "restricted-zh", "defense-zh", "confidential-en", "restricted-en",
+                           "aerospace-zh", "military-zh", "medical-device-zh", "export-permit-zh", "control-zh"})
 _WS = re.compile(r"\s+")
 
 

@@ -110,7 +110,7 @@ bash adapters/claude-code/install.sh
 
 讀 [TEAM.md](TEAM.md)（agent 入口），人讀 [team/README.zh-TW.md](team/README.zh-TW.md)（10 分鐘）。
 離線試玩：`python3 infra/chat-gateway/demo.py`（零憑證、零網路）。
-v0.2.0-alpha 實驗性：只到 observe / suggest / draft，沒有任何寫入動作；T3 一律拒載。
+v0.2.0-alpha 實驗性：只到 observe / suggest / draft，沒有任何寫入動作；T3 設定層拒載（exit 3），字樣層擋下並提示（不是內容理解）。
 
 ---
 

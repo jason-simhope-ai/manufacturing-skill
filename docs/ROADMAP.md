@@ -44,7 +44,7 @@
 - ✅ **工具**：`teamctl`（check / roster / audit-verify）、`build`、`deid`；手寫驗證器 + 錯誤碼，CI 與 gateway 載入時都強制
 - ✅ **Chat gateway**（`infra/chat-gateway/`，Python 3.11、核心只用 stdlib）：mock adapter 與 mock driver 完整測試；Slack / Discord adapter 與 Claude Code driver 已隨附，但未在 CI 對真實平台測試、需要憑證
 - ✅ **2 分鐘離線 demo**：`python3 infra/chat-gateway/demo.py`（零憑證、零網路）
-- ✅ **資料分級 T0–T3**：SaaS 聊天與雲端模型上限 T1；T3 一律拒載
+- ✅ **資料分級 T0–T3**：SaaS 聊天與雲端模型上限 T1；T3 設定層拒載（exit 3）、字樣層擋下並提示（非內容理解）
 - ✅ `/team` 指令（預覽用，不經 gateway）
 - ⚠️ **刻意不做**：沒有長期記憶、沒有任何寫入動作（分身工具恆為唯讀、autonomy 上限 `draft`）
 

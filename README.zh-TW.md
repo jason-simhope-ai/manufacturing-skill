@@ -78,9 +78,9 @@ python3 infra/chat-gateway/demo.py
 | 你是 | 路徑 |
 | ---- | ---- |
 | **AI agent** | 讀 [TEAM.md](TEAM.md)（≤ 6,000 B）：照啟動演算法 `teamctl check` → `build` → 讀 roster，再依漸進揭露地圖往下讀 |
-| **人（10 分鐘）** | [TEAM.md](TEAM.md) → [team/README.zh-TW.md](team/README.zh-TW.md) → 任選一個分身檔，例如 [team/twins/qa-manager.md](team/twins/qa-manager.md) |
+| **人（10 分鐘）** | 從 [team/README.zh-TW.md](team/README.zh-TW.md) 開始 → 任選一個分身檔，例如 [team/twins/qa-manager.md](team/twins/qa-manager.md) →（選讀）[TEAM.md](TEAM.md)，那是給 agent 的啟動檔 |
 
-**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 一律不處理**（gateway 啟動即拒絕，exit 3）。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 強制）。
+**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 不處理，但做法是「拒載」不是「理解」**：roster 出現 T3 頻道或分身，gateway 啟動即拒絕（exit 3）；訊息含明顯的 T3 字樣（國防、航太、ITAR 等）會被擋下並提示改走公司 T3 程序，字樣之外的 T3 內容系統認不出來，要靠人與流程。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 掃追蹤檔；`team/local` 靠本機 pre-commit）。
 
 **誠實的現況（alpha）**
 

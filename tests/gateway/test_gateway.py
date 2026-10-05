@@ -633,6 +633,37 @@ class TestDLP(HarnessCase):
         self.assertEqual(sanitize.dlp_tier("CONFIDENTIAL draft"), "T2")
         self.assertIsNone(sanitize.dlp_tier("一般 SOP 說明"))
 
+    def test_t3_words_added_in_round_3(self):
+        for text in ("這批航太件的公差", "軍工訂單 BOM", "符合軍規嗎", "醫材客戶的 NCR", "醫療器材客戶",
+                     "ITAR 與 EAR99 分類", "這是 CUI 文件", "外銷許可證辦了嗎", "出口管制清單", "這是管制品",
+                     "航 太專案", "軍\u200b工訂單"):
+            self.assertEqual(sanitize.dlp_tier(text), "T3", text)
+
+    def test_t3_words_are_not_substrings_of_everyday_words(self):
+        for text in ("SPC 管制圖與管制界限", "文件管制程序", "品質管制", "製程管制計畫", "near the ear", "play guitar",
+                     "BEAR 軸承", "Cui bono"):
+            self.assertIsNone(sanitize.dlp_tier(text), text)
+
+    def test_amount_forms_are_t2(self):
+        for text in ("報價 US$ 40,000", "USD 3000", "40000 USD", "報價 125 萬元", "每件 3千元", "約五萬元"):
+            self.assertEqual(sanitize.dlp_tier(text), "T2", text)
+        self.assertIsNone(sanitize.dlp_tier("USD 匯率是什麼"))
+
+    def test_new_t3_word_is_blocked_before_the_model_and_advises(self):
+        h = self.make()
+        for word in ("航太", "ITAR", "外銷許可"):
+            [r] = h.msg(f"@品保 這批{word}件的公差")
+            self.assertIn("可能屬 T3", r.text)
+            self.assertIn("T3 程序", r.text)
+        self.assertEqual(h.driver.calls, [])
+        self.assertIn("dlp:T3", h.reasons())
+
+    def test_new_amount_is_blocked_in_t1_channel(self):
+        h = self.make()
+        [r] = h.msg("@品保 這批報價 125 萬元 要不要特採")
+        self.assertIn("T2 標記", r.text)
+        self.assertEqual(h.driver.calls, [])
+
     def test_filter_output_order(self):
         text = (f"見 ![a](https://x.example/i.png) [文件](https://x.example/d) https://y.example/z "
                 f"<https://z.example|連結> @everyone <!here> key {FAKE_SLACK}")

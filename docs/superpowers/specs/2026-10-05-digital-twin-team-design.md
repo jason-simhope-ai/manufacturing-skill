@@ -24,7 +24,7 @@
 - 先過「需要分身嗎？」閘門（`needsTwinGate`）；流程修正能解決就不開分身。
 - Alpha 只做到 `observe / suggest / draft`：**沒有任何寫入工具**，分身工具恆為 `Read, Grep, Glob`。
 - Chat-ops：`infra/chat-gateway/`（Python 3.11，核心只用 stdlib）、mock / Slack / Discord adapter、`HarnessDriver`（mock + claude-code）。每輪必須 @mention，回覆前綴 `【<職稱>分身】`，不讀頻道歷史、不接 DM、忽略所有 bot 作者。
-- 安全：T0–T3；SaaS 聊天與雲端模型上限 T1；T3（高安規客製專案）在 alpha **一律拒載（exit 3）**；repo 無真名、無平台 id、無 secret（CI 強制）。
+- 安全：T0–T3；SaaS 聊天與雲端模型上限 T1；T3（高安規客製專案）在 alpha **設定層拒載（exit 3），字樣層以 DLP 關鍵字擋下並提示（不是內容理解）**；repo 無真名、無平台 id、無 secret（CI 強制）。
 - Pilot：wave 1 = 生產部主管分身 + 品保部主管分身（T1）；技術部主管分身視 gate 而定；董事長室不開分身。
 
 ### 決策一覽（細節見 §12）
@@ -463,7 +463,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 | T2 confidential | 圖紙、BOM、報價、客戶名、個資 | 僅 mock（本機） | 預設地端；放寬到雲端是政策文字，需零留存合約 + 書面核准 + manifest 明列三項 | 只在 mock 可設定；Slack-T2 延後 |
 | T3 restricted | 高安規客製專案的任何資料，包含專案「是否存在」 | 不適用 | 不適用 | **拒載，exit 3** |
 
-超過 T3 的等級不在任何 AI 系統的範圍內，本 repo 也拒絕建模。拿不準就往上一級；頻道 tier 即內容 tier，只能往上升，不能往下降。DLP tripwire（只是告警，不是防線）：「機密 / CONFIDENTIAL / RESTRICTED / 受限 / 國防」字樣、統一編號（含檢查碼）、身分證字號 `[A-Z][12]\d{8}`、`NT\$\s?[\d,]{4,}`，以及本機 denylist 中的圖號與專案代號樣式。命中等級高於頻道 → `dlp_blocked`，提示改到正確頻道，內容不送進模型；命中 T3 樣式 → 回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
+超過 T3 的等級不在任何 AI 系統的範圍內，本 repo 也拒絕建模。拿不準就往上一級；頻道 tier 即內容 tier，只能往上升，不能往下降。DLP tripwire（只是告警，不是防線）：「機密 / CONFIDENTIAL」（T2）、「RESTRICTED / 受限 / 國防 / 航太 / 軍工 / 軍規 / 醫材 / 醫療器材 / ITAR / EAR / CUI / 外銷許可 / 管制」（T3；`管制` 排除管制圖、文件管制等品管用語）、統一編號（含檢查碼）、身分證字號 `[A-Z][12]\d{8}`、`NT\$\s?[\d,]{4,}`、`US$`／`USD` 金額與「萬元／千元」（T2），以及本機 denylist 中的圖號與專案代號樣式。命中等級高於頻道 → `dlp_blocked`，提示改到正確頻道，內容不送進模型；命中 T3 樣式 → 回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
 
 ### 11.2 T3 在 alpha 的處理
 

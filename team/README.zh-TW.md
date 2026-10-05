@@ -1,6 +1,23 @@
 # 數位分身團隊 — 10 分鐘說明
 
 > 每個職位有一個副駕分身。**副駕不是替身**：判斷永遠是人做，分身讓你看得更多、更快發現漏洞。
+>
+> **人類讀者從這份開始。** 根目錄的 [TEAM.md](../TEAM.md) 是給 AI agent 的啟動檔（位元組預算、錯誤碼、演算法），不必讀。
+> 狀態：v0.2.0-alpha，實驗性；只在測試工作區與合成／已去識別資料上試。
+
+## 先看這裡：誰不該現在導入
+
+先確認五件事，**任何一項是「否」就先不要導入**，改用既有的 `/command`（例如 `/inspect`、`/quote`）並跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`，紙上就能做）：
+
+| 要有 | 說明 |
+| ---- | ---- |
+| Slack 或 Discord 工作區 | 目前只支援 Slack、Discord 與本機 mock；**不支援 LINE、Teams**。不要把 LINE 或 Teams 的內容複製貼上到分身頻道代替，那等於繞過分級 |
+| 一台常駐主機、一位金鑰保管人 | gateway 要一直開著；token 與金鑰只放環境變數，由 IT 或管理部保管，不是導入負責人 |
+| 至少兩位主管，每週各 15 分鐘 review | 沒有 review，分身只是多一個沒人檢查的訊息來源 |
+| 資料已數位化，且能先去識別成 T1 | 見下方「資料餵入」。流程還在紙本，先做流程修正 |
+| 公司接受「T1 內容送到雲端模型」 | 見下方「T0–T3」。客戶合約（NDA、客戶規範）不允許第三方 AI 看的資料，先查合約，不要先試 |
+
+另外：老闆期待「裝了就省人力」的，不要導入；分身的指標不是省時間（見 [導入指南](../docs/adoption-guide.md) 的團隊段）。
 
 ## 0–2 分：一張圖
 
@@ -18,8 +35,46 @@
 - **07:50**　生產部主管分身在頻道貼出提醒：「請先貼出 3 個今日重點。」主管寫下三點後，分身再用排程資料挑戰：「第 2 點提到的工單 `WO-EX-014` 與缺料清單重疊，你要不要先看？」插單或加班，由主管決定。
 - **09:30**　品保部主管分身在 NCR 的 thread 補上兩件相似案與一個反例：「你先前判『中』，以下兩點可能推翻。」回覆末段的 `🧭 需要你判斷` 列出嚴重度與是否升級 8D，由品保部主管選。
 - 每則回覆都附依據、`[ASSUMED]` 假設、未查證項目與信心（只有「中」或「低」）。
+- 離線 demo（`python3 infra/chat-gateway/demo.py`）裡的回覆是**預錄**的，不是模型推論；它示範流程與防線，不證明分身答得準。
 
-## 5–8 分：三分類、五級 autonomy、不做的事
+## 5–8 分：資料分級 T0–T3（給人看的版本）
+
+| 級別 | 白話 | 車間例子 | 能進哪裡（alpha） |
+| ---- | ---- | -------- | ----------------- |
+| **T0 公開** | 本來就公開的 | 產品型錄、公開的規範與標準、官網上的公司介紹 | 任何頻道 |
+| **T1 內部** | 對外不公開，但外洩了損失有限 | SOP、排程摘要（工單號、機台、交期餘裕、保養時段）、已去識別的 NCR（客戶是 `CUST-xx`、沒有人名） | Slack／Discord／mock；**內容會送到雲端模型** |
+| **T2 機密** | 外洩會傷到客戶或公司 | 圖紙、BOM、報價與金額、客戶名、人名與電話、統一編號 | **只能在本機 mock**；alpha 不能上 Slack／Discord，也不能給雲端模型（把 `cloudTierCeiling`／`saasTierCeiling` 設到 T2 以上，`teamctl check` 報 `E047`，gateway 拒載） |
+| **T3 高安規** | 國防、航太、醫療器材等客戶專案的**任何**資料，連「有這個專案」都算 | 專案代號、客戶名單、管制清單、外銷許可 | 不處理（見下） |
+
+三條規則：**拿不準就往上一級**；頻道的分級就是內容的分級，只升不降；T3 與 T2 的判斷靠人與流程，工具只是補一道告警。
+
+**T3 實際上是怎麼擋的**（兩道，都不是「理解內容」）：
+
+1. 設定層：roster 裡出現任何 T3 頻道或 T3 分身，gateway 啟動就拒絕（exit 3），什麼都不載入。
+2. 字樣層（DLP 關鍵字告警）：訊息含下列字樣時，gateway 擋下、不送進模型，並回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
+   - 視為 T3：`受限`／`RESTRICTED`、`國防`、`航太`、`軍工`、`軍規`、`醫材`／`醫療器材`、`ITAR`、`EAR`、`CUI`、`外銷許可`、`管制`（不含 `管制圖`、`文件管制`、`製程管制` 等品管用語）。
+   - 視為 T2（送進 T1 頻道會被擋）：`機密`／`CONFIDENTIAL`、統一編號、身分證字號、`NT$`／`US$`／`USD` 金額、`萬元`／`千元`，以及你自己放進 `team/local/names.denylist` 的客戶名、圖號、專案代號。
+   - **這是字樣比對，不是內容理解**：換個說法、縮寫、圖號、客戶代號、照片裡的文字都擋不到；`受限` 也會誤擋「不受限制」。所以不要對同仁說「T3 一律不處理」，要說「T3 不准進來，系統只會擋明顯字樣，其餘靠你自己」。同仁自己要先判斷，不要把 T3 話題丟進任何分身頻道。
+
+**模型在雲端**：T1 內容會由 gateway 以 `claude -p` 送到 Anthropic API（用營運者自己的 API 金鑰），同時也留在 Slack／Discord 上。保留期限、資料區域與零留存條款取決於你和供應商的合約，本 repo 不替你保證。全 repo 的資料流向頁正在準備中，在那之前請以這張表為準。
+
+## 資料餵入：分身怎麼讀到排程／NCR 資料
+
+Wave 1 的價值（「用排程資料挑戰並補漏」、「補相似 NCR 與反例」）取決於分身讀得到資料。設計很單純：**一個資料夾，由人匯出，分身只讀。**
+
+| 項目 | 做法 |
+| ---- | ---- |
+| 放哪 | 一個**已存在的資料夾**，路徑設在環境變數 `MFG_TEAM_DATA_T1`（建議絕對路徑、放在 repo 外，絕對不要 commit）。沒設就是沒有資料：分身只剩 `team/.build/ref/` 的參考文字 |
+| 只對真模型有效 | 這個資料夾只在 `--driver claude-code` 時交給模型（以 `--add-dir`，工具只有 `Read`／`Grep`／`Glob`，不能寫）；`--driver mock`（含 demo）的預錄回覆完全不讀它 |
+| 誰匯出 | 該部門的資料窗口，在**來源端**匯出：生管匯排程、品保工程師匯 NCR。是人匯出、人放進去，分身不會自己去連 MES／ERP，也不會寫回 |
+| 放什麼 | 只放 **T1 以下**：排程摘要（工單號、機台、交期餘裕、保養時段）、已去識別的 NCR（客戶 `CUST-xx`、無人名、無聯絡方式）。不放：圖紙、BOM、報價與金額、客戶名、人名、電話、email |
+| 先去識別 | 匯出後、放進資料夾前，先跑 `team/tools/deid.py`（指令見 `team/local/README.md`）。它對殘留**一律失敗**：有任何命中就不寫輸出檔、exit 1。但它只掃通用樣式（email、電話、人名加職稱、金額與統編、上面的 DLP 字樣）加你的 `team/local/names.denylist`；**英文客戶別名、圖號若沒進 denylist 或對照表，它掃不到**。所以每次匯出都要由匯出者抽查幾列，再放進資料夾 |
+| 格式 | 沒有固定 schema：分身用 `Grep`／`Read` 讀文字檔。建議 UTF-8 CSV、第一列欄名、欄名人看得懂。範例：排程 `work_order,machine,due_date,slack_days,maintenance_window,snapshot_date`；NCR `ncr_no,date,part_family,defect,disposition,snapshot_date`。檔內放 `snapshot_date`（或檔名含日期），回覆才說得出資料多舊 |
+| 多久更新 | 由人決定，分身只讀檔案當下的內容。建議早會前（例如 07:30，早於 07:50 的排程貼文）匯出覆蓋同一檔 |
+| 看得到的範圍 | 這個資料夾對**該 gateway 服務的所有分身與頻道**都可見。想分開，就用不同的 gateway 與資料夾；不要把某個部門才該看的東西放進共用資料夾 |
+| 怎麼確認讀到 | `python3 -m chat_gateway self-check --driver claude-code`（需 `PYTHONPATH=infra/chat-gateway`）會檢查資料夾存在。再問一個答案只在檔案裡的問題（例：「WO-EX-0412 的交期餘裕？」），用 `grep WO-EX-0412 "$MFG_TEAM_DATA_T1"/*.csv` 對照回覆的依據 |
+
+## 8–10 分：三分類、五級 autonomy、不做的事
 
 | 分類 | 意思 | 例 |
 | ---- | ---- | -- |
@@ -27,7 +82,7 @@
 | `create` 創造新能力 | 以前沒人做 | 每日 SPC 趨勢提醒 |
 | `outsource` 外包既有工作 | 今天有人在做，上線後那個人不再做 | 8D 排版、簡報資料包 |
 
-outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判 outsource。
+outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一項、上限 `draft`、90 天內複審，並要求 teach-back 與人工練習。分類有爭議一律判 outsource。
 
 | autonomy | 能做 |
 | -------- | ---- |
@@ -36,16 +91,49 @@ outsource 預設休眠；要喚醒必須在 roster opt-in，每分身最多一�
 | `draft` | 在回覆中產出標 `DRAFT` 的草稿 |
 | `act-with-approval`、`act` | 定義保留；alpha 不開放 |
 
-**分身永遠不做**：替你做決定、寫入任何系統、對外發送、冒充你、評比個人、讀整個頻道、保留長期記憶（只記得本頻道最近 10 則 @ 對話，重啟即清空）。
+**分身永遠不做**：替你做決定、寫入任何系統、對外發送、冒充你、評比個人、讀整個頻道、保留長期記憶（只帶入本頻道最近 10 則被 @ 的問答，**含他人的提問**，重啟即清空）。
 
 **FAQ：會不會取代我？** 不會。每項能力都寫明「上線後你還親手做什麼」；分身指標與技能保留紀錄不作為人力或績效依據；你可以隨時用「我先說」讓自己先判斷。
 
-## 8–10 分：怎麼開始
+## 這些承諾，工具擋得住什麼
 
-1. 跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`）：流程修正或既有指令能解決的，就不開分身。
-2. 複製 `team/roster.example.yaml` 到 `team/local/roster.local.yaml`，改成自己的部門與職位（只放職稱，不放姓名；本機設定見 `team/local/README.md`）。
-3. `python3 team/tools/teamctl.py check` 通過後，用 `python3 team/tools/build.py --summary` 編譯；離線試玩：`python3 infra/chat-gateway/demo.py`。
-4. 誰核准？outsource 的核准人必須在該部門的升級梯上、且不是本人。
-5. **T3（高安規客製專案）為什麼不在 alpha？** 它需要獨立主機、專屬地端模型與客戶書面同意；在這些就位前，系統一律拒載，詳見 `team/policies/restricted.md`。
+**`teamctl check`（lint）檢查結構，不檢查真偽。** 下表把「系統強制」和「靠人」分開寫：
+
+| 承諾 | 工具實際做的 | 擋不住的 |
+| ---- | ------------ | -------- |
+| 每項能力標分類、寫 `today`／`humanStillDoes` | 缺漏是硬錯誤；`strengthen` 的 `humanStillDoes` 只剩「審閱／確認／核准／蓋章」會被擋（`E038`） | 標錯：把 outsource 標成 strengthen 再寫一句「親手核對」就能過；`today` 寫「無」也過。真偽靠季審與「有爭議判 outsource」 |
+| outsource 休眠、≤ 1 項、≤ `draft`、90 天複審 | lint 檢查結構；gateway 不會呼叫休眠能力，並把 outsource 限制在 `draft` | **`reviewBy` 到期由 lint 發現，不是執行期強制**：只有人跑 `teamctl check` 才看得到（本機 roster 過期是錯誤，CI 只警告，且 CI 看不到你的本機 roster）；gateway 執行期不看 `reviewBy` |
+| teach-back 與人工練習 | `manualRepsPerMonth` 只驗證是 ≥ 1 的整數 | **自報制**：沒有提醒、沒有記錄、沒有驗證，由在職者在週 review 自己說。文件寫「要求」，不是系統強制 |
+| 決策點 🧭、信心只有「中／低」 | gateway 程式強制（模型沒列決策點時補上通用句） | `/team ask` 預覽路徑不經 gateway，沒有頁尾 |
+| 人先寫 D4、「我先說」 | 只寫在 prompt 裡 | 使用者不說就沒有；沒有任何紀錄 |
+| 成功指標（人修改 🧭 的比例、人先寫 D4 的比例、週 review 出席率） | 無；系統不收集 | 要由導入負責人每週手工記錄（表格見導入指南） |
+| 每分身在 `roster.json` 的項目 ≤ 600 B | 本機 roster 超過是警告 `W008`；只有 CI 檢查出貨範例 roster 時才是錯誤 `E050` | 警告不會擋你，但代表 `roster.json` 越來越肥（出貨的範例品保分身有 3 項能力，已是 586 B）；想再多啟用一項時，縮短能力 id 或職稱，或少啟用一項 |
+
+## 怎麼開始
+
+1. 跑「需要分身嗎？」閘門（`team/gate/need-a-twin.md`）：流程修正或既有指令能解決的，就不開分身。閘門裡「涉及 T3 嗎」那題（G7）**請在紙上自己確認，不要把答案打進任何聊天或 AI 對話**（回答「有，某某國防案」本身就洩漏了 T3 的存在）。
+2. 前置：Python 3.11+、`pip install pyyaml`。指令用 `python3`（Windows 未驗證）。
+3. 複製 `team/roster.example.yaml` 到 `team/local/roster.local.yaml`，改成自己的部門與職位（只放職稱，不放姓名；本機設定見 `team/local/README.md`）。
+4. `python3 team/tools/teamctl.py check` 通過後，用 `python3 team/tools/build.py --summary` 編譯；離線試玩：`python3 infra/chat-gateway/demo.py`。
+5. 誰核准？outsource 的核准人必須在該部門的升級梯上、且不是本人。
+6. **兩週與逐日做法**：見 [導入指南](../docs/adoption-guide.md) 團隊段的「兩週逐日表」，含「AI 賦能原則」與部署檢核表範本。
+
+**不要把秘密放進任何檔案**：token、金鑰只放環境變數（`MFG_TEAM_*`、`ANTHROPIC_API_KEY`）；真名、平台 id、客戶名只放 `team/local/*`（不進版控）。CI 只掃追蹤檔，`team/local` 靠本機 pre-commit（`team/local/README.md`）。
+
+## 名詞
+
+| 詞 | 意思 |
+| -- | ---- |
+| 分身 | 一個職位的副駕 AI 角色：一份 `team/twins/<id>.md` 加上 roster 的設定。不是人的替身，不做決定、不寫入系統 |
+| roster | 名冊檔：有哪些部門、職位、哪些職位有分身、綁哪些頻道。範例是 `team/roster.example.yaml`，真實的放 `team/local/` |
+| 決策點（🧭） | 該由人選的問題（分身檔的 `decisionPoints`、`decisionRights`）。分身遇到就停下，列出選項與取捨，不替人選 |
+| 三分類 | 每項能力必標 `strengthen`（強化既有優勢）、`create`（創造新能力）、`outsource`（外包既有工作），見上表 |
+| autonomy 等級 | 分身能做到哪：`observe`（答事實）＜`suggest`（給選項）＜`draft`（寫標 DRAFT 的草稿）＜`act-with-approval`＜`act`；alpha 最高 `draft`，後兩級不開放 |
+| gateway | 把聊天工作區接到分身的小程式（`infra/chat-gateway/`）：驗身分、檢查分級、限流、寫稽核紀錄 |
+| adapter | gateway 接特定平台的接頭：`mock`（本機）、`slack`、`discord` |
+| 稽核錨點 | gateway 自動維護一個簽章過的檢查點檔 `audit/checkpoint.json`（每個分級的紀錄筆數與最後一筆的雜湊）。「稽核錨點」就是這個檔（或 `audit-verify` 印出的 head）**另存在別處的複本**，每週由導入負責人以外的人簽收；有它，才抓得到「日誌與檢查點被一起回退」。日誌只存雜湊、不存訊息文字，所以出事時要靠 Slack／雲端平台端的紀錄還原內容 |
+| teach-back | 在職者定期用自己的話向同事講清楚被 outsource 的那件事怎麼做、為什麼；加上每月的人工練習次數。目前由人自報 |
+| dormant | 休眠：能力寫在分身檔裡，但 roster 沒有 opt-in，就不會被呼叫 |
+| T0–T3 | 資料分級，見上表 |
 
 給 agent 的入口在根目錄的 [TEAM.md](../TEAM.md)。
