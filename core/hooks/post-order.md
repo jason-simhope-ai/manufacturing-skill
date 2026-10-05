@@ -16,7 +16,7 @@ SO 建立完成後自動觸發，確保「客戶 PO 變成內部行動」不漏�
 
 ### 1. 通知 production-planner
 
-- 推送新 SO 到 scheduler-mcp 待排隊列
+- 推送新 SO 到 manufacturing-scheduler 待排隊列
 - 自動跑一次 `capacity-planning` 評估能否準時
 - 如果預估 > 客戶交期 → 立即標紅，回報 sales-coordinator
 
