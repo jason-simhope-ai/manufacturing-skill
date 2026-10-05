@@ -41,6 +41,7 @@
 - 🎯 補完一個社群 profile（最有可能：射出成型，因為下一個目標客戶可能是射出廠）
 - ✅ ~~部分內容繼承~~（v0.1.4 提早出貨）
 - ✅ ~~多 profile 同時 active~~（v0.1.5 提早出貨）
+- ✅ 設備接單設計（ETO）profile：`machinery-eto` alpha 已出貨（3 agent、3 skill、3 know-how、`pre-quote` hook override；內容需設備製造業工程師驗證）
 - ✅ GitHub Actions CI（v0.1.1 起；v0.1.3 加結構檢查；v0.1.4 加 inheritance lint；v0.1.5 加 multi-profile pairwise scan）
 - 🎯 自動產生 explainer HTML（從 plugin.json + manifests 動態 render）— 部分達成（v0.1.4 stat panel auto-regen + drift detection），更全面的 catalog 自動化仍 pending
 
