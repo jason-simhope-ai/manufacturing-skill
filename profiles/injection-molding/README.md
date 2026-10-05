@@ -16,6 +16,8 @@
 
 All four files are explicitly labelled with an alpha warning header.
 
+> **Automotive customers (IATF 16949 / PPAP):** the IATF 16949 + PPAP know-how lives in core — see [`core/know-how/iatf-16949.md`](../../core/know-how/iatf-16949.md), which includes an injection-molding section (per-cavity dimensional results, process-window control, regrind approval, mold-change re-submission). It is installed with every profile; no extra profile is needed.
+
 ## What this profile covers (and what's still missing)
 
 **Covered:**

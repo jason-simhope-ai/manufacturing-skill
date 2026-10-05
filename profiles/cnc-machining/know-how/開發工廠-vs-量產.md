@@ -38,7 +38,7 @@ source: SIMHOPE 實務經驗
 - ✅ 啟用 `prototype-coordinator`（開發件協調）
 - ✅ 報價時 `quote-specialist` 多算 prototype 工時 + 風險加成
 - ✅ 排程時保留 buffer 給試切失敗重做
-- ⚠️ IATF 16949 PPAP 的 Cpk ≥ 1.67 在開發階段難達到（樣本不足），轉量產才嚴
+- ⚠️ PPAP 初期製程研究的 Cpk 門檻（常見 1.67，以客戶 CSR 為準；見 core 的 `iatf-16949`）在開發階段難達到（樣本不足），轉量產才嚴
 
 ---
 

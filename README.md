@@ -32,8 +32,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 `manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
 
-- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, Lean, OEE, MRP).
-- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 4 know-how docs covering IATF 16949, tool life, cutting parameters, job-shop vs. mass production). Stub profiles for PCB assembly, injection molding, food processing, and pharma are scaffolded for community / customer contribution.
+- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, IATF 16949 / PPAP, Lean, OEE, MRP, FMEA, GD&T, ECN, INCOTERMS).
+- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 3 know-how docs covering tool life, cutting parameters, job-shop vs. mass production). Stub profiles for PCB assembly, injection molding, food processing, and pharma are scaffolded for community / customer contribution.
 - **Infra layer** — MCP server templates for ERP/MES connectivity, on-prem LLM setup guides (Ollama on NVIDIA GB10), and reference configurations.
 - **Adapter layer** — a Claude Code adapter (v1). Cursor / Gemini / Codex adapters are post-v1.
 
@@ -45,7 +45,7 @@ Manufacturing AI adoption usually fails on three things:
 
 | Problem                    | Traditional answer                                             | What this plugin gives you                                                           |
 | -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 4 know-how docs — AI understands ISO/Lean/OEE on day one |
+| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 9 core know-how docs — AI understands ISO/IATF/Lean/OEE on day one |
 | Every factory is different | Hire an SI, pay for full custom build                          | Core + profile overlay — fork, edit your profile, done                               |
 | IT blocks cloud SaaS       | Cannot pass customer audits (drawings must not leave premises) | On-prem-first design with GB10/Ollama runtime                                        |
 
@@ -127,7 +127,7 @@ manufacturing-skill/
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
 │   ├── agents/               # 5 universal personas
 │   ├── skills/               # 6-stage flow + utility skills
-│   ├── know-how/             # ISO 9001, Lean, OEE, MRP
+│   ├── know-how/             # ISO 9001, IATF 16949, Lean, OEE, MRP, ...
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/
 │   ├── cnc-machining/        # ★ Complete v1 profile
