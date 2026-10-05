@@ -17,15 +17,15 @@
 
 ## 3. 啟動演算法
 
-前置：Python 3.11+、`pip install pyyaml`（缺少時 teamctl exit 2）。在 repo clone 內執行；`~/.claude/plugins/` 的安裝副本只供閱讀，工具一律在 clone 跑（路徑見其 `.installed` 的 `source`）。
+前置：Python 3.11+、`pip install pyyaml`（缺少時 teamctl exit 2）。`$ROOT`＝本檔所在目錄，須是 repo clone（有 `infra/`）；讀到的是 `~/.claude/plugins/` 安裝副本（不含 `infra/`，工具跑不起來）→ `$ROOT` 改用其 `.installed` 的 `source`。下列路徑都相對 `$ROOT`，執行時換成絕對路徑。
 
 ```
-1. python3 team/tools/teamctl.py check            # 有任何 E 碼 → 停止並回報；不要自行修改 roster 或分身檔
-2. python3 team/tools/build.py --summary          # 預設讀 team/local/roster.local.yaml，沒有就讀 example（demo 模式，強制 mock）；寫入 team/.build/（唯讀 checkout 加 --out DIR）
+1. python3 "$ROOT/team/tools/teamctl.py" check    # 有任何 E 碼 → 停止並回報；不要自行修改 roster 或分身檔
+2. python3 "$ROOT/team/tools/build.py" --summary  # 預設讀 team/local/roster.local.yaml，沒有就讀 example（demo 模式，強制 mock）；寫入 team/.build/（唯讀 checkout 加 --out DIR）
 3. 讀 team/.build/roster.json 與 team/policies/core-rules.md；不要讀其他分身檔
 4a. /team status → /team ask <twin> <問題>        # 只有跑過 adapters/claude-code/install.sh 才有 /team；否則讀 core/commands/team.md 照做。預覽不是控制邊界
-4b. python3 infra/chat-gateway/demo.py            # 回覆是預錄，不是模型推論，不能當「分身運作正常」的證據
-4c. MFG_TEAM_STATE_DIR=$(mktemp -d) PYTHONPATH=infra/chat-gateway python3 -m chat_gateway run --adapter mock --driver mock
+4b. python3 "$ROOT/infra/chat-gateway/demo.py"    # 回覆是預錄，不是模型推論，不能當「分身運作正常」的證據
+4c. cd "$ROOT" && MFG_TEAM_STATE_DIR=$(mktemp -d) PYTHONPATH="$ROOT/infra/chat-gateway" python3 -m chat_gateway run --adapter mock --driver mock
     # REPL 每行：<頻道> <使用者> @<分身> <訊息>，例 qa-floor mock-qa-manager @品保 …；無 identities 時自動合成使用者 mock-<職位 id>
     # 被拒的訊息印 (no reply: policy_denied …)；回覆為預錄；Ctrl-D 結束（非互動請改用 --script FILE.jsonl）
 ```

@@ -40,7 +40,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ## 這能做什麼
 
-簡單說：**裝起來後你會多 5 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
+簡單說：**裝起來後你會多 6 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
 
 | #   | 場景                  | AI 同事幫你做                                                                |
 | --- | --------------------- | ---------------------------------------------------------------------------- |
@@ -51,9 +51,9 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
 | 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥都有起點範本）  |
 
-**5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
+**6 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管、工程變更 — 各司其職、會互相接力（看下面 Mermaid 圖）。
 
-**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 5 隻 AI 同事，**你不用每次重講一遍**。
+**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 6 隻 AI 同事，**你不用每次重講一遍**。
 
 ---
 
@@ -97,7 +97,7 @@ python3 infra/chat-gateway/demo.py
 
 採用「**core + profile overlay**」架構：
 
-- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
+- **Core 層** — 普世製造業基本功：6 段流程 + 6 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
 - **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
@@ -108,7 +108,7 @@ python3 infra/chat-gateway/demo.py
 
 ## Agent 之間怎麼協作
 
-看完 demo 最常被問的問題：「5 隻 AI 同事是怎麼接力的？」一張圖說明。
+看完 demo 最常被問的問題：「6 隻 AI 同事是怎麼接力的？」一張圖說明。
 
 ### 流程：以 `/quote` 為例
 
@@ -130,7 +130,7 @@ sequenceDiagram
     Quote->>User: 完整報價單（含交期 + 檢驗成本）
 ```
 
-### 5 隻通用 agent · 各司其職
+### 6 隻通用 agent · 各司其職
 
 | Agent       | 角色             | 何時被呼叫              | 主要接力對象       |
 | ----------- | ---------------- | ----------------------- | ------------------ |
@@ -139,6 +139,7 @@ sequenceDiagram
 | 📅 生管     | 排程、產能評估   | 排單、交期確認          | 報價師、倉管       |
 | 🔍 品管     | 檢驗計畫、不良追蹤 | `/inspect`、`/8d`       | 業助、倉管         |
 | 📦 倉管     | 庫存、BOM 對帳   | `/bom-check`、缺料      | 生管、品管         |
+| 🛠️ 工程變更 | ECN / ECO 影響分析、變更追溯 | 圖紙或 BOM 改版     | 生管、品管、倉管   |
 
 > CNC 產業包再加 4 隻（CAM 工程師、刀具管理、量測技師、首件確認），詳見 [profiles/cnc-machining/](profiles/cnc-machining/)。
 
@@ -150,7 +151,7 @@ sequenceDiagram
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 6 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
 
@@ -226,7 +227,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
-1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
+1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 6 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
 2. **Stub 加碼客製** — 若你是 PCB / 射出 / 食品 / 製藥，那個產業包是 stub 但有 starter template，照著填內容就能用。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
@@ -257,7 +258,7 @@ manufacturing-skill/
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # 普世製造業基本功
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
-│   ├── agents/               # 5 隻 universal persona
+│   ├── agents/               # 6 隻 universal persona
 │   ├── skills/               # 6 段流程 + 通用 skill
 │   ├── know-how/             # ISO 9001、Lean、OEE、MRP
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error

@@ -24,6 +24,8 @@ TEAM.md                       ────►     TEAM.md
 profiles/<active>/profile.json ────►    active-profile.json
 ```
 
+`infra/`（含 `infra/chat-gateway/`）**不安裝**。team 工具（`teamctl.py`、`build.py`）載入 `infra/chat-gateway/chat_gateway/patterns.py`，所以 `/team` 的 status／check／ask／demo 都在 repo clone（`.installed` 的 `source`）執行；安裝副本只夠 `/team gate`。見 [core/commands/team.md](../../core/commands/team.md) 的 `$ROOT` 段。
+
 ---
 
 ## Override 規則（filename-based）
@@ -62,19 +64,15 @@ Claude Code 預期 plugin 內：
 ├── .installed               # 安裝紀錄（時間、版本、profile、team: true）
 ├── team/                    # 數位分身團隊（資料、policies、tools；/team 指令使用）
 ├── TEAM.md                  # agent 啟動檔
-├── commands/
-│   ├── quote.md
-│   ├── order-status.md
-│   ├── bom-check.md
-│   ├── inspect.md
-│   ├── install-profile.md
-│   └── manufacturing.md
+├── commands/                # 11 個：quote、order-status、bom-check、inspect、8d、manufacturing、
+│   └── *.md                 #   init、install-profile、add-profile、morning-briefing、team
 ├── agents/
 │   ├── quote-specialist.md       # core
 │   ├── sales-coordinator.md      # core
 │   ├── production-planner.md     # core
 │   ├── quality-inspector.md      # core
 │   ├── inventory-manager.md      # core
+│   ├── engineering-change-manager.md # core
 │   ├── cnc-programmer.md         # profile (cnc)
 │   ├── tool-life-engineer.md     # profile (cnc)
 │   ├── fixture-designer.md       # profile (cnc)

@@ -12,7 +12,7 @@
 Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 1. 知道製造業 6 段流程（報價→接單→排程→生產→檢驗→出貨）怎麼跑
-2. 召喚 5 隻 universal agent persona（報價師/業助/生管/品管/倉管）
+2. 召喚 6 隻 universal agent persona（報價師/業助/生管/品管/倉管/工程變更）
 3. 載入你選的 vertical profile（v1 完整支援 CNC 精密加工）
 4. 接上你的 ERP/MES/PLM（透過 MCP server）
 5. 在地端 GPU（GB10 / Ollama）或雲端 LLM 跑起來
@@ -25,7 +25,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 6 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay 架構，企業 fork 後改 profile 即可     |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
 
@@ -59,7 +59,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 | ----------------- | --------------------------------------------------------- | ----------------------------------------- |
 | 1. USE 入口       | slash commands `/quote /order-status /bom-check /inspect` | `core/commands/`                          |
 | 2. FLOW 流程      | 6 段 skill：報價→接單→排程→生產→檢驗→出貨                 | `core/skills/01-06.md`                    |
-| 3. ROLE 角色      | 5 大 persona + profile 加碼                               | `core/agents/` + `profiles/*/agents/`     |
+| 3. ROLE 角色      | 6 大 persona + profile 加碼                               | `core/agents/` + `profiles/*/agents/`     |
 | 4. INFRA 基礎設施 | MCP server / 地端 LLM / 檔案規範                          | `infra/`                                  |
 | 5. REF 知識庫     | ISO / IATF / Lean / OEE / SPC                             | `core/know-how/` + `profiles/*/know-how/` |
 | 6. HOOK 生命週期  | pre-quote / post-order / pre-ship / on-error              | `core/hooks/` + `profiles/*/hooks/`       |
