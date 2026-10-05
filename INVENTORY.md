@@ -147,12 +147,23 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於公開資料，未經實際射出廠工程師驗證。歡迎射出廠師傅 PR 修正。
 
-#### Stub profiles（3 個 — 歡迎 contribute）
+#### `profiles/food-processing/` — 🧪 v0.1 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md)                                                                               |
+| Agents (2)   | [haccp-coordinator](profiles/food-processing/agents/haccp-coordinator.md) · [traceability-officer](profiles/food-processing/agents/traceability-officer.md)                           |
+| Skills (2)   | [haccp-plan-review](profiles/food-processing/skills/haccp-plan-review.md) · [batch-traceability-recall-drill](profiles/food-processing/skills/batch-traceability-recall-drill.md)     |
+| Know-how (2) | [haccp-iso22000-basics](profiles/food-processing/know-how/haccp-iso22000-basics.md) · [food-defects-and-ccp-examples](profiles/food-processing/know-how/food-defects-and-ccp-examples.md) |
+| Hooks (1)    | [pre-ship](profiles/food-processing/hooks/pre-ship.md)（取代 core `pre-ship`，加食品批次放行要件）                                                                                  |
+
+> **Alpha 警告**：內容基於 Codex / ISO 22000 公開資料，未經食品廠 HACCP 小組驗證；管制界限皆為範例，法規細節標「需驗證」。不可取代 HACCP 管制小組或法規顧問，AI 不簽核 CCP 偏差、不決定回收。
+
+#### Stub profiles（2 個 — 歡迎 contribute）
 
 | Profile                                      | manifest                                                                                                | 預留範本                                                                             |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
-| [food-processing](profiles/food-processing/) | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md) | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md) |
 | [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
@@ -259,7 +270,8 @@ core/  know-how         : 8
 core/  hooks            : 4
 CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
-Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+Stub profiles           : 2 (PCB / pharma — manifest + README + _templates)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + CAPTURE-GUIDE.md

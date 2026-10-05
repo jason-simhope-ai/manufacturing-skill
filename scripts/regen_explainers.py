@@ -57,13 +57,17 @@ def gather_metrics() -> dict:
     cnc_kh = count_md(REPO / "profiles" / "cnc-machining" / "know-how")
     cnc_hooks = count_md(REPO / "profiles" / "cnc-machining" / "hooks")
 
-    # Injection profile (alpha)
-    inj_agents = count_md(REPO / "profiles" / "injection-molding" / "agents")
-    inj_skills = count_md(REPO / "profiles" / "injection-molding" / "skills")
-    inj_kh = count_md(REPO / "profiles" / "injection-molding" / "know-how")
-    inj_hooks = count_md(REPO / "profiles" / "injection-molding" / "hooks")
-
     profiles = plugin_json.get("profiles", {})
+
+    # Alpha profiles (summed over plugin.json `profiles.alpha`, e.g.
+    # injection-molding + food-processing). Keys keep the historical
+    # `inj` name so the rendered layout stays unchanged.
+    alpha_dirs = [REPO / "profiles" / n for n in profiles.get("alpha", [])]
+    inj_agents = sum(count_md(d / "agents") for d in alpha_dirs)
+    inj_skills = sum(count_md(d / "skills") for d in alpha_dirs)
+    inj_kh = sum(count_md(d / "know-how") for d in alpha_dirs)
+    inj_hooks = sum(count_md(d / "hooks") for d in alpha_dirs)
+
     n_complete = len(profiles.get("complete", []))
     n_alpha = len(profiles.get("alpha", []))
     n_stub = len(profiles.get("stub", []))
@@ -117,7 +121,9 @@ def render_explainer01_stats(m: dict) -> str:
         f'{m["kh"]["inj"]}α）</div></div>',
         f'<div class="stat"><div class="stat-num">{m["hooks"]["total"]}</div>'
         f'<div class="stat-label">Hooks（'
-        f'{m["hooks"]["core"]} + {m["hooks"]["cnc"]}）</div></div>',
+        f'{m["hooks"]["core"]} + {m["hooks"]["cnc"]}'
+        + (f' + {m["hooks"]["inj"]}α' if m["hooks"]["inj"] else '')
+        + '）</div></div>',
         f'<div class="stat"><div class="stat-num">'
         f'{m["profiles"]["total"]}</div>'
         f'<div class="stat-label">Profile（'

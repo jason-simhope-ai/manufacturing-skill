@@ -15,7 +15,7 @@ body:
       options:
         - pcb-assembly (currently stub)
         - injection-molding (currently alpha)
-        - food-processing (currently stub)
+        - food-processing (currently alpha)
         - pharma (currently stub)
         - sheet-metal (new)
         - mold-making (new)

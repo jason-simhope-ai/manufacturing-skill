@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`profiles/food-processing/` promoted from stub to alpha** (`0.1.0-alpha`): 2 agents (`haccp-coordinator`, `traceability-officer`), 2 skills (`haccp-plan-review` — Codex 12 steps / 7 principles checklist + CCP decision tree; `batch-traceability-recall-drill` — one-up / one-down trace, timed mock recall, mass balance), 2 know-how docs (`haccp-iso22000-basics`, `food-defects-and-ccp-examples`), and a food-specific `pre-ship` hook override (CCP record sign-off, CoA, lot / expiry consistency, allergen label vs. recipe, cold-chain temperature records). Every file carries an alpha header; all critical limits are labelled as examples and Taiwan regulatory specifics as "needs verification" (需驗證). Agents explicitly never sign off a CCP deviation, release product, or decide a recall — a human does.
+- `profiles/food-processing/profile.json` gains `warnings` (does not replace a qualified HACCP team / regulatory counsel), expanded `complianceFrameworks` (HACCP, ISO 22000, FSSC 22000, ISO/TS 22002-1, Taiwan Food Safety and Sanitation Act / GHP / HACCP regulation / traceability rules, TQF) and updated `wantedContributions`.
+- `profiles/food-processing/README.md` rewritten in zh-TW for non-technical successors, with short LINE-oriented usage tips and a clear does / does-not table.
+
+### Changed
+
+- `plugin.json`: `food-processing` moved from `profiles.stub` to `profiles.alpha`.
+- `scripts/regen_explainers.py`: alpha counts now sum over every profile in `profiles.alpha` (was hard-coded to injection-molding); hooks stat shows the alpha share when non-zero. Explainer 01 stat panel regenerated.
+- `INVENTORY.md`, `README.md`, `README.zh-TW.md`, `.github/ISSUE_TEMPLATE/profile-contribution.yml`: food-processing (and the previously stale injection-molding README tree comment) shown as alpha.
 
 ## [0.1.5] — 2026-05-09
 

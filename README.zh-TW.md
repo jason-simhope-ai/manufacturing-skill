@@ -63,7 +63,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 採用「**core + profile overlay**」架構：
 
 - **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。射出與食品（HACCP / ISO 22000、批次追溯）是 alpha（有內容、尚待業界實務驗證）；PCB / 製藥是 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
 
@@ -192,7 +192,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
-2. **Stub 加碼客製** — 若你是 PCB / 射出 / 食品 / 製藥，那個產業包是 stub 但有 starter template，照著填內容就能用。
+2. **Alpha / Stub 加碼客製** — 射出、食品是 alpha（有內容但需驗證）；PCB / 製藥是 stub，有 starter template 可照著填。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
 ---
@@ -229,8 +229,8 @@ manufacturing-skill/
 ├── profiles/                 # 產業包
 │   ├── cnc-machining/        # ★ v1 唯一完整產業包
 │   ├── pcb-assembly/         # Stub — 歡迎 contribute
-│   ├── injection-molding/    # Stub
-│   ├── food-processing/      # Stub
+│   ├── injection-molding/    # Alpha — 待射出廠驗證
+│   ├── food-processing/      # Alpha — HACCP / ISO 22000，待食品廠驗證
 │   └── pharma/               # Stub
 ├── adapters/claude-code/     # 一鍵安裝
 ├── infra/                    # MCP server、地端 LLM 設定
@@ -284,7 +284,7 @@ manufacturing-skill/
 
 PR 都歡迎，特別是：
 
-- 新產業包（PCB / 射出 / 食品 / 製藥 — 看 stub 裡的 README 知道要做什麼）
+- 新產業包（PCB / 射出 / 食品 / 製藥 — 看各產業包的 README 知道要做什麼）
 - ERP connector 實作（SAP / Oracle / 鼎新 / Workday）
 - explainer 卡片翻譯成其他語言
 - 真實導入 case study
