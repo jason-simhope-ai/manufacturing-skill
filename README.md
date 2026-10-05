@@ -88,6 +88,8 @@ Or skip the wizard:
 /quote "Stainless brackets, 100 pcs, ±0.05mm"      # plain text works too
 ```
 
+- **Not on Claude Code?** Export the same merged content as plain markdown for Cursor, Gemini CLI, Codex or an on-prem Ollama system prompt: `python3 adapters/generic/export.py --profiles cnc-machining --out ./export` — see [adapters/generic/README.md](adapters/generic/README.md) (experimental, v0.3 preview).
+
 ---
 
 ### Not a CNC shop?

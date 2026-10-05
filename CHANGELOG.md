@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **Generic adapter (experimental, v0.3 preview)** — `adapters/generic/export.py` exports the same merged content `install.sh` would install (core + profile overlay, `extends:` resolved, multi-profile conflict scan) as plain markdown for non-Claude agents (Cursor, Gemini CLI, Codex, on-prem Ollama, print). Reuses `adapters/claude-code/_resolve_extends.py` and `_multiprofile.py` rather than reimplementing them. Two formats: `--format files` (directory tree + `MANIFEST.json` with source, origin, versions and sha256 per file) and `--format bundle` (single `manufacturing-skill.<profiles>.md` with bilingual how-to preamble, table of contents and per-file frontmatter tables). Slash commands are exported as "playbooks" and hooks are marked documentation-only. `--include` filters kinds; `--reproducible` drops the MANIFEST timestamp for byte-identical output. Docs in `adapters/generic/README.md` (zh-TW).
+- **CI step "Generic adapter — export tests"** — `tests/generic/test_export.py` (12 stdlib unittest cases: core-only / single-profile file sets, profile override precedence, all `tests/extends` success fixtures exported identically to the resolver's expected output, resolver-failure / conflict / unknown-profile / bad `--include` exits, bundle + MANIFEST determinism, MANIFEST sha256 integrity, `--force` overwrite guard).
 
 ## [0.1.5] — 2026-05-09
 

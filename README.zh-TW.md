@@ -174,6 +174,8 @@ bash adapters/claude-code/install.sh
 /quote 「我做不鏽鋼五金件，幫我寫一份報價流程」  # 純文字描述也可以
 ```
 
+- **不用 Claude Code？** 同一份內容可匯出成純 markdown，給 Cursor、Gemini CLI、Codex 或地端 Ollama 當 system prompt：`python3 adapters/generic/export.py --profiles cnc-machining --out ./export` — 詳見 [adapters/generic/README.md](adapters/generic/README.md)（experimental，v0.3 preview）。
+
 ---
 
 ## 常見問題
