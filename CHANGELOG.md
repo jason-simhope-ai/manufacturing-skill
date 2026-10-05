@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).
+
+### Fixed
+
+- **CI core heading-anchor guard (step 10b) now actually runs on PRs** — checkout uses `fetch-depth: 0`, a failing diff is an error instead of a silent skip, the step reports whether core files were touched, and its logic moved into an argv/env-driven Python block (no filename or heading interpolated into `python3 -c`, no hidden errors, dead check removed).
 
 ## [0.1.5] — 2026-05-09
 
