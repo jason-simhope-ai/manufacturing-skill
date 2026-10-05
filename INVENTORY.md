@@ -172,11 +172,18 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師驗證；數字標「範例 / 需驗證」。尚無 MES 連線 — AOI/SPI/ICT/FCT 分析需先匯出 CSV。
 
-#### Stub profiles（1 個 — 歡迎 contribute）
+#### `profiles/pharma/` — 🧪 v0.1.0 alpha profile
 
-| Profile                                      | manifest                                                                                                | 預留範本                                                                             |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
+| 類別         | 內容                                                                                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                                                                                                                          |
+| Agents (2)   | [deviation-capa-coordinator](profiles/pharma/agents/deviation-capa-coordinator.md) · [batch-record-reviewer](profiles/pharma/agents/batch-record-reviewer.md)                                                   |
+| Skills (2)   | [deviation-investigation-5whys-fishbone](profiles/pharma/skills/deviation-investigation-5whys-fishbone.md) · [batch-record-completeness-review](profiles/pharma/skills/batch-record-completeness-review.md)     |
+| Know-how (2) | [gmp-gxp-basics](profiles/pharma/know-how/gmp-gxp-basics.md) · [validation-and-change-control](profiles/pharma/know-how/validation-and-change-control.md)                                                       |
+| Hooks (1)    | [pre-batch-release](profiles/pharma/hooks/pre-batch-release.md)（新增，不覆寫 core `pre-ship`；QA 放行前文件齊備檢查）                                                                                         |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)                                                                                                                                    |
+
+> **Alpha 警告**：內容基於 PIC/S GMP、ICH Q7/Q9/Q10、資料完整性指引公開摘要，未經 GMP QA / 確效人員驗證；數字標「範例 / 需驗證」。AI 輸出永遠不是 GMP 紀錄 — 不結案偏差、不核准 CAPA、不放行批次；不取代 QA / QP、法規事務或經確效的系統。
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
 
@@ -284,7 +291,8 @@ CNC profile (complete)  : 4 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
 Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
 PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
-Stub profiles           : 1 (pharma — manifest + README + _templates)
+Pharma profile (alpha)  : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+Stub profiles           : 0
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + CAPTURE-GUIDE.md

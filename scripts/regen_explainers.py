@@ -60,8 +60,8 @@ def gather_metrics() -> dict:
     profiles = plugin_json.get("profiles", {})
 
     # Alpha profiles (summed over plugin.json `profiles.alpha`, e.g.
-    # injection-molding + food-processing + pcb-assembly). Keys keep the historical
-    # `inj` name so the rendered layout stays unchanged.
+    # injection-molding + food-processing + pcb-assembly + pharma). Keys keep
+    # the historical `inj` name so the rendered layout stays unchanged.
     alpha_dirs = [REPO / "profiles" / n for n in profiles.get("alpha", [])]
     inj_agents = sum(count_md(d / "agents") for d in alpha_dirs)
     inj_skills = sum(count_md(d / "skills") for d in alpha_dirs)

@@ -63,7 +63,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 採用「**core + profile overlay**」架構：
 
 - **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出成型、食品（HACCP / ISO 22000、批次追溯）與 PCB 組裝（SMT / EMS）是 alpha（有內容、尚待業界實務驗證）；製藥是 stub
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出成型、食品（HACCP / ISO 22000、批次追溯）、PCB 組裝（SMT / EMS）與製藥 / 醫材（GMP / GxP 偏差 CAPA、批次紀錄預檢；AI 輸出永遠不是 GMP 紀錄）是 alpha（有內容、尚待業界實務驗證）；目前沒有 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
 
@@ -192,7 +192,7 @@ A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
-2. **Alpha / Stub 加碼客製** — 射出、食品、PCB 組裝是 alpha（內容標示「需驗證」，請自家工程師審過再用）；製藥是 stub，有 starter template 可照著填。
+2. **Alpha 加碼客製** — 射出、食品、PCB 組裝、製藥都是 alpha（內容標示「需驗證」，請自家工程師審過再用）；各產業包的 `_templates/` 有 starter template 可照著填。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
 ---
@@ -231,7 +231,7 @@ manufacturing-skill/
 │   ├── pcb-assembly/         # Alpha — SMT / EMS，待業界驗證
 │   ├── injection-molding/    # Alpha — 待射出廠驗證
 │   ├── food-processing/      # Alpha — HACCP / ISO 22000，待食品廠驗證
-│   └── pharma/               # Stub
+│   └── pharma/               # Alpha — GMP / GxP，待 QA 驗證
 ├── adapters/claude-code/     # 一鍵安裝
 ├── infra/                    # MCP server、地端 LLM 設定
 ├── docs/
@@ -284,7 +284,7 @@ manufacturing-skill/
 
 PR 都歡迎，特別是：
 
-- 產業包（驗證 PCB / 射出 / 食品 alpha 內容；補完製藥 stub — 看各產業包 README 知道要做什麼）
+- 產業包（驗證 PCB / 射出 / 食品 / 製藥 alpha 內容；新增其他產業 — 看各產業包 README 知道要做什麼）
 - ERP connector 實作（SAP / Oracle / 鼎新 / Workday）
 - explainer 卡片翻譯成其他語言
 - 真實導入 case study

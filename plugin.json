@@ -39,8 +39,8 @@
       "pharma"
     ],
     "complete": ["cnc-machining"],
-    "alpha": ["injection-molding", "food-processing", "pcb-assembly"],
-    "stub": ["pharma"],
+    "alpha": ["injection-molding", "food-processing", "pcb-assembly", "pharma"],
+    "stub": [],
     "default": "cnc-machining"
   },
   "languages": {
