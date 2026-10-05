@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`docs/architecture.md`** — corrects the core agent count from 5 to 6 (`engineering-change-manager` was missing); now describes seven layers and three tiers.
 - **`SECURITY.md`** — scope table and "Operating securely" extended for `team/` and `infra/chat-gateway/`.
 - **DLP precision and state-dir UX.** `受限` / `軍規` / `軍工` / `管制` skip negated and unrelated-word forms (`不受限制`, `將軍規模`, `監管制度`); a checksum-valid 8-digit number is a UBN only with a cue within 12 characters (統編, VAT, 公司, 發票 ...), and dates need a strong cue. A gateway refusal over a stale audit log now prints the directory, the safe fix and the env var; new `teamctl state-reset --confirm` moves the state dir aside (never deletes). The explainer stat panel counts team-tier twins; `_teamlib.py` gets a module map.
+- **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).
+
+### Fixed
+
+- **CI profile-extends lint (step 10a) no longer passes vacuously** — it now also lints the `tests/extends/case-*/profile.md` fixtures (error cases must be rejected, others accepted) alongside real `profiles/` files, and fails if zero files were linted.
+- **CI core heading-anchor guard (step 10b) now actually runs on PRs** — checkout uses `fetch-depth: 0`, a failing diff is an error instead of a silent skip, the step reports whether core files were touched, and its logic moved into an argv/env-driven Python block (no filename or heading interpolated into `python3 -c`, no hidden errors, dead check removed).
 
 ### Security
 
