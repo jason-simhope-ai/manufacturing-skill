@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`examples/company-facts.template.md`** — zh-TW fill-in template (machines and hourly rates, materials, compliance frameworks, quoting margin bands and risk add-ons, lead-time norms, approvals, data-classification rules). All numbers are labelled placeholders; copy to `company-facts.md` outside the repo.
+- **`docs/data-classification.md`** — four-tier (T0 public / T1 internal / T2 confidential / T3 restricted) data classification with a cloud / on-prem / no-AI rule table and a note on consumer vs commercial API terms.
+- **`docs/adoption-guide.md`** — new section on using company-facts and where real factory data should live; fixed the wrong `infra/mock-data/machine_loads.json` path (mock data lives in `infra/mcp-servers/scheduler-mcp/mock-data/` and holds loads, not rates).
+- **`.gitignore`** — real-factory-data block (`company-facts.md`, `customer-data/`, `drawings/`, `rfq/`, `logs/`, `*.dwg`, `*.step`, `*.stp`, `*.iges`) with `!examples/**` so synthetic examples stay tracked.
+- **Mock-data labelling** in `/order-status`, `/morning-briefing` and `/manufacturing`: without an MCP connection output must be labelled 「模擬資料」; removed the `git log` status-inference fallback from `/morning-briefing`.
 
 ## [0.1.5] — 2026-05-09
 

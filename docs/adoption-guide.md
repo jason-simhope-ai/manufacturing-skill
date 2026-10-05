@@ -41,7 +41,8 @@ W3：profile 客製
 W4：MCP 接資料
   ├─ scheduler-mcp 接你的 MES / 排程系統
   ├─ erp-connector 接你的 ERP（最花時間，常 1-2 週）
-  └─ 把 mock data 換成真資料
+  └─ 把 mock data 換成真資料（mock 在 `infra/mcp-servers/scheduler-mcp/mock-data/`，
+     只是示範用的負載與工單；未接上前，所有狀態類輸出都會標示「模擬資料」）
 
 W5：使用者試跑
   ├─ 業助試報價（同時人工跑一次對照）
@@ -91,17 +92,46 @@ W6：上線 + 文件
 
 `erp-connector` 接到客戶分級後，調整 `quote-specialist` 的利潤率邏輯。
 
-### 3. 機台費率
+### 3. 機台費率、毛利、料價
 
-`infra/mock-data/machine_loads.json` 內的費率換成你工廠真實數字。
+機台費率、毛利帶、風險加成、標準料價**沒有放在 mock data 裡**。
+`infra/mcp-servers/scheduler-mcp/mock-data/machine_loads.json` 只是機台「負載」的示範資料，不含費率。
+請改為填寫 [`examples/company-facts.template.md`](../examples/company-facts.template.md)（見下一節），
+存成 `company-facts.md` 放在 repo 之外，報價時用 `@` 附上。
 
 ### 4. 標準件庫
 
-如果有公司專用的標準件庫（夾治具、刀具、模治具），加到 `know-how/<company>-standard-parts.md`。
+如果有公司專用的標準件庫（夾治具、刀具、模治具），加到 `core/know-how/<company>-standard-parts.md`（或你的 profile 下的 `know-how/`）。
 
 ### 5. 報價單版面
 
 `examples/sample-quote-output.md` 改成你公司的版面（含公司 logo、條款、銀行資訊）。
+
+---
+
+## 公司事實檔（company-facts）與真實資料存放
+
+### 用 company-facts 讓 agent 用你的數字
+
+1. 複製 [`examples/company-facts.template.md`](../examples/company-facts.template.md) 為 `company-facts.md`。
+2. 填入機台費率、毛利帶、風險加成、料價、交期常規、核准權限與資料分類規則。範本內所有數字都是「範例」佔位值，須全部換成自己的。
+3. 沒把握的欄位留空或寫「待確認」，讓 agent 標成 `[ASSUMED]` 再由人確認。
+4. 使用時明確附上，例如 `/quote @~/factory-work/rfq/客戶A-RFQ.pdf @~/factory-work/company-facts.md`。目前不要假設 agent 會自動讀到這個檔案。
+5. 此檔通常屬 T2 機密（含費率與毛利），分級見 [docs/data-classification.md](data-classification.md)。
+
+### 真實資料放哪裡
+
+**原則：真實資料放在 repo 之外的工作資料夾**，例如 `~/factory-work/`，底下自行分 `customer-data/`、`drawings/`、`rfq/`、`logs/`。
+在那個資料夾裡開 Claude Code，而不是在本 repo 的 clone 裡操作。
+
+`.gitignore` 另外提供一道保險：若你不小心在 repo 內建立 `company-facts.md`、`customer-data/`、`drawings/`、`rfq/`、`logs/`，
+或放入 `*.dwg`、`*.step`、`*.stp`、`*.iges`，它們不會出現在 `git status`。`examples/` 底下的合成資料仍照常追蹤。
+這只防止誤 commit，**不代表資料沒有被送到 AI 服務**；哪些資料能送去哪裡，以資料分級為準。
+
+### 未接 ERP / MES 時
+
+沒有 MCP 連線時，`/order-status`、`/morning-briefing` 等指令只會用 mock data 回答，並須標示「模擬資料」；
+不要把這些輸出當成真實訂單狀態或機台負載。
 
 ---
 
