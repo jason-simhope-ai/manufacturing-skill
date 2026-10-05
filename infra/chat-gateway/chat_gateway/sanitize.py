@@ -23,6 +23,10 @@ _INVISIBLE_EXTRA = re.compile(
     "[\u034f\u115f\u1160\u180b-\u180d\u3164\ufe00-\ufe0f\uffa0\U000e0100-\U000e01ef]"
 )
 _HTML_COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.DOTALL)
+# Every character `str.splitlines()` treats as a line break becomes "\n", so the model's view
+# and the quote / [附件] line splitting agree (EXT-10); other C0, DEL and C1 controls are removed.
+_LINE_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
+_CONTROL = re.compile("[\x00-\x08\x0e-\x1b\x1f\x7f-\x9f]")
 
 
 def strip_invisible(text: str) -> str:
@@ -33,7 +37,10 @@ def strip_invisible(text: str) -> str:
 def sanitize_for_model(text: str) -> str:
     """Text actually sent to the driver and echoed in replies: drop only format /
     zero-width / bidi / tag / CGJ / variation-selector / Hangul-filler characters and
-    HTML comments (hidden content). No NFKC, so zh-TW full-width punctuation stays."""
+    HTML comments (hidden content). Line separators (CR, VT, FF, U+0085, U+2028, U+2029, …)
+    become newlines and the other C0/C1 controls are removed. No NFKC, so zh-TW full-width
+    punctuation stays."""
+    text = _CONTROL.sub("", _LINE_BREAKS.sub("\n", text))
     return _HTML_COMMENT.sub("", strip_invisible(text))
 
 

@@ -19,6 +19,7 @@ import threading
 import time
 from typing import Any, Collection
 
+from chat_gateway import ConfigRefused
 from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, Event, InboundMessage, Reply
 from chat_gateway_ext._saas import SaasAdapterBase, attachment_note, sdk_missing
 
@@ -31,7 +32,7 @@ FORBIDDEN_PERMISSIONS = ("administrator", "manage_webhooks", "change_nickname", 
 ALLOWED_MENTIONS = {"parse": []}
 SUPPRESS_EMBEDS = 1 << 2
 MAX_CHUNK = 1900                                     # Discord hard limit is 2,000 characters
-CUSTOM_ID_RE = re.compile(r"^mfg:(approve|deny):(apv-[0-9a-f]{4,32}):([0-9a-f]{16,64})$")
+CUSTOM_ID_RE = re.compile(r"mfg:(approve|deny):(apv-[0-9a-f]{4,32}):([0-9a-f]{16,64})")  # fullmatch only
 COMPONENT_INTERACTION, BUTTON = 3, 2
 DISCORD_EPOCH_MS = 1420070400000
 
@@ -59,7 +60,7 @@ def discord_message_to_inbound(d: dict, bot_user_id: str,
     guild = d.get("guild_id")
     is_dm = not guild
     is_bot = bool(author.get("bot") or author.get("system") or d.get("webhook_id") or not uid)
-    external = bool(guild) and allowed_guilds is not None and str(guild) not in allowed_guilds
+    external = bool(guild) and (allowed_guilds is None or str(guild) not in allowed_guilds)
     parent = d.get("thread_parent_id")              # set by the transport for messages inside a thread
     return InboundMessage(
         event_id=f"discord:{d['id']}", platform="discord", channel_ref=str(parent or d["channel_id"]),
@@ -74,10 +75,10 @@ def discord_interaction_to_click(d: dict, allowed_guilds: Collection[str] | None
     data, guild = d.get("data") or {}, d.get("guild_id")
     if d.get("type") != COMPONENT_INTERACTION or data.get("component_type") != BUTTON or not guild:
         return None
-    if allowed_guilds is not None and str(guild) not in allowed_guilds:
+    if allowed_guilds is None or str(guild) not in allowed_guilds:     # no allowlist → deny
         return None
     user = (d.get("member") or {}).get("user") or d.get("user") or {}
-    m = CUSTOM_ID_RE.match(str(data.get("custom_id") or ""))
+    m = CUSTOM_ID_RE.fullmatch(str(data.get("custom_id") or ""))
     if not m or not user.get("id") or user.get("bot"):
         return None
     decision, approval_id, nonce = m.groups()
@@ -132,12 +133,18 @@ class DiscordAdapter(SaasAdapterBase):
 
     def __init__(self, bindings: dict, transport: Any = None, **kw: Any):
         super().__init__(bindings, transport, **kw)
+        # EXT-11: the guild allowlist is mandatory. A transport without one would disable the
+        # guild check, so refuse to construct. The real transport fills its set as it vets each
+        # guild on connect; until then the set is empty and every event is treated as foreign.
+        guilds = getattr(self._transport, "allowed_guilds", None)
+        if guilds is None or not isinstance(guilds, (set, frozenset)):
+            raise ConfigRefused("discord transport has no guild allowlist (allowed_guilds); refusing to start")
 
     def _real_transport(self) -> Any:                # pragma: no cover - needs SDK + credentials
         return _DiscordPyTransport(self._secrets[0], self.refs)
 
     def to_event(self, raw: dict) -> Event | None:
-        return discord_to_event(raw, self.bot_user_id, getattr(self._transport, "allowed_guilds", None))
+        return discord_to_event(raw, self.bot_user_id, self._transport.allowed_guilds)
 
     def post(self, reply: Reply) -> str:
         self._guard(reply.channel_ref)

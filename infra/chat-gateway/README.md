@@ -86,8 +86,10 @@ Rules to know before you replay NCRs:
 | `MFG_TEAM_STATE_DIR` | `~/.local/state/manufacturing-skill/team` | Must be an absolute path. The gateway writes only here: `audit/<tier>/audit.jsonl`, `audit/checkpoint.json` and `post-limits.json`. |
 | `MFG_TEAM_DENYLIST` | `team/local/names.denylist` if present | Local denylist (one regex per line). A hit counts as T2 for inbound DLP and the output filter. If the variable is set, the file must exist; a bad regex refuses start (exit 78), naming only the line number. |
 | `MFG_TEAM_AUDIT_HMAC_KEY`, `MFG_TEAM_APPROVAL_HMAC_KEY` | — | Required unless both adapter and driver are mock. Each must be at least 16 characters. Error messages name a missing variable but never print its value. |
-| `MFG_TEAM_DAILY_BUDGET_USD` | off | Soft daily spending cap per twin. |
-| `MFG_TEAM_MAX_BUDGET_USD`, `MFG_TEAM_TIMEOUT_S` | `0.10`, `60` | Passed to the driver on every call. |
+| `MFG_TEAM_DAILY_BUDGET_USD` | off | Soft daily spending cap per twin, at most 1000. |
+| `MFG_TEAM_MAX_BUDGET_USD`, `MFG_TEAM_TIMEOUT_S` | `0.10`, `60` | Passed to the driver on every call. Budget at most 5 USD; timeout 5–600 s. |
+
+Numbers must be finite: `nan`, `inf`, a value out of range or not a number refuses start with exit 64, naming the variable.
 
 ## Package map
 
@@ -95,7 +97,7 @@ Rules to know before you replay NCRs:
 | ------ | ---- |
 | `chat_gateway/adapters/base.py` | Frozen event types (`InboundMessage`, `ApprovalClick`, `ScheduledPost`, `Reply`, `ApprovalCard`) and the `ChatAdapter` protocol |
 | `chat_gateway/drivers/base.py` | Frozen `TwinInvocation`, `TwinResult` and `HarnessDriver` types, plus `DriverError` and `result_from_json` |
-| `chat_gateway/core.py` | `load_roster` / `validate_roster` (T3 → exit 3; `act*`, dual approval, prompt hash or budget, suspected token → exit 78), `effective_autonomy`, `RateLimiter`, `Gateway` |
+| `chat_gateway/core.py` | `load_roster` / `validate_roster` (T3 → exit 3; `act*`, dual approval, prompt hash or budget, suspected token, an id outside the lint pattern → exit 78), `effective_autonomy`, `RateLimiter`, `Gateway` |
 | `chat_gateway/sanitize.py` | Text normalization, `<<UNTRUSTED>>` envelopes, tripwires, DLP, output filter |
 | `chat_gateway/approvals.py` | `ApprovalBook`: approval cards bound to an args hash, 30-minute TTL, single use; `NoopExecutor` |
 | `chat_gateway/audit.py` | Append-only audit log. Each tier is an HMAC-SHA256 chain keyed by `MFG_TEAM_AUDIT_HMAC_KEY`; `checkpoint.json` (signed, rewritten after every append) holds each tier's count, last seq and head MAC, so `verify` catches edits, deletions, reordering, truncation, a removed tier file and seq gaps. A rollback of log *and* checkpoint is only caught by an earlier off-host copy of the checkpoint: shipping it off-host is the operator's job. `content_sha256` holds a keyed content tag, never message text; at T2 and above `content_len` is dropped too. |
@@ -120,6 +122,8 @@ imported lazily. `import chat_gateway.core` never needs a third-party SDK.
 - Output filtering runs in this order: strip URLs and images, neutralize mass mentions, mask secrets, mask emails and Taiwan phone numbers (`[REDACTED:email]`, `[REDACTED:tw-mobile]`; counted in the audit `redactions.pii`), block the whole reply if a higher tier is detected, then cap the length at 3,000 characters.
 - Inbound DLP is a word-and-shape alarm. T2 (blocked in a T1 channel): `機密`/`confidential`, a Taiwan unified business number only with a cue word (`統編`, `統一編號`, `VAT`, `公司`, `股份`, `發票`) and a valid checksum, national id, NT$/US$/萬元 amounts, any email address, Taiwan mobile numbers, Taiwan landlines written with a separator after the area code (`02-1234-5678`), and the local denylist. T3 (refused): the Chinese words and `ITAR`/`EAR`/`CUI` listed in `patterns.py`.
 - Rate limits: 6 messages per user per minute, 60 per channel per hour, and 3 scheduled posts per channel per day. Duplicate event ids are rejected for 10 minutes or 1,000 entries.
+- Twin and channel ids must match `^[a-z][a-z0-9-]{1,40}$` and capability ids `^[a-z0-9][a-z0-9-]{1,40}$` (the same patterns as the linter); anything else is refused at load (exit 78).
+- A post that fails on the chat platform (rate limit, missing channel, timeout, the adapter's own unbound-channel refusal) is audited as `post_failed` with the exception class name only and skipped; the gateway keeps serving other events. `chat_gateway post` exits 70 when its post failed.
 - Calls are single-threaded, so concurrency is 1, which is within the spec's limit of 2.
 
 The Slack and Discord adapters have not been tested against the real platforms in CI and need credentials to run.
@@ -160,9 +164,9 @@ content, and the adapter drops it.
 
 - Only @mentions reach the gateway. The bot mention is removed from the text. The bot's own messages are dropped.
 - Messages from bots or webhooks, DMs, externally shared channels and non-allowlisted guilds are forwarded with their flags set but with the text removed. The gateway can then audit `policy_denied` without seeing the content.
-- Discord leaves any guild that holds no bound channel. It does this at startup and whenever it is added to a guild, and it emits an event that the gateway audits.
-- Attachments are reported by file name only, as a `[附件] …` line. They are never downloaded. The gateway wraps that line in an `<<UNTRUSTED … source=attachment>>` envelope, so a message with an attachment is a tainted turn (no approval card, no URLs, autonomy at most `suggest`).
-- Approvals come only from button clicks, which the platform delivers over the authenticated socket. Chat text is never parsed as a click. A malformed or unknown button is dropped.
+- Discord leaves any guild that holds no bound channel. It does this at startup and whenever it is added to a guild, and it emits an event that the gateway audits. The guild allowlist is mandatory: a transport without one is refused at construction, and until the allowlist is filled every guild is treated as foreign.
+- Attachments are reported by file name only, as a `[附件] …` line (control characters, C1 and U+2028/U+2029 replaced, so a name cannot start a new line). They are never downloaded. The gateway wraps that line in an `<<UNTRUSTED … source=attachment>>` envelope, so a message with an attachment is a tainted turn (no approval card, no URLs, autonomy at most `suggest`).
+- Approvals come only from button clicks, which the platform delivers over the authenticated socket. Chat text is never parsed as a click. A malformed or unknown button is dropped (ids and nonces must match in full; a trailing newline is malformed).
 - `post()` refuses any channel that is not in `bindings.json` by raising `PermissionError`. This also covers DMs.
 - Error messages name a missing variable but never print its value, and `repr()` never shows tokens. Do not turn on `DEBUG` logging for `slack_sdk` or `discord`.
 
@@ -186,11 +190,11 @@ Tests use a fake `claude` script (`python3 tests/gateway/test_claude_code_driver
 
 | Variable | Default | Notes |
 | -------- | ------- | ----- |
-| `MFG_TEAM_CLAUDE_CONFIG_DIR` | — (required) | A dedicated service-account `CLAUDE_CONFIG_DIR`. It must exist and must not be `~/.claude`. |
+| `MFG_TEAM_CLAUDE_CONFIG_DIR` | — (required) | A dedicated service-account `CLAUDE_CONFIG_DIR`. It must be an absolute path to an existing directory and must not be `~/.claude`. The child gets its realpath. |
 | `ANTHROPIC_API_KEY` | — (required) | Service-account key. `MFG_TEAM_ANTHROPIC_API_KEY` is accepted as an alias. Never printed or logged. |
-| `MFG_TEAM_CLAUDE_BIN` | `claude` | Path or name of the CLI. |
+| `MFG_TEAM_CLAUDE_BIN` | `claude` | Path or name of the CLI. Resolved once to an absolute path; empty and relative `PATH` entries are ignored. |
 | `MFG_TEAM_MAX_BUDGET_USD`, `MFG_TEAM_TIMEOUT_S` | `0.10`, `60` | Per call. The smaller of the driver value and the invocation value wins. |
-| `MFG_TEAM_DATA_T1` | off | Added as `--add-dir` only when set and granted to the invocation. |
+| `MFG_TEAM_DATA_T1` | off | Added as `--add-dir` (realpath) only when set and granted to the invocation. Must be an absolute path. |
 
 Every call uses this fixed argument list (no shell, never built from chat text):
 
@@ -200,11 +204,11 @@ claude -p --output-format json --restricted --strict-mcp-config --tools "Read,Gr
   --max-budget-usd <n> [--add-dir <MFG_TEAM_DATA_T1>]
 ```
 
-- **Environment.** The child sees only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR` and `ANTHROPIC_API_KEY`. The user message and channel window go in through stdin.
-- **System prompt.** The compiled twin prompt plus a short header (tier, effective autonomy, taint, predict-first) is written to a `0600` file under `$MFG_TEAM_STATE_DIR/driver-tmp/` and deleted after the call, including on failure.
-- **Working directory.** `team/.build/ref/` (spec §9.5). The prompt's index lines read `<kind>/<id>.md`, relative to it. `identities.json`, `bindings.json`, `roster.json` and every twin prompt live one level up, outside the model's reach; the driver refuses to run if any of them, or any `*.prompt.md`, appears under `ref/`.
+- **Environment.** The child sees only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR` and `ANTHROPIC_API_KEY`. `PATH` is fixed: the resolved CLI's directory, then `/usr/local/bin:/usr/bin:/bin`. The user message and channel window go in through stdin.
+- **System prompt.** The compiled twin prompt plus a short header (tier, effective autonomy, taint, predict-first) is written to a `0600` file `twin-*.prompt.md` under `$MFG_TEAM_STATE_DIR/driver-tmp/` and deleted after the call, including on failure.
+- **Working directory.** `team/.build/ref/` (spec §9.5). The prompt's index lines read `<kind>/<id>.md`, relative to it. `identities.json`, `bindings.json`, `roster.json` and every twin prompt live one level up, outside the model's reach; the driver refuses to run if any of them, or any `*.prompt.md`, appears under `ref/`, or if `ref/` or anything under it is a symlink. It runs in the realpath of `ref/`.
 - **Prompt integrity.** The driver re-hashes the compiled prompt bytes it sends and refuses them if they no longer match the roster's `promptSha`.
 - **Output.** The CLI's JSON envelope is parsed; `structured_output` (or a JSON `result` string) becomes a `TwinResult`, with `usage` filled from the envelope. `TWIN_RESULT_SCHEMA` is also kept as `chat_gateway_ext/twin_result.schema.json`; a test keeps the two identical.
-- **Failures.** A non-zero exit, a timeout (the process group is killed), unparsable output or a CLI-reported error becomes a `DriverError` with a short message. Raw stderr is never forwarded.
+- **Failures.** A non-zero exit, a timeout, unparsable output (more than 1 MB, invalid UTF-8, nesting too deep, duplicate JSON keys) or a CLI-reported error becomes a `DriverError` with a short message. The child runs in its own process group, killed on every exit path; the timeout is a hard deadline even if a descendant keeps the output pipe open. Stderr is discarded, never forwarded.
 - **Self-check.** `self_check()` runs `claude --version` and `claude --help` and refuses to start (exit 78) if any pinned flag is missing. `--system-prompt[-file]` in the help text is accepted. It also requires the config dir and the API key.
 - **Billing.** The driver needs an Anthropic API key (`ANTHROPIC_API_KEY`) and spends that account's API credit, not a personal subscription. `--max-budget-usd` caps each call. Use a service account, not a personal login, for a shared bot.

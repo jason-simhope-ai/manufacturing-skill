@@ -20,10 +20,13 @@ from chat_gateway import ConfigRefused
 from chat_gateway.adapters.base import ApprovalCard, Event, Reply
 
 PIP_HINT = "pip install -r infra/chat-gateway/requirements-optional.txt"
-APPROVAL_ID_RE = re.compile(r"^apv-[0-9a-f]{4,32}$")
-NONCE_RE = re.compile(r"^[0-9a-f]{16,64}$")
+# Always used with fullmatch: `$` alone also matches before a trailing newline (EXT-09).
+APPROVAL_ID_RE = re.compile(r"apv-[0-9a-f]{4,32}")
+NONCE_RE = re.compile(r"[0-9a-f]{16,64}")
 DECISIONS = ("approve", "deny")
-_CTRL = re.compile(r"[\x00-\x1f\x7f]")
+# C0, DEL, C1 (incl. U+0085 NEL) and U+2028/U+2029: anything `str.splitlines()` breaks on, so a
+# file name can never push text out of its `[附件]` line (EXT-10).
+_CTRL = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
 
 def require_env(env: Mapping[str, str], *names: str) -> list[str]:
@@ -63,7 +66,7 @@ def attachment_note(names: list[str]) -> str:
 
 
 def approval_ref(approval_id: str, nonce: str) -> bool:
-    return bool(APPROVAL_ID_RE.match(approval_id) and NONCE_RE.match(nonce))
+    return bool(APPROVAL_ID_RE.fullmatch(approval_id) and NONCE_RE.fullmatch(nonce))
 
 
 class SaasAdapterBase:

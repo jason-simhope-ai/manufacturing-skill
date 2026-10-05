@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import json
+import math
 import re
 import secrets
 import time
@@ -23,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
 
-from . import (ALPHA_MAX_AUTONOMY, AUTONOMY, EXIT_T3, READ_ONLY_TOOLS, TIERS, ConfigRefused,
+from . import (ALPHA_MAX_AUTONOMY, AUTONOMY, EXIT_T3, EXIT_USAGE, READ_ONLY_TOOLS, TIERS, ConfigRefused,
                autonomy_rank, min_autonomy, tier_rank)
 from . import sanitize
 from .adapters.base import (ApprovalCard, ApprovalClick, ChatAdapter, Event, InboundMessage,
@@ -47,6 +48,11 @@ LOCAL_DRIVERS = frozenset({"mock"})
 ALPHA_MAX_OFFPREM_TIER = "T1"     # SaaS chat platforms and cloud models: T1 at most in alpha
 T3_DOC = "docs/superpowers/specs/2026-10-05-digital-twin-team-design.md §11.2"
 T3_REPLY = "此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理"
+# Same patterns as team/tools/_teamlib.py `_ID_RE` / `_CAPID_RE` (the linter). Duplicated, not
+# imported: the gateway core is stdlib-only and never imports team/tools. Re-checked at load
+# because ids reach file names (the claude-code driver's temp files) and audit records.
+ID_RE = re.compile(r"[a-z][a-z0-9-]{1,40}")          # twin and channel ids (always fullmatch)
+CAPID_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,40}")    # capability ids may start with a digit (8d-…)
 _TEXT_APPROVAL = re.compile(r"^\s*(?:核准|批准|同意|approved?|lgtm)\s*[。.!！]?\s*$", re.IGNORECASE)
 
 
@@ -88,6 +94,10 @@ def _need(cond: bool, msg: str) -> None:
         raise ConfigRefused(msg)
 
 
+def _id_ok(value: object, pattern: re.Pattern = ID_RE) -> bool:
+    return isinstance(value, str) and pattern.fullmatch(value) is not None
+
+
 def validate_roster(roster: dict, base_dir: Path) -> dict:
     """Validate a parsed roster.json; returns a copy with `_prompts` = {twin_id: abs path}."""
     _need(isinstance(roster, dict), "roster must be an object")
@@ -120,14 +130,18 @@ def validate_roster(roster: dict, base_dir: Path) -> dict:
     prompts: dict[str, str] = {}
     base = base_dir.resolve()
     for t in twins:
+        _need(isinstance(t, dict), "twin entries must be objects")
         tid = t.get("id")
         _need(isinstance(tid, str) and bool(tid), "twin without id")
+        _need(_id_ok(tid), f"twin id {tid[:60]!r} must match ^{ID_RE.pattern}$")
         _need(t.get("tierCeiling") in TIERS, f"twin {tid}: bad tierCeiling")
         _need(isinstance(t.get("title"), str), f"twin {tid}: title missing")
         autonomy_ok(t.get("effectiveCeiling"), f"twin {tid}.effectiveCeiling")
         caps = t.get("capabilities") or []
         _need(isinstance(caps, list) and caps, f"twin {tid}: no capabilities")
         for c in caps:
+            _need(isinstance(c, dict) and _id_ok(c.get("id"), CAPID_RE),
+                  f"twin {tid}: capability ids must match ^{CAPID_RE.pattern}$")
             autonomy_ok(c.get("autonomy"), f"twin {tid}.{c.get('id')}")
         _need(int((t.get("outsource") or {}).get("enabled", 0)) <= 1, f"twin {tid}: >1 enabled outsource (E034)")
         rel = t.get("prompt", "")
@@ -142,7 +156,9 @@ def validate_roster(roster: dict, base_dir: Path) -> dict:
         prompts[tid] = str(ppath)
     ids = set(prompts)
     for c in channels:
+        _need(isinstance(c, dict), "channel entries must be objects")
         cid = c.get("id")
+        _need(_id_ok(cid), f"channel id {str(cid)[:60]!r} must match ^{ID_RE.pattern}$")
         _need(c.get("tier") in TIERS, f"channel {cid}: bad tier")
         autonomy_ok(c.get("autonomyCeiling"), f"channel {cid}.autonomyCeiling")
         _need(set(c.get("twins") or []) <= ids and c.get("twins"), f"channel {cid}: unknown twins")
@@ -280,6 +296,10 @@ class Gateway:
         self.approvals = approvals or ApprovalBook(secrets.token_bytes(32), clock=clock, token_hex=token_hex)
         self.executor = executor or NoopExecutor()
         self._hex, self.read_roots, self.extra_dlp = token_hex, tuple(read_roots), tuple(extra_dlp)
+        for name, value in (("daily_budget_usd", daily_budget_usd), ("max_budget_usd", max_budget_usd),
+                            ("timeout_s", timeout_s)):
+            if value is not None and not (isinstance(value, (int, float)) and math.isfinite(value) and value > 0):
+                raise ConfigRefused(f"{name} must be a finite number > 0", exit=EXIT_USAGE)
         self.daily_budget_usd, self.max_budget_usd, self.timeout_s = daily_budget_usd, max_budget_usd, timeout_s
         self._windows: dict[str, deque] = {}
         self._seen: OrderedDict[str, float] = OrderedDict()
@@ -378,6 +398,27 @@ class Gateway:
             return self._scheduled(event)
         raise TypeError(f"unknown event type {type(event).__name__}")
 
+    def deliver(self, out: Reply | ApprovalCard) -> bool:
+        """Post one reply or card. A failed post (platform error, timeout, the adapter's own
+        unbound-channel PermissionError) is audited as `post_failed` with the exception class
+        name only, and the gateway keeps serving; returns False then."""
+        try:
+            if isinstance(out, ApprovalCard):
+                self.adapter.post_approval(out)
+            else:
+                self.adapter.post(out)
+            return True
+        except Exception as exc:  # noqa: BLE001 - one bad post must not stop every channel
+            cid = self._chan_by_ref.get((self.adapter.name, out.channel_ref))
+            if cid is None and out.channel_ref in self.channels:
+                cid = out.channel_ref
+            ctx = _Ctx(platform=self.adapter.name, channel_id=cid,
+                       tier=self.channels[cid]["tier"] if cid else None, thread=out.thread_ref)
+            extra = ({"approval_id": out.approval_id} if isinstance(out, ApprovalCard)
+                     else {"twin": out.twin_id or None})
+            self._audit("post_failed", ctx, decision="deny", deny_reason=type(exc).__name__, **extra)
+            return False
+
     def run(self, pace: float = 0.0) -> int:
         """Drive the adapter until its event stream ends; returns number of events."""
         n = 0
@@ -387,7 +428,7 @@ class Gateway:
                 self.last_deny = None
                 outs = self.handle(ev)
                 for out in outs:
-                    (self.adapter.post_approval if isinstance(out, ApprovalCard) else self.adapter.post)(out)
+                    self.deliver(out)
                 dropped = getattr(self.adapter, "notice_dropped", None)   # mock REPL only: never silent
                 if not outs and self.last_deny and callable(dropped):
                     dropped(*self.last_deny)

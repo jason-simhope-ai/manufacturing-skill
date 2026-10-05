@@ -41,7 +41,7 @@ ACTIONS = frozenset(
     "msg_in msg_out route_decision tool_proposed tool_denied approval_requested "
     "approval_granted approval_denied approval_expired injection_flag policy_denied "
     "rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded "
-    "config_refused".split()
+    "config_refused post_failed".split()
 )
 _FILE_KEYS = ("T0", "T1", "T2", "T3", "sys")
 GENESIS = "sha256:0"

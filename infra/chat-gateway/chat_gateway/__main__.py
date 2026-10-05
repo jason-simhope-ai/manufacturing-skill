@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 
 from . import EXIT_CONFIG, EXIT_DATA, EXIT_INTERNAL, EXIT_OK, EXIT_USAGE, ConfigRefused
 from .adapters import load_adapter_class
-from .adapters.base import ApprovalCard, ScheduledPost
+from .adapters.base import ScheduledPost
 from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
 from .audit import AuditLog, heads, verify_report
@@ -92,10 +92,13 @@ def _post(gw: Gateway, cfg: GatewayConfig, twin: str, capability: str, channel: 
     outs = gw.handle(ScheduledPost(twin, capability, channel))
     state.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     state.write_text(json.dumps(gw.post_rl.dump()), encoding="utf-8")
-    for out in outs:
-        (gw.adapter.post_approval if isinstance(out, ApprovalCard) else gw.adapter.post)(out)
+    failed = sum(not gw.deliver(out) for out in outs)
     if not outs:
         print("post refused by policy (see audit log)", file=sys.stderr)
+    if failed:
+        print(f"post failed on the chat platform ({failed} message(s); see audit log, action post_failed)",
+              file=sys.stderr)
+        return EXIT_INTERNAL
     return EXIT_OK
 
 

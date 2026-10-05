@@ -10,7 +10,9 @@ Usage:
 from __future__ import annotations
 
 import json
+import math
 import os
+import signal
 import stat
 import sys
 import tempfile
@@ -23,10 +25,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GW_DIR = REPO_ROOT / "infra" / "chat-gateway"
 sys.path.insert(0, str(GW_DIR))
 
+from chat_gateway import ConfigRefused  # noqa: E402
 from chat_gateway.drivers import load_driver_class  # noqa: E402
 from chat_gateway.drivers.base import DriverError, TwinInvocation, TwinResult  # noqa: E402
 from chat_gateway_ext.claude_code import (  # noqa: E402
-    REQUIRED_FLAGS, TWIN_RESULT_SCHEMA, ClaudeCodeDriver)
+    KILL_GRACE_S, MAX_STDOUT_BYTES, REQUIRED_FLAGS, SAFE_PATH_DIRS, TWIN_RESULT_SCHEMA, ClaudeCodeDriver)
 
 # Built by concatenation so repo secret scanners never see a literal key.
 SECRET = "sk" + "-ant-" + "FAKE-test-key-0123456789"
@@ -69,6 +72,28 @@ FAKE_SCRIPT = textwrap.dedent('''\
     mode = rd("mode", "ok").strip()
     if mode == "slow":
         time.sleep(30)
+    if mode in ("setsid", "setsid-exit", "lingering"):
+        import subprocess
+        kw = dict(start_new_session=True) if mode != "lingering" else dict(stdout=subprocess.DEVNULL)
+        g = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], **kw)
+        with open(os.path.join(REC, "grandchild.pid"), "w") as fh:
+            fh.write(str(g.pid))
+        if mode == "setsid":
+            time.sleep(30)
+    if mode == "huge":
+        sys.stdout.write("x" * 2000000)
+        sys.exit(0)
+    if mode == "deep":
+        sys.stdout.write("[" * 200000 + "]" * 200000)
+        sys.exit(0)
+    if mode == "badutf8":
+        sys.stdout.flush()
+        sys.stdout.buffer.write(b"\\xff\\xfe{{}}")
+        sys.exit(0)
+    if mode == "dupkeys":
+        sys.stdout.write('{{"type":"result","subtype":"success","is_error":true,"is_error":false,'
+                         '"structured_output":{{"reply":"x","confidence":"中"}}}}')
+        sys.exit(0)
     if mode == "fail":
         sys.stderr.write("SECRET-STDERR-CONTENT")
         sys.exit(3)
@@ -280,8 +305,9 @@ class TestRun(Base):
         self.driver().run(self.inv())
         env = self.call()["env"]
         self.assertEqual(env["ANTHROPIC_API_KEY"], SECRET)
-        self.assertEqual(env["CLAUDE_CONFIG_DIR"], str(self.config_dir))
-        self.assertEqual(env["PATH"], self.env["PATH"])
+        self.assertEqual(env["CLAUDE_CONFIG_DIR"], os.path.realpath(self.config_dir))
+        # EXT-13: a fixed PATH (the resolved claude's directory + system dirs), not the gateway's PATH
+        self.assertEqual(env["PATH"], os.pathsep.join(dict.fromkeys([str(self.bin.parent), *SAFE_PATH_DIRS])))
         self.assertEqual(env["HOME"], self.env["HOME"])
         for leak in ("AWS_SECRET_ACCESS_KEY", "SLACK_BOT_TOKEN", "MFG_TEAM_AUDIT_HMAC_KEY", "MFG_TEAM_STATE_DIR"):
             self.assertNotIn(leak, env)
@@ -403,6 +429,171 @@ class TestRun(Base):
     def test_unstartable_binary(self):
         with self.assertRaises(DriverError):
             self.driver(bin=str(self.bin) + "-missing").run(self.inv())
+
+
+def _alive(pid: int) -> bool:
+    """True while `pid` runs (a zombie counts as dead)."""
+    try:
+        with open(f"/proc/{pid}/stat", encoding="ascii") as fh:
+            return fh.read().rsplit(")", 1)[1].split()[0] != "Z"
+    except OSError:
+        return False
+
+
+class TestExtHardening(Base):
+    """Fixes for SECURITY-REVIEW-EXT findings (EXT-02/04/05/06/07/08/13)."""
+
+    def _grandchild(self) -> int:
+        pid = int((self.rec / "grandchild.pid").read_text())
+        self.addCleanup(lambda: _alive(pid) and os.kill(pid, signal.SIGKILL))
+        return pid
+
+    # EXT-06
+    @unittest.skipUnless(os.path.isdir("/proc"), "needs /proc")
+    def test_ext06_setsid_grandchild_holding_stdout_does_not_block(self):
+        for mode in ("setsid", "setsid-exit"):
+            with self.subTest(mode=mode):
+                self.set_mode(mode)
+                t0 = time.monotonic()
+                with self.assertRaises(DriverError) as cm:
+                    self.driver(timeout_s=1).run(self.inv())
+                self.assertLess(time.monotonic() - t0, 1 + KILL_GRACE_S)
+                self.assertIn("timed out", str(cm.exception))
+                self._grandchild()
+
+    @unittest.skipUnless(os.path.isdir("/proc"), "needs /proc")
+    def test_ext06_process_group_killed_after_a_normal_exit(self):
+        self.set_mode("lingering")
+        self.assertEqual(self.driver().run(self.inv()).reply, RESULT_OBJ["reply"])
+        pid = self._grandchild()
+        deadline = time.monotonic() + 5
+        while _alive(pid) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertFalse(_alive(pid))
+
+    # EXT-08
+    def test_ext08_stdout_capped_at_1mb(self):
+        self.set_mode("huge")
+        with self.assertRaises(DriverError) as cm:
+            self.driver().run(self.inv())
+        self.assertIn("larger than", str(cm.exception))
+        with self.assertRaises(DriverError):
+            ClaudeCodeDriver.parse_output(b" " * (MAX_STDOUT_BYTES + 1))
+
+    def test_ext08_deep_nesting_is_driver_error(self):
+        self.set_mode("deep")
+        with self.assertRaises(DriverError) as cm:
+            self.driver().run(self.inv())
+        self.assertIn("nested", str(cm.exception))
+        deep_obj = '{"a":' * 50000 + "1" + "}" * 50000
+        with self.assertRaises(DriverError):
+            ClaudeCodeDriver.parse_output(deep_obj)
+        inner = json.dumps({"type": "result", "subtype": "success", "result": "[" * 100000 + "]" * 100000})
+        with self.assertRaises(DriverError):
+            ClaudeCodeDriver.parse_output(inner)
+
+    def test_ext08_invalid_utf8_is_driver_error(self):
+        self.set_mode("badutf8")
+        with self.assertRaises(DriverError) as cm:
+            self.driver().run(self.inv())
+        self.assertIn("UTF-8", str(cm.exception))
+
+    def test_ext08_duplicate_keys_rejected(self):
+        self.set_mode("dupkeys")
+        with self.assertRaises(DriverError) as cm:
+            self.driver().run(self.inv())
+        self.assertIn("duplicate", str(cm.exception))
+        dup_inner = json.dumps({"type": "result", "subtype": "success",
+                                "result": '{"reply":"a","reply":"b","confidence":"中"}'})
+        with self.assertRaises(DriverError):
+            ClaudeCodeDriver.parse_output(dup_inner.encode())
+
+    # EXT-07
+    def test_ext07_twin_id_never_reaches_the_temp_path(self):
+        self.driver().run(self.inv(twin_id="../../escaped/x"))
+        pf = Path(self.call()["prompt_file"])
+        self.assertEqual(pf.parent, self.state / "driver-tmp")
+        self.assertTrue(pf.name.startswith("twin-"), pf.name)
+        self.assertFalse((self.state.parent / "escaped").exists())
+
+    # EXT-02
+    def test_ext02_driver_refuses_non_finite_or_huge_limits(self):
+        for kw in ({"max_budget_usd": math.nan}, {"max_budget_usd": math.inf}, {"max_budget_usd": 0},
+                   {"max_budget_usd": 1e6}, {"timeout_s": math.inf}, {"timeout_s": math.nan},
+                   {"timeout_s": 99999999}):
+            with self.subTest(kw=kw):
+                with self.assertRaises(ConfigRefused) as cm:
+                    self.driver(**kw)
+                self.assertEqual(cm.exception.exit, 64)
+        for budget in (math.nan, math.inf, -1.0):
+            with self.subTest(budget=budget):
+                with self.assertRaises(DriverError):
+                    self.driver().run(self.inv(max_budget_usd=budget))
+                self.assertFalse((self.rec / "call.json").exists())
+
+    # EXT-04
+    def test_ext04_symlink_under_ref_refused(self):
+        ref = self.build / "ref"
+        for target, link in ((self.build, ref / "up"), (self.prompt, ref / "skills" / "x.md")):
+            with self.subTest(link=link.name):
+                link.parent.mkdir(parents=True, exist_ok=True)
+                link.symlink_to(target)
+                with self.assertRaises(DriverError) as cm:
+                    self.driver().run(self.inv())
+                self.assertIn("symlink", str(cm.exception))
+                self.assertFalse((self.rec / "call.json").exists())
+                link.unlink()
+        real = self.build / "ref-real"
+        ref.rename(real)
+        ref.symlink_to(real)
+        with self.assertRaises(DriverError) as cm:
+            self.driver().run(self.inv())
+        self.assertIn("symlink", str(cm.exception))
+
+    # EXT-05 (minimum)
+    def test_ext05_relative_config_and_data_paths_refused(self):
+        rel = self.driver(config_dir="svc-config")
+        self.assertTrue(any("CONFIG_DIR must be an absolute path" in p for p in rel.self_check()))
+        with self.assertRaises(DriverError):
+            rel.run(self.inv())
+        rel_data = self.driver(data_root="data-t1")
+        self.assertTrue(any("DATA_T1 must be an absolute path" in p for p in rel_data.self_check()))
+        with self.assertRaises(DriverError):
+            rel_data.run(self.inv(read_roots=("data-t1",)))
+        self.assertFalse((self.rec / "call.json").exists())
+
+    def test_ext05_paths_reach_the_child_realpath_resolved(self):
+        root = Path(self._tmp.name)
+        (root / "cfg-link").symlink_to(self.config_dir)
+        (root / "data-link").symlink_to(self.data)
+        self.driver(config_dir=str(root / "cfg-link"), data_root=str(root / "data-link")).run(
+            self.inv(read_roots=(str(root / "data-link"),)))
+        c = self.call()
+        self.assertEqual(c["env"]["CLAUDE_CONFIG_DIR"], os.path.realpath(self.config_dir))
+        self.assertEqual(c["argv"][c["argv"].index("--add-dir") + 1], os.path.realpath(self.data))
+        self.assertEqual(c["cwd"], os.path.realpath(self.build / "ref"))
+
+    # EXT-13 (minimum)
+    def test_ext13_planted_claude_in_cwd_is_not_executed(self):
+        planted = self.build / "ref" / "claude"
+        planted.write_text(f"#!/bin/sh\ntouch {self.rec / 'PLANTED'}\n", encoding="utf-8")
+        planted.chmod(0o755)
+        self.env["PATH"] = os.pathsep.join(["", ".", str(self.bin.parent), "/usr/bin", "/bin"])
+        drv = self.driver(bin="claude")
+        self.assertEqual(drv.self_check(), [])
+        self.assertEqual(drv.bin_path, str(self.bin))
+        self.assertTrue(os.path.isabs(drv.bin_path))
+        drv.run(self.inv())
+        self.assertFalse((self.rec / "PLANTED").exists())
+        self.assertEqual(self.call()["env"]["PATH"].split(os.pathsep)[0], str(self.bin.parent))
+        self.assertNotIn("", self.call()["env"]["PATH"].split(os.pathsep))
+
+    def test_ext13_only_empty_or_relative_path_entries_means_not_found(self):
+        self.env["PATH"] = os.pathsep.join(["", ".", "bin"])
+        drv = self.driver(bin="claude")
+        self.assertTrue(any("not found" in p for p in drv.self_check()))
+        with self.assertRaises(DriverError):
+            drv.run(self.inv())
 
 
 class TestWiring(unittest.TestCase):
