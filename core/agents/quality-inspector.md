@@ -3,7 +3,7 @@ name: quality-inspector
 displayName: 品質管理 / Quality Inspector
 description: IQC / IPQC / FQC / OQC 四階段檢驗、不良品處理、客訴根因分析
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 品質管理 / Quality Inspector

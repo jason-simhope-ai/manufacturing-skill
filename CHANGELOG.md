@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Changed
+
+- **Least-privilege tool lists (B08):** removed the `Bash` tool from the 6 core agents (`engineering-change-manager`, `inventory-manager`, `production-planner`, `quality-inspector`, `quote-specialist`, `sales-coordinator`) and from the `/quote`, `/bom-check`, `/inspect`, `/8d` commands; they only need `Read` / `Grep` / `Glob`. `Bash` stays on `/install-profile` and `/add-profile` (they run `install.sh`). Profile agents and the remaining commands are unchanged.
+- **`post-order` hook (B21):** customer PO acknowledgement is now generated as a draft for a human to review and send, instead of being sent automatically by email / Telegram.
+- **README demo captions (B07):** the hero demo is now labelled honestly as a response to a persona prompt pasted into claude.ai (web), not a recording of the installed plugin running in Claude Code.
+- **`examples/sample-drawing/bracket.md` (B36):** expected demo output now states that the pre-quote hook passes on completeness while the SUS304 + anodize contradiction is caught by `quote-specialist`, matching the quickstart.
+
+### Added
+
+- **`docs/permissions-template.md`** (zh-TW): recommended Claude Code `permissions` `allow` / `ask` / `deny` snippet for a factory workstation (read-only tools allowed, network egress and destructive commands denied), with its limits stated; linked from `docs/adoption-guide.md` (B08).
+- **README.zh-TW.md FAQ:** "Can I use it from LINE?" — current copy-paste workflow, no LINE gateway today (B22, docs part only).
 
 ## [0.1.5] — 2026-05-09
 

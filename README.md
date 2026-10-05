@@ -17,6 +17,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo-en.png)
 
+> *Illustration only: this is the response to a persona prompt pasted into the claude.ai web chat (see [capture](docs/demo/real-claude-response.md)), not a recording of the installed plugin running in Claude Code. The animation below replays the same response.*
+
 **The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
 
 **🎬 19-second demo animation** (full flow from `/quote` to structured quote):
