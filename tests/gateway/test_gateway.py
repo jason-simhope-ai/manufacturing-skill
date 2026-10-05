@@ -739,9 +739,13 @@ class TestStaticSecurity(unittest.TestCase):
 
     def test_stdlib_only(self):
         allowed = set(sys.stdlib_module_names) | {"chat_gateway"}
+        # WP4: the optional SDKs may appear only as lazy (indented, in-function) imports in their adapter.
+        lazy_sdk = {"slack.py": "slack_sdk", "discord.py": "discord"}
         for path in [*(GW_DIR / "chat_gateway").rglob("*.py"), GW_DIR / "demo.py"]:
-            for m in re.finditer(r"^\s*(?:from|import)\s+([a-zA-Z_][\w]*)", path.read_text(encoding="utf-8"), re.M):
-                self.assertIn(m.group(1), allowed, f"{path}: {m.group(0)}")
+            for m in re.finditer(r"^(\s*)(?:from|import)\s+([a-zA-Z_][\w]*)", path.read_text(encoding="utf-8"), re.M):
+                if m.group(1) and path.parent.name == "adapters" and lazy_sdk.get(path.name) == m.group(2):
+                    continue
+                self.assertIn(m.group(2), allowed, f"{path}: {m.group(0)}")
 
     def test_mock_script_path_validated(self):
         with self.assertRaises(ValueError):
