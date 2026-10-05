@@ -510,8 +510,13 @@ jobs:
       # inside ALLOWED. Bash is opt-in per agent: the body must contain
       #   <!-- tools: bash-justified: <reason> -->
       # Starters under _templates/ may never opt in (they get copied).
+      # Read-only MCP tools of the reference scheduler server are also
+      # allowed, by prefix: `mcp__manufacturing-scheduler__<tool>` (the
+      # concrete tool names are pinned by tests/mcp). Any other MCP
+      # server prefix has to be added to MCP_PREFIXES in its own PR.
       # WebFetch / Write / Edit etc. are not allowed at all — widen
-      # ALLOWED / OPT_IN below only in a PR that discusses why.
+      # ALLOWED / OPT_IN / MCP_PREFIXES below only in a PR that
+      # discusses why.
       # ---------------------------------------------------------------
       - name: Agents — tool allowlist
         run: |
@@ -519,6 +524,7 @@ jobs:
           import glob, re, sys, yaml
           ALLOWED = {"Read", "Grep", "Glob"}
           OPT_IN = {"Bash"}   # allowed only with the bash-justified marker
+          MCP_PREFIXES = ("mcp__manufacturing-scheduler__",)  # read-only scheduler tools
           MARKER = re.compile(r"<!--\s*tools:\s*bash-justified:\s*\S[^>]*?-->")
           files = sorted(set(
               glob.glob("core/**/agents/*.md", recursive=True)
@@ -545,10 +551,12 @@ jobs:
                        if isinstance(raw, str) else {str(t) for t in (raw or [])})
               is_template = "/_templates/" in f
               has_marker = bool(MARKER.search(parts[2]))
-              bad = sorted(tools - ALLOWED - OPT_IN)
+              bad = sorted(t for t in tools - ALLOWED - OPT_IN
+                           if not t.startswith(MCP_PREFIXES))
               if bad:
                   print(f"::error file={f}::tools {bad} are not on the allowlist "
-                        f"{sorted(ALLOWED)} (+ Bash with a justification marker)")
+                        f"{sorted(ALLOWED)} (+ Bash with a justification marker, "
+                        f"+ {list(MCP_PREFIXES)} tools)")
                   fail = True
               if tools & OPT_IN:
                   if is_template:
