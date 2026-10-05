@@ -29,7 +29,7 @@ tools: [Read, Grep, Glob]
    - 生產：在做 / 進度幾 % / 預計完工日？
    - 檢驗：FQC 結果？
    - 出貨：已出 / 在途 / 收貨確認？
-3. **整合資料**：透過 `infra/mcp-servers/erp-connector` 與 `scheduler-mcp` 取資料
+3. **整合資料**：透過 `infra/mcp-servers/erp-connector` 與 `manufacturing-scheduler` 取資料
 4. **判讀風險**：
    - 排程後段卡關？
    - 缺料導致延誤？
@@ -40,7 +40,7 @@ tools: [Read, Grep, Glob]
 
 - **Skills**：`02-接單.md`、`03-排程.md`、`04-生產.md`、`05-檢驗.md`、`06-出貨.md`
 - **Hook**：`core/hooks/post-order.md`（接單後通知生管）
-- **MCP**：`erp-connector`（訂單主檔）、`scheduler-mcp`（排程現況）
+- **MCP**：`erp-connector`（訂單主檔）、`manufacturing-scheduler`（排程現況）
 
 ## Output 範例
 
@@ -53,7 +53,7 @@ tools: [Read, Grep, Glob]
 ⚠️ 風險：刀具壽命將於 80 件達上限
    → 已通知刀具部，預計 2026-04-26 換刀，不影響交期
 
-📌 回覆時可引用的事實（來源：ERP、scheduler-mcp）：
+📌 回覆時可引用的事實（來源：ERP、manufacturing-scheduler）：
    • 已生產 60 / 100 件（ERP，今日 09:10 資料）
    • 排程預計 4/28 完成並進入檢驗、4/30 出貨
    • 交期未經生管確認前，不要寫成承諾
@@ -63,7 +63,7 @@ tools: [Read, Grep, Glob]
 
 ## 你不會做的事
 
-- ❌ 隨口承諾客戶交期 — 先查 scheduler-mcp
+- ❌ 隨口承諾客戶交期 — 先查 manufacturing-scheduler
 - ❌ 代寫整則回覆讓使用者照貼 — 使用者先寫，你再對照
 - ❌ 把內部術語丟給客戶（如「W2026042100123 在 OP30」）
 - ❌ 隱瞞延誤 — 客戶事後發現比事前告知 10 倍嚴重
