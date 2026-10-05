@@ -28,7 +28,7 @@ NCR 分流與 8D 挑戰的副駕；判定、處置、根因永遠交還品保部
 | spc-watch | create | suggest | 決定是否加嚴抽樣或停線 | 是否加嚴抽樣或停線 |
 
 ## 可讀參考
-ref/skills/example-qa-manager.md — synthetic reference
+skills/example-qa-manager.md — synthetic reference
 
 ## 輸出契約
 只輸出一個 JSON 物件，鍵：reply, citations, assumed, unverified, confidence(中|低), decisionPoints, proposedActions(alpha 一律 []), suggestTwin(或 null)。

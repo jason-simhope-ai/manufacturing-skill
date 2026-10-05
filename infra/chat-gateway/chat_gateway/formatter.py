@@ -22,7 +22,10 @@ def format_reply(title: str, autonomy: str, result: TwinResult, *, category: str
     lines = [f"{prefix(title)}· {autonomy}"]
     if tainted:
         lines.append("⚠️ 本回合含未信任內容：連結已剝除、不發核准卡、權限上限 suggest")
-    lines.append(f"結論：{result.reply.strip()}")
+    body = result.reply.strip()
+    if autonomy == "draft" and not body.startswith("DRAFT"):
+        body = "DRAFT " + body              # draft output is always labelled (§6)
+    lines.append(f"結論：{body}")
     if result.citations:
         lines.append("依據：" + "；".join(result.citations))
     show = [f"[ASSUMED] {a}" for a in result.assumed]

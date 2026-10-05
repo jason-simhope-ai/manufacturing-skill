@@ -135,7 +135,7 @@ def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
                               f" · est. US${u['cost_usd']:.4f}\n")
             if pace:
                 time.sleep(pace)
-        ok, n = verify(Path(tmp) / "audit")
+        ok, n = verify(Path(tmp) / "audit", DEMO_AUDIT_KEY)
     out.write(f"\naudit verify: {'OK' if ok else 'FAILED'} ({n})\n")
     if usages:
         k = len(usages)
@@ -144,8 +144,8 @@ def run_demo(out: TextIO, roster_path: Path, pace: float = 0.0) -> int:
         cost = sum(u["cost_usd"] for u in usages) / k
         full = estimate_tokens("字" * (PROMPT_BUDGET_BYTES // 3))
         out.write(f"est. per answered message ({k}): in ≈{tin:,} / out ≈{tout:,} tokens ≈ US${cost:.4f}\n")
-        out.write(f"  assumes US${ASSUMED_USD_PER_MTOK[0]:g}/US${ASSUMED_USD_PER_MTOK[1]:g} per MTok (Sonnet-class list "
-                  f"price) and small fixture prompts; a full {PROMPT_BUDGET_BYTES:,} B prompt adds up to "
+        out.write(f"  assumes US${ASSUMED_USD_PER_MTOK[0]:g}/US${ASSUMED_USD_PER_MTOK[1]:g} per MTok (an assumed price, "
+                  f"not a quote; check current pricing) and small fixture prompts; a full {PROMPT_BUDGET_BYTES:,} B prompt adds up to "
                   f"≈{full:,} input tokens (≈US${full * ASSUMED_USD_PER_MTOK[0] / 1e6:.4f}).\n")
         out.write("  The claude-code driver bills the operator's account instead; each call is capped by "
                   "--max-budget-usd 0.10.\n")

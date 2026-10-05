@@ -3,7 +3,7 @@
 
     teamctl.py [--repo-root DIR] check [--roster PATH] [--ci|--strict] [--today YYYY-MM-DD]
     teamctl.py roster [--roster PATH] [--json] [--crontab]
-    teamctl.py audit-verify FILE_OR_DIR     (uses chat_gateway.audit.verify)
+    teamctl.py audit-verify FILE_OR_DIR     (chat_gateway.audit; key from MFG_TEAM_AUDIT_HMAC_KEY)
     teamctl.py build [build.py options]       (same as build.py)
 
 `check` prints `::error file=PATH::E0xx: message` lines (CI annotation
@@ -102,10 +102,12 @@ def cmd_roster(args, root: Path) -> int:
 
 
 def cmd_audit_verify(args, root: Path) -> int:
+    """Keyed verification: needs MFG_TEAM_AUDIT_HMAC_KEY (else the public demo key)."""
+    import os  # noqa: PLC0415
     gw = root / "infra" / "chat-gateway"
     sys.path.insert(0, str(gw))
     try:
-        from chat_gateway import audit  # noqa: PLC0415
+        from chat_gateway.__main__ import audit_key_for_verify, print_verify  # noqa: PLC0415
     except ImportError as e:
         print(f"teamctl: cannot import chat_gateway.audit ({e})",
               file=sys.stderr)
@@ -114,12 +116,7 @@ def cmd_audit_verify(args, root: Path) -> int:
         print(f"teamctl: no such file or directory {args.file}",
               file=sys.stderr)
         return 2
-    ok, n = audit.verify(args.file)
-    if ok:
-        print(f"audit verify: OK ({n})")
-        return 0
-    print(f"audit verify: FAILED ({n} records verified before the break)")
-    return 1
+    return 0 if print_verify(args.file, audit_key_for_verify(os.environ)) else 1
 
 
 def main(argv=None) -> int:

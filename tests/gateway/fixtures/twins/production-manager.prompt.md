@@ -27,7 +27,7 @@
 | delay-risk | create | suggest | 決定是否調整交期 | 是否通知業務調整交期 |
 
 ## 可讀參考
-ref/skills/example-production-manager.md — synthetic reference
+skills/example-production-manager.md — synthetic reference
 
 ## 輸出契約
 只輸出一個 JSON 物件，鍵：reply, citations, assumed, unverified, confidence(中|低), decisionPoints, proposedActions(alpha 一律 []), suggestTwin(或 null)。

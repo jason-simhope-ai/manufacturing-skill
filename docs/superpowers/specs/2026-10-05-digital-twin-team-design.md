@@ -1,7 +1,7 @@
 # Digital Twin Team（虛實整合團隊）— v0.2.0-alpha Design Spec
 
 - **Date**: 2026-10-05（v1 draft → v2 final）
-- **Author**: Claude (lead architect) for Jason Lin（生成式 AI 專案執行專員）
+- **Author**: Claude (lead architect) for Jason Lin
 - **Status**: ✅ v2 final — 合併 round-2 裁決（DECISIONS-R2：A1–A9、B1–B17、scope C、D1–D16）；可依 §18 平行實作
 - **Target version**: 0.2.0-alpha（experimental；team tier 預設安裝但 Claude Code 不自動載入，不改變 v0.1.5 既有行為）
 - **Related**: [docs/ROADMAP.md](../../ROADMAP.md) v2.0「自建 orchestrator + bot」— 本 spec 只提前「聊天分身」，**不**自建 LLM runtime
@@ -413,7 +413,7 @@ $MFG_TEAM_CLAUDE_BIN -p --output-format json --restricted --strict-mcp-config --
 
 ### 9.6 稽核、限流、錯誤
 
-- **Audit**（`audit.py`）：寫入 `${MFG_TEAM_STATE_DIR}/audit/<tier>/audit.jsonl`，append-only，每行一筆。欄位（snake_case）：`v, ts, seq, event_id, platform, channel, channel_tier, thread, operator`（`role:<position>`，或 `role:unknown`）`, operator_ref`（`HMAC-SHA256(MFG_TEAM_AUDIT_HMAC_KEY, platform+":"+user_id)` 的前 16 個 hex）`, twin, twin_prompt_sha, driver, action, capability, category, effective_autonomy, args_hash, approval_id, decision`（`allow|deny`）`, deny_reason, content_sha256, content_len, redactions{secret,pii,amount}, tainted, usage, latency_ms, prev_hash, hash`。`hash = "sha256:"+sha256(canonical_json(該筆去掉 hash 欄位))`；第一筆的 `prev_hash = "sha256:0"`。alpha 不存訊息全文。`action` 列舉：`msg_in msg_out route_decision tool_proposed tool_denied approval_requested approval_granted approval_denied approval_expired injection_flag policy_denied rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded config_refused`。所有 deny 與 `injection_flag` 都必須記錄。
+- **Audit**（`audit.py`）：寫入 `${MFG_TEAM_STATE_DIR}/audit/<tier>/audit.jsonl`，append-only，每行一筆。欄位（snake_case）：`v, ts, seq, event_id, platform, channel, channel_tier, thread, operator`（`role:<position>`，或 `role:unknown`）`, operator_ref`（`HMAC-SHA256(MFG_TEAM_AUDIT_HMAC_KEY, platform+":"+user_id)` 的前 16 個 hex）`, twin, twin_prompt_sha, driver, action, capability, category, effective_autonomy, args_hash, approval_id, decision`（`allow|deny`）`, deny_reason, content_sha256, content_len, redactions{secret,pii,amount}, tainted, usage, latency_ms, prev_hash, hash`。`hash = "hmac-sha256:"+HMAC-SHA256(由 MFG_TEAM_AUDIT_HMAC_KEY 衍生的分級子金鑰, prev_hash+"\n"+canonical_json(該筆去掉 hash 欄位))`；第一筆的 `prev_hash = "sha256:0"`；`content_sha256` 存 HMAC 內容標記（衍生金鑰），不是明文雜湊。每次寫入後以衍生金鑰簽署 `audit/checkpoint.json`（各分級筆數、最後 seq、head）；`audit-verify` 據此偵測竄改、刪除、重排、截尾、整檔刪除與 seq 缺號。把 checkpoint 定期複製到主機外是營運者的責任（它擋不住「log 與 checkpoint 一起回滾」）。alpha 不存訊息全文。`action` 列舉：`msg_in msg_out route_decision tool_proposed tool_denied approval_requested approval_granted approval_denied approval_expired injection_flag policy_denied rate_limited replay_rejected dlp_blocked format_fixed driver_error config_loaded config_refused`。所有 deny 與 `injection_flag` 都必須記錄。
 - **限流**：每人 6 則/分、每頻道 60 則/時、每頻道主動貼文 3 則/日、driver 併發 2、每次呼叫 `--max-budget-usd 0.10`；`MFG_TEAM_DAILY_BUDGET_USD`（每分身每日軟上限）預設關閉。event_id 去重保留 10 分鐘或 1,000 筆。
 - **錯誤**：driver 逾時或失敗 → 回「暫時無法回應（#seq）」，絕不臆測；同一分身連續失敗 3 次 → 自動降為 observe。
 
@@ -488,7 +488,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 
 ### 11.6 上線門檻與殘餘風險
 
-G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = 真實 Slack/Discord 測試工作區、最小 scope 稽核、稽核雜湊每週由導入負責人以外的人簽收。G2（T2 上 SaaS）與 G3（T3）見 §14。殘餘風險必須由人的政策涵蓋：影子 AI（員工把資料貼進個人 AI）、工作站被入侵、聊天與雲端供應商端的資料保存、語意型污染（看似合理的錯價或錯規格）、管理員權限過大、設定錯誤。職責分離：導入負責人（GenAI 專案執行專員）不擔任核准人，也不保管稽核錨點。
+G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = 真實 Slack/Discord 測試工作區、最小 scope 稽核、稽核雜湊每週由導入負責人以外的人簽收。G2（T2 上 SaaS）與 G3（T3）見 §14。殘餘風險必須由人的政策涵蓋：影子 AI（員工把資料貼進個人 AI）、工作站被入侵、聊天與雲端供應商端的資料保存、語意型污染（看似合理的錯價或錯規格）、管理員權限過大、設定錯誤。職責分離：AI 導入負責人不擔任核准人，也不保管稽核錨點。
 
 ## 12. 設計決策紀錄（Q1–Q9）
 

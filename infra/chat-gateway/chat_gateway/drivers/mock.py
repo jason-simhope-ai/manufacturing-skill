@@ -21,9 +21,10 @@ from ..prompt import estimate_tokens
 from .base import DriverError, TwinInvocation, TwinResult, result_from_json
 
 DEFAULT_FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "mock_driver.json"
-# Labeled assumption for cost *estimates* only (Sonnet-class list price, USD per MTok).
-# The claude-code driver bills the operator's account and is capped by --max-budget-usd.
-ASSUMED_USD_PER_MTOK = (2.0, 10.0)
+# Labeled assumption for cost *estimates* only (USD per MTok in/out; an assumed price, not a
+# quote — check current pricing). The claude-code driver bills the operator's account and is
+# capped by --max-budget-usd.
+ASSUMED_USD_PER_MTOK = (3.0, 15.0)
 MODES = ("deterministic", "compliant_malicious")
 _ENVELOPE = re.compile(r"<<UNTRUSTED id=\w+ source=\w+>>\n(.*?)\n<</UNTRUSTED id=\w+>>", re.DOTALL)
 

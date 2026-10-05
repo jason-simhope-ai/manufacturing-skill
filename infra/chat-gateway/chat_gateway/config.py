@@ -11,6 +11,8 @@ from . import ConfigRefused
 
 DEFAULT_ROSTER = "team/.build/roster.json"
 DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
+DEFAULT_DENYLIST = "team/local/names.denylist"
+DENYLIST_VAR = "MFG_TEAM_DENYLIST"
 AUDIT_KEY_VAR = "MFG_TEAM_AUDIT_HMAC_KEY"
 APPROVAL_KEY_VAR = "MFG_TEAM_APPROVAL_HMAC_KEY"
 MIN_KEY_LEN = 16
@@ -31,6 +33,7 @@ class GatewayConfig:
     daily_budget_usd: float | None
     max_budget_usd: float
     timeout_s: int
+    denylist: Path | None = None       # optional local denylist (inbound DLP + output filter)
 
 
 def _num(env: Mapping[str, str], name: str, default: float | None, cast=float):
@@ -60,6 +63,10 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
     state = Path(env.get("MFG_TEAM_STATE_DIR") or DEFAULT_STATE_DIR).expanduser()
     if not state.is_absolute():
         raise ConfigRefused("MFG_TEAM_STATE_DIR must be an absolute path")
+    deny_raw = env.get(DENYLIST_VAR)
+    if deny_raw and not Path(deny_raw).expanduser().is_file():
+        raise ConfigRefused(f"{DENYLIST_VAR} is set but is not a file")
+    deny = Path(deny_raw or DEFAULT_DENYLIST).expanduser()
     return GatewayConfig(
         roster=Path(roster or env.get("MFG_TEAM_ROSTER") or DEFAULT_ROSTER),
         adapter=adapter, driver=driver, state_dir=state.resolve(),
@@ -69,4 +76,5 @@ def config_from_env(env: Mapping[str, str], *, roster: str | None = None, adapte
         daily_budget_usd=_num(env, "MFG_TEAM_DAILY_BUDGET_USD", None),
         max_budget_usd=_num(env, "MFG_TEAM_MAX_BUDGET_USD", 0.10),
         timeout_s=int(_num(env, "MFG_TEAM_TIMEOUT_S", 60, int)),
+        denylist=deny if deny.is_file() else None,
     )

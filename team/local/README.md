@@ -8,7 +8,7 @@
 | `identities.local.yaml` | 平台 user id → 職位；只有這裡列出的 id 算數 |
 | `bindings.local.yaml` | 邏輯頻道 → 平台頻道 id |
 | `deid-map.local.yaml` | `deid.py` 的客戶名對照表（`CUST-xx`） |
-| `names.denylist` | 真名、客戶名、圖號、專案代號（每行一個 regex）；供 `deid.py` 與 pre-commit hook 掃描 |
+| `names.denylist` | 真名、客戶名、圖號、專案代號（每行一個 regex）；供 `deid.py`、pre-commit hook 與 gateway（輸入 DLP、輸出過濾，視為 T2）掃描 |
 | `playbook.local.md` | 逐人導入筆記 |
 | `personal/<twin-id>.local.md` | 在職者偏好（白名單欄位，本文 ≤ 900 B） |
 

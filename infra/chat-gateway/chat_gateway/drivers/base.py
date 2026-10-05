@@ -37,6 +37,7 @@ class TwinInvocation:
     predict_first: bool = False
     timeout_s: int = 60
     max_budget_usd: float = 0.10
+    prompt_sha: str | None = None        # roster promptSha; drivers that read the file re-check it
 
 
 @dataclass(frozen=True)

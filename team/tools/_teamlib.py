@@ -73,7 +73,9 @@ OUTSOURCE_MAX_DAYS = 90
 OUTSOURCE_WARN_DAYS = 14
 GATE_STALE_DAYS = 120
 ACTING_MAX_DAYS = 30
-REF_PREFIX = "ref/"   # spec 5.5 (4): index lines read `ref/<kind>/<id>.md`
+# spec 5.5 (4) / 9.5: the claude-code driver runs with cwd `team/.build/ref/`, so index
+# lines read `<kind>/<id>.md` (relative to that directory; nothing above it is reachable).
+REF_PREFIX = ""
 
 CODES = {
     "E001": "YAML 解析失敗，或最上層不是 mapping",
@@ -108,6 +110,7 @@ CODES = {
     "E044": "roster 的 twin.autonomyCeiling 高於分身檔的 autonomyCeiling",
     "E045": "每人 positions + actingFor 超過 2",
     "E046": "personal overlay 出現白名單以外的欄位",
+    "E047": "alpha 上限：policy.cloudTierCeiling／saasTierCeiling 不得高於 T1（雲端模型與 SaaS 聊天只到 T1）",
     "E050": "超過 bytes 預算",
     "E051": "build 不確定（兩次輸出不同）",
     "E060": ".gitignore 缺必要項目，或追蹤檔含 *.local.*／team/.build／team/local",
@@ -118,6 +121,7 @@ CODES = {
     "W005": "compose.optional 的 profile 未啟用，已略過",
     "W006": "agent 本文過大，改為索引行而非內嵌",
     "W007": "本機 roster.json 超過 4,000 B 總量",
+    "W008": "roster.json 單一分身項目超過 600 B（只有 --ci 檢查範例 roster 時是 E050）",
 }
 
 REQUIRED_GITIGNORE = (
@@ -197,7 +201,11 @@ class _Loader(yaml.SafeLoader):
 
 
 def _construct_timestamp(loader, node):
-    return yaml.SafeLoader.construct_yaml_timestamp(loader, node).isoformat()
+    try:
+        return yaml.SafeLoader.construct_yaml_timestamp(loader, node).isoformat()
+    except ValueError:
+        # e.g. 2026-02-30: keep the raw string so the schema walker reports E005
+        return str(node.value)
 
 
 _Loader.add_constructor("tag:yaml.org,2002:timestamp", _construct_timestamp)
@@ -477,97 +485,52 @@ _IDENTITY_FILE = {"schema": ("int", False), "users": (("list", ("map", {
 # --------------------------------------------------------------------------
 # Heuristic scanners (spec 11.4)
 # --------------------------------------------------------------------------
-# TODO(WP3): SECRET_PATTERNS is meant to have a single source of truth in
-# chat_gateway/patterns.py. `shared_secret_patterns()` loads it when present
-# and well-formed; the fallback below is a verbatim copy of the spec list.
+# Every regex lives in infra/chat-gateway/chat_gateway/patterns.py (stdlib `re`
+# only); it is loaded from this tool's own repository by file path, so mini repos
+# in tests and repos without the gateway package on sys.path work the same.
 
-_FALLBACK_SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("slack-token", re.compile(r"xox[abprs]-[0-9A-Za-z-]{10,}")),
-    ("slack-app-token", re.compile(r"xapp-\d-[A-Z0-9]+-\d+-[a-f0-9]{20,}")),
-    ("slack-webhook", re.compile(r"https://hooks\.slack\.com/services/\S+")),
-    ("discord-token",
-     re.compile(r"[MNO][A-Za-z\d_-]{23,27}\.[\w-]{6}\.[\w-]{27,}")),
-    ("discord-webhook", re.compile(
-        r"https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/\S+")),
-    ("anthropic-key", re.compile(r"sk-ant-[A-Za-z0-9_-]{20,}")),
-    ("github-token", re.compile(r"gh[pousr]_[A-Za-z0-9]{36,}")),
-    ("aws-key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("private-key", re.compile(
-        r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
-]
-
-_GENERIC_SECRET = re.compile(
-    r"(?i)\b(?:secret|passw(?:or)?d|token|api[_-]?key)\b[\"']?\s*[:=]\s*"
-    r"[\"']?[A-Za-z0-9_\-+/=]{16,}")
-
-_SURNAMES = ("陳林黃張李王吳劉蔡楊許鄭謝郭洪曾邱廖賴徐周葉蘇莊呂江何蕭羅高"
-             "潘簡朱鍾彭游詹胡施沈余盧梁趙顏柯翁魏孫戴范方宋鄧杜傅侯曹薛丁"
-             "卓阮馬董唐藍蔣石古紀姚連馮歐程湯田康姜白汪鄒尤巫黎涂龔嚴韓袁"
-             "金童陸夏柳邵")
-_TITLES = ("廠長|總經理|副總經理|經理|副總|董事長|協理|襄理|課長|組長|主任|"
-           "處長|部長|科長|領班|老闆|先生|小姐|女士|工程師|技師|師傅|主管|會計")
-_CJK_CLASS = "㐀-鿿"
-
-NAME_ZH = re.compile(rf"(?<![{_CJK_CLASS}])[{_SURNAMES}](?:{_TITLES})")
-NAME_OTHER: list[tuple[str, re.Pattern]] = [
-    ("honorific-name", re.compile(r"\b(?:Mr|Ms|Mrs|Dr)\.\s+[A-Z][a-z]+")),
-    ("tw-mobile", re.compile(r"(?<!\d)09\d{2}-?\d{3}-?\d{3}(?!\d)")),
-    ("slack-id", re.compile(r"\b[UWCGT][A-Z0-9]{8,}\b")),
-    ("discord-id", re.compile(r"\b\d{17,20}\b")),
-]
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*"
-                    r"\.[A-Za-z]{2,})")
-_EMAIL_OK = re.compile(r"(?:^|\.)example\.(?:com|org|test)$", re.I)
+_PATTERNS_FILE = TOOL_REPO / "infra" / "chat-gateway" / "chat_gateway" / "patterns.py"
 
 
-def _tw_business_id_ok(digits: str) -> bool:
-    """Taiwan unified business number checksum."""
-    if len(digits) != 8 or not digits.isdigit():
-        return False
-    weights = (1, 2, 1, 2, 1, 2, 4, 1)
-    total = 0
-    for d, w in zip(digits, weights):
-        p = int(d) * w
-        total += p // 10 + p % 10
-    return total % 5 == 0 or (digits[6] == "7" and (total + 1) % 5 == 0)
+def _load_patterns():
+    try:
+        spec = importlib.util.spec_from_file_location("_gw_patterns_for_teamlib",
+                                                      _PATTERNS_FILE)
+        if spec is None or spec.loader is None:
+            raise ImportError(str(_PATTERNS_FILE))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # pure regex module
+        return mod
+    except (ImportError, OSError) as e:
+        raise ImportError(
+            "team tools need infra/chat-gateway/chat_gateway/patterns.py (the single "
+            f"source of the secret/name/DLP regexes); not found or unreadable: {e}") from None
 
 
-# DLP tripwires (spec 11.1). Entries: (class, pattern, optional validator).
-DLP_PATTERNS: list[tuple[str, re.Pattern, Any]] = [
-    ("confidential-word", re.compile(
-        r"機密|受限|國防|CONFIDENTIAL|RESTRICTED", re.I), None),
-    ("tw-business-id", re.compile(r"(?<!\d)\d{8}(?!\d)"), _tw_business_id_ok),
-    ("tw-national-id", re.compile(r"\b[A-Z][12]\d{8}\b"), None),
-    ("nt-amount", re.compile(r"NT\$\s?[\d,]{4,}"), None),
-]
+_PAT = _load_patterns()
+SECRET_PATTERNS: list[tuple[str, re.Pattern]] = list(_PAT.SECRET_PATTERNS)
+_GENERIC_SECRET = _PAT.REPO_GENERIC_SECRET[1]
+NAME_ZH = _PAT.NAME_ZH
+NAME_OTHER: list[tuple[str, re.Pattern]] = list(_PAT.NAME_OTHER)
+_EMAIL, _EMAIL_OK = _PAT.EMAIL, _PAT.EMAIL_OK
+PII_PATTERNS: list[tuple[str, re.Pattern]] = list(_PAT.PII_PATTERNS)
+_tw_business_id_ok = _PAT.valid_ubn
 
 
 def dlp_scan(text: str) -> list[str]:
-    """Return DLP classes that match `text` (no matched values)."""
+    """DLP classes (patterns.DLP_PATTERNS names) that match `text`; never the values."""
     hits = []
-    for name, pat, check in DLP_PATTERNS:
+    for name, pat in _PAT.DLP_PATTERNS:
         for m in pat.finditer(text):
-            if check is None or check(m.group(0)):
+            if name != "tw-ubn" or _PAT.valid_ubn(m.group(0)):
                 hits.append(name)
                 break
     return hits
 
 
 def shared_secret_patterns(root: Path) -> list[tuple[str, re.Pattern]]:
-    p = root / "infra" / "chat-gateway" / "chat_gateway" / "patterns.py"
-    if p.is_file():
-        try:
-            spec = importlib.util.spec_from_file_location(
-                "_gw_patterns_for_teamlib", p)
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)  # pure regex module
-            pats = list(getattr(mod, "SECRET_PATTERNS"))
-            if pats and all(isinstance(n, str) and hasattr(r, "search")
-                            for n, r in pats):
-                return pats
-        except Exception:  # noqa: BLE001 - fall back to the spec copy
-            pass
-    return _FALLBACK_SECRET_PATTERNS
+    """Kept for callers; the patterns no longer depend on the scanned repo."""
+    return SECRET_PATTERNS
 
 
 def load_lint_allow(root: Path) -> tuple[list[re.Pattern], list[str]]:
@@ -952,6 +915,12 @@ class _Validator:
             add("E043", "policy.cloudTierCeiling must not be T3")
         if policy.get("saasTierCeiling") == "T3" and self.mode in ("ci", "strict"):
             add("E043", "policy.saasTierCeiling must not be T3")
+        for key in ("cloudTierCeiling", "saasTierCeiling"):
+            val = policy.get(key)
+            t3_flagged = val == "T3" and (key == "cloudTierCeiling" or self.mode in ("ci", "strict"))
+            if val in TIERS and _rank(val, TIERS) > _rank("T1", TIERS) and not t3_flagged:
+                add("E047", f"policy.{key} is {val}: alpha caps cloud models and SaaS chat at T1 "
+                    "(no waiver; T2 off-premises is deferred, spec 14)")
 
         # twins attached to positions
         enabled_twins: dict[str, dict] = {}
@@ -1388,9 +1357,12 @@ class _Validator:
         for t in json.loads(rj)["twins"]:
             n = len(canon(t))
             if n > BUDGETS["roster.json-twin"]:
-                self.add("E050", self.roster_path, f"roster.json entry for "
-                         f"twin {t['id']!r} is {n} B "
-                         f"(max {BUDGETS['roster.json-twin']} B)")
+                msg = (f"roster.json entry for twin {t['id']!r} is {n} B "
+                       f"(max {BUDGETS['roster.json-twin']} B)")
+                if self.is_example and self.mode == "ci":
+                    self.add("E050", self.roster_path, msg)
+                else:
+                    self.add("W008", self.roster_path, msg, "warning")
         for name, data in sorted(c1.files.items()):
             if name.startswith("twins/"):
                 self.stats["budget_rows"].append(
@@ -1485,7 +1457,7 @@ def _embed_form(body: str, levels: int = 2) -> str:
     the twin's own `##` sections, and fenced code blocks dropped. Those blocks
     are output examples (dated sample data, report layouts) that would fight
     the TwinResult contract and break the "no dates in the prompt" rule; the
-    complete file stays readable under ref/agents/."""
+    complete file stays readable as agents/<id>.md under team/.build/ref/."""
     out, fenced = [], False
     for line in body.split("\n"):
         if line.lstrip().startswith("```"):

@@ -13,7 +13,7 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 插單與否 ② 是否加班
     信心：中 · 分類：強化既有優勢 · 稽核 #2
     audit: #2 msg_out
-    ≈ tokens in 525 / out 134 · est. US$0.0024
+    ≈ tokens in 524 / out 134 · est. US$0.0036
 
 ━━ Beat 2/8 · @ 路由 · defaultTwin · 🧭 決策點與頁尾 · 頻道外分身被拒
 [07:55] #daily-ops mock-prod-lead: @生產 今日重點：① WO-EX-0412 趕交期 ② CNC-03 保養 ③ 新人上線
@@ -25,7 +25,7 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 保養是否延後 ② WO-EX-0412 是否加班趕工
     信心：中 · 分類：強化既有優勢 · 稽核 #5
     audit: #3 msg_in → #4 route_decision → #5 msg_out
-    ≈ tokens in 690 / out 165 · est. US$0.0030
+    ≈ tokens in 689 / out 165 · est. US$0.0045
 [07:58] #daily-ops mock-machining: WO-EX-0415 的料今天會到嗎？
   → #daily-ops thread:m-0202
     【生產部主管分身】· suggest
@@ -35,7 +35,7 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 是否先排替代工單
     信心：低 · 分類：強化既有優勢 · 稽核 #8
     audit: #6 msg_in → #7 route_decision → #8 msg_out
-    ≈ tokens in 877 / out 117 · est. US$0.0029
+    ≈ tokens in 876 / out 117 · est. US$0.0044
 [08:00] #qa-floor mock-qa-lead: @生產 幫我看一下今天排程
   → #qa-floor thread:m-0203
     【gateway】這個分身不在本頻道。本頻道可用：【品保部主管分身】（#11）
@@ -49,7 +49,7 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 嚴重度最終判定
     信心：中 · 分類：強化既有優勢 · 稽核 #14
     audit: #12 msg_in → #13 route_decision → #14 msg_out
-    ≈ tokens in 577 / out 90 · est. US$0.0021
+    ≈ tokens in 576 / out 90 · est. US$0.0031
 [08:07] #qa-floor mock-qa-lead: @品保 NCR-EX-012 我判「中」，理由：只影響外觀、可重工
   → #qa-floor thread:m-0302
     【品保部主管分身】· suggest
@@ -60,7 +60,7 @@ gateway up: audit #1 config_loaded
     建議詢問 【生產部主管分身】（請自行 @，分身不代為轉交）
     信心：中 · 分類：強化既有優勢 · 稽核 #17
     audit: #15 msg_in → #16 route_decision → #17 msg_out
-    ≈ tokens in 702 / out 151 · est. US$0.0029
+    ≈ tokens in 701 / out 151 · est. US$0.0044
 
 ━━ Beat 4/8 · 忽略：bot 作者、未 @、DM、未授權職位
 [08:10] #qa-floor mock-other-bot [bot]: @品保 自動同步：NCR-EX-013 已建立
@@ -79,7 +79,7 @@ gateway up: audit #1 config_loaded
   → #qa-floor thread:m-0501
     【品保部主管分身】內容含 T2 標記，不能在 T1 頻道處理；請改到正確分級的頻道（內容未送進模型）（#28）
     audit: #25 msg_in → #26 route_decision → #27 dlp_blocked(dlp:T2) → #28 msg_out
-[08:21] #qa-floor mock-qa-lead: @品保 國防專案那批的公差也一起看
+[08:21] #qa-floor mock-qa-lead: @品保 高安規專案（受限）那批的公差也一起看
   → #qa-floor thread:m-0502
     【品保部主管分身】此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理（#32）
     audit: #29 msg_in → #30 route_decision → #31 dlp_blocked(dlp:T3) → #32 msg_out
@@ -95,8 +95,8 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 最終決定由你做（分身未列出決策點，已由 gateway 補上）
     信心：低 · 分類：強化既有優勢 · 稽核 #39
     audit: #33 msg_in → #34 route_decision → #35 injection_flag(ignore-zh,role-swap-zh,secret-request,claims-approval,path-traversal) → #36 tool_proposed → #37 tool_denied(tainted_turn) → #38 format_fixed(confidence,decision_points) → #39 msg_out
-    ≈ tokens in 984 / out 178 · est. US$0.0037
-  (driver 換回 deterministic；taint 仍留在頻道窗內)
+    ≈ tokens in 983 / out 178 · est. US$0.0056
+  (driver 換回 deterministic；taint 留在頻道窗內，直到該則訊息被擠出窗口)
 [08:31] #qa-floor mock-qa-lead: @品保 核准
   → #qa-floor thread:m-0602
     【品保部主管分身】聊天文字不能核准任何事；核准只接受核准卡上的按鈕點擊（#43）
@@ -113,7 +113,7 @@ gateway up: audit #1 config_loaded
     🧭 需要你判斷：① 是否加嚴抽樣或停線
     信心：中 · 分類：創造新能力 · 稽核 #47
     audit: #45 msg_in → #46 route_decision → #47 msg_out
-    ≈ tokens in 1,179 / out 96 · est. US$0.0033
+    ≈ tokens in 1,178 / out 96 · est. US$0.0050
 
 ━━ Beat 7/8 · 限流：同一人每分鐘 6 則，第 7 則被擋（回覆以精簡模式顯示）
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 1 次）
@@ -122,42 +122,42 @@ gateway up: audit #1 config_loaded
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #50
     audit: #48 msg_in → #49 route_decision → #50 msg_out
-    ≈ tokens in 1,013 / out 67 · est. US$0.0027
+    ≈ tokens in 1,012 / out 67 · est. US$0.0040
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 2 次）
   → #daily-ops thread:m-0702
     【生產部主管分身】· suggest
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #53
     audit: #51 msg_in → #52 route_decision → #53 msg_out
-    ≈ tokens in 1,103 / out 67 · est. US$0.0029
+    ≈ tokens in 1,102 / out 67 · est. US$0.0043
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 3 次）
   → #daily-ops thread:m-0703
     【生產部主管分身】· suggest
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #56
     audit: #54 msg_in → #55 route_decision → #56 msg_out
-    ≈ tokens in 1,193 / out 67 · est. US$0.0031
+    ≈ tokens in 1,192 / out 67 · est. US$0.0046
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 4 次）
   → #daily-ops thread:m-0704
     【生產部主管分身】· suggest
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #59
     audit: #57 msg_in → #58 route_decision → #59 msg_out
-    ≈ tokens in 1,131 / out 67 · est. US$0.0029
+    ≈ tokens in 1,130 / out 67 · est. US$0.0044
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 5 次）
   → #daily-ops thread:m-0705
     【生產部主管分身】· suggest
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #62
     audit: #60 msg_in → #61 route_decision → #62 msg_out
-    ≈ tokens in 1,024 / out 67 · est. US$0.0027
+    ≈ tokens in 1,023 / out 67 · est. US$0.0041
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 6 次）
   → #daily-ops thread:m-0706
     【生產部主管分身】· suggest
     …
     信心：中 · 分類：強化既有優勢 · 稽核 #65
     audit: #63 msg_in → #64 route_decision → #65 msg_out
-    ≈ tokens in 978 / out 67 · est. US$0.0026
+    ≈ tokens in 977 / out 67 · est. US$0.0039
 [08:40] #daily-ops mock-machining: @生產 WO-EX-0415 進度？（第 7 次）
   → #daily-ops thread:m-0707
     【gateway】訊息太頻繁，請稍候再 @（每人每分鐘 6 則、每頻道每小時 60 則）（#68）
@@ -170,6 +170,6 @@ gateway up: audit #1 config_loaded
   slack adapter 但未設 HMAC 金鑰 → refused, exit 78: missing required environment variables: MFG_TEAM_AUDIT_HMAC_KEY, MFG_TEAM_APPROVAL_HMAC_KEY
 
 audit verify: OK (68)
-est. per answered message (13): in ≈921 / out ≈102 tokens ≈ US$0.0029
-  assumes US$2/US$10 per MTok (Sonnet-class list price) and small fixture prompts; a full 12,000 B prompt adds up to ≈4,000 input tokens (≈US$0.0080).
+est. per answered message (13): in ≈920 / out ≈102 tokens ≈ US$0.0043
+  assumes US$3/US$15 per MTok (an assumed price, not a quote; check current pricing) and small fixture prompts; a full 12,000 B prompt adds up to ≈4,000 input tokens (≈US$0.0120).
   The claude-code driver bills the operator's account instead; each call is capped by --max-budget-usd 0.10.

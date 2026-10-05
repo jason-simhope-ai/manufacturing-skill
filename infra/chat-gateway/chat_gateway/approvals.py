@@ -11,6 +11,7 @@ mechanism is still complete and tested:
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import hmac
 import json
@@ -26,9 +27,12 @@ Resolution = Literal["granted", "denied", "expired", "mismatch", "forbidden", "r
 TTL_S = 1800
 
 
+def _canonical(obj: object) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 def args_hash(args: object) -> str:
-    body = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return "sha256:" + hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return "sha256:" + hashlib.sha256(_canonical(args).encode("utf-8")).hexdigest()
 
 
 class Executor(Protocol):
@@ -56,6 +60,7 @@ class _Pending:
     channel_ref: str
     thread_ref: str | None
     expires_at: float
+    canonical: str = ""          # canonical JSON of the whole action, frozen at creation
     done: bool = False
 
 
@@ -77,10 +82,13 @@ class ApprovalBook:
         """`action` = {"name": str, "args": {...}}; `requester` = platform user ref."""
         approval_id = "apv-" + self._hex(4)
         nonce = self._hex(16)
-        ahash = args_hash(action.get("args", {}))
+        frozen = copy.deepcopy(dict(action))
+        frozen.setdefault("args", {})
+        canonical = _canonical(frozen)                 # raises TypeError for non-JSON args
+        ahash = args_hash(frozen["args"])
         expires = self._clock() + self.ttl_s
         self._book[approval_id] = _Pending(
-            action=dict(action), args_hash=ahash, mac=self._mac(approval_id, nonce, ahash),
+            action=frozen, canonical=canonical, args_hash=ahash, mac=self._mac(approval_id, nonce, ahash),
             requester=requester, approvers=frozenset(approvers), tier=tier, twin_id=twin_id,
             channel_ref=channel, thread_ref=thread_ref, expires_at=expires)
         lines = (f"動作：{action.get('name', '?')}", f"參數雜湊：{ahash[:19]}…",
@@ -111,8 +119,16 @@ class ApprovalBook:
             return "forbidden"
         if action is not None and args_hash(action.get("args", {})) != rec.args_hash:
             return "mismatch"
+        try:   # the executed action must be byte-identical to what was hashed at creation
+            now_canonical = _canonical(rec.action)
+        except (TypeError, ValueError):
+            now_canonical = None
+        to_run = json.loads(rec.canonical)
+        if now_canonical != rec.canonical or args_hash(to_run.get("args", {})) != rec.args_hash:
+            rec.done = True
+            return "mismatch"
         rec.done = True
         if click.decision != "approve":
             return "denied"
-        executor.execute(rec.action)
+        executor.execute(to_run)
         return "granted"

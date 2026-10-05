@@ -21,9 +21,10 @@ from .adapters import load_adapter_class
 from .adapters.base import ApprovalCard, ScheduledPost
 from .adapters.mock import MockAdapter
 from .approvals import ApprovalBook
-from .audit import AuditLog, verify
-from .config import GatewayConfig, config_from_env
-from .core import Gateway, load_roster
+from .audit import AuditLog, heads, verify_report
+from .config import AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env
+from .core import Gateway, load_roster, synthetic_mock_identities
+from .sanitize import load_denylist
 from .drivers import load_driver_class
 
 
@@ -53,13 +54,21 @@ def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None
     if cfg.demo_keys:
         print("DEMO KEYS — mock mode only; set MFG_TEAM_AUDIT_HMAC_KEY and "
               "MFG_TEAM_APPROVAL_HMAC_KEY for anything real", file=sys.stderr)
+    if cfg.adapter == "mock" and cfg.driver == "mock" and not (roster.get("_identities") or {}).get("users"):
+        roster["_identities"] = synthetic_mock_identities(roster)
+        users = ", ".join(u["userId"] for u in roster["_identities"]["users"])
+        print(f"no identities.json: mock mode uses synthetic users ({users})", file=sys.stderr)
+    try:
+        extra_dlp = load_denylist(cfg.denylist) if cfg.denylist else []
+    except (OSError, ValueError) as exc:
+        raise ConfigRefused(f"local denylist unusable: {exc}") from None
     adapter = _make_adapter(cfg, roster, script)
     driver = _make_driver(cfg, env)
     audit = AuditLog(cfg.state_dir / "audit", cfg.audit_key)
     data_root = env.get("MFG_TEAM_DATA_T1")
     return Gateway(roster, adapter, driver, audit, approvals=ApprovalBook(cfg.approval_key),
                    read_roots=(data_root,) if data_root else (), daily_budget_usd=cfg.daily_budget_usd,
-                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s)
+                   max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s, extra_dlp=extra_dlp)
 
 
 def _post(gw: Gateway, cfg: GatewayConfig, twin: str, capability: str, channel: str | None) -> int:
@@ -79,6 +88,32 @@ def _post(gw: Gateway, cfg: GatewayConfig, twin: str, capability: str, channel: 
     if not outs:
         print("post refused by policy (see audit log)", file=sys.stderr)
     return EXIT_OK
+
+
+def audit_key_for_verify(env: Mapping[str, str]) -> bytes:
+    """The audit key from the environment, else the public demo key (with a notice)."""
+    if env.get(AUDIT_KEY_VAR):
+        return env[AUDIT_KEY_VAR].encode()
+    print(f"DEMO KEY — {AUDIT_KEY_VAR} is not set; verifying with the public demo key "
+          "(only mock-mode logs will verify)", file=sys.stderr)
+    return DEMO_AUDIT_KEY
+
+
+def print_verify(path: str, key: bytes) -> bool:
+    ok, n, problems = verify_report(path, key)
+    print(f"audit verify: {'OK' if ok else 'FAILED'} ({n})")
+    for problem in problems[:20]:
+        print(f"  problem: {problem}")
+    info = heads(path, key) if ok else None
+    if info:
+        print(f"  last seq {info['seq']}; checkpoint heads (copy off-host for sign-off):")
+        for tier, h in sorted(info["tiers"].items()):
+            print(f"    {tier}: count={h['count']} seq={h['seq']} head={h['head']}")
+    return ok
+
+
+def _audit_verify(path: str, env: Mapping[str, str]) -> int:
+    return EXIT_OK if print_verify(path, audit_key_for_verify(env)) else EXIT_CONFIG
 
 
 def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None) -> int:
@@ -107,9 +142,7 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
             if not Path(args.path).exists():
                 print(f"no such file: {args.path}", file=sys.stderr)
                 return EXIT_USAGE
-            ok, n = verify(args.path)
-            print(f"audit verify: {'OK' if ok else 'FAILED'} ({n})")
-            return EXIT_OK if ok else EXIT_CONFIG
+            return _audit_verify(args.path, env)
         cfg = config_from_env(env, roster=args.roster, adapter=args.adapter, driver=args.driver)
         gw = build_gateway(cfg, env, getattr(args, "script", None))
         if args.cmd == "self-check":

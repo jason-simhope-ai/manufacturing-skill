@@ -22,6 +22,7 @@
 4a. Claude Code 內預覽：/team status → /team ask <twin> <問題>        # 只是預覽，不是控制邊界
 4b. 離線 demo：python3 infra/chat-gateway/demo.py
 4c. 聊天：PYTHONPATH=infra/chat-gateway python3 -m chat_gateway run --adapter mock --driver mock
+    # REPL 每行：<頻道> <使用者> @<分身> <訊息>；沒有 identities.json 時用合成使用者 mock-<職位 id>
 ```
 
 ## 4. 漸進揭露地圖

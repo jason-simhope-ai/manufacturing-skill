@@ -9,10 +9,13 @@ Pinned argv (never widened, never built from chat text):
 * The child environment is an allowlist: PATH, HOME, CLAUDE_CONFIG_DIR and
   ANTHROPIC_API_KEY (from `ANTHROPIC_API_KEY`, or `MFG_TEAM_ANTHROPIC_API_KEY` as an alias).
   Nothing else from the gateway's environment reaches the model process.
-* cwd is `team/.build/` (the parent of the compiled `twins/` directory that holds the prompt),
-  so the `ref/<kind>/<id>.md` index lines in the prompt (prompt.py, `_teamlib.REF_PREFIX`)
-  resolve to `team/.build/ref/<kind>/<id>.md`. The spec text says `team/.build/ref/`; that
-  would make `ref/...` resolve one level too deep, so the parent is used instead.
+* cwd is `team/.build/ref/` (spec §9.5), the sibling of the compiled `twins/` directory, and
+  the prompt's index lines read `<kind>/<id>.md` (`_teamlib.REF_PREFIX = ""`). `Read/Grep/Glob`
+  are confined to cwd (+ `--add-dir`), so `identities.json`, `bindings.json`, `roster.json`
+  and the other twins' prompts are out of reach. The driver refuses to run if any of those
+  appear under cwd.
+* The compiled prompt's bytes are re-hashed on every call and must equal the roster's
+  `promptSha` (passed as `TwinInvocation.prompt_sha`), so a post-start edit is refused.
 * The system prompt is the compiled twin prompt plus a short per-call runtime header
   (tier, effective autonomy, taint, predict-first), written to a 0600 temp file in the
   state dir and removed in `finally`. The user message and channel window go via stdin.
@@ -25,6 +28,7 @@ Stdlib only.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -71,6 +75,7 @@ REQUIRED_FLAGS: tuple[tuple[str, tuple[str, ...]], ...] = (
 KEY_VARS = ("ANTHROPIC_API_KEY", "MFG_TEAM_ANTHROPIC_API_KEY")
 ENV_PASSTHROUGH = ("PATH", "HOME")
 CHECK_TIMEOUT_S = 15
+FORBIDDEN_IN_CWD = frozenset({"identities.json", "bindings.json", "roster.json"})
 DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
 _FENCE = re.compile(r"^\s*```(?:json)?\s*\n(.*?)\n\s*```\s*$", re.DOTALL)
 
@@ -165,15 +170,25 @@ class ClaudeCodeDriver:
         prompt = Path(inv.prompt_path)
         if not prompt.is_file():
             raise DriverError("compiled prompt file missing")
-        cwd = prompt.resolve().parent.parent          # team/.build/
-        if not (cwd / "ref").is_dir():
+        cwd = prompt.resolve().parent.parent / "ref"          # team/.build/ref/
+        if not cwd.is_dir():
             raise DriverError("reference directory missing next to the compiled prompt")
+        exposed = [p for p in cwd.rglob("*") if p.name in FORBIDDEN_IN_CWD or p.name.endswith(".prompt.md")]
+        if exposed:
+            raise DriverError("refusing to run: the model's working directory contains roster, identity, "
+                              "binding or prompt files")
         return cwd
 
     def _system_prompt(self, inv: TwinInvocation) -> str:
         try:
-            base = Path(inv.prompt_path).read_text(encoding="utf-8")
+            data = Path(inv.prompt_path).read_bytes()
         except OSError:
+            raise DriverError("compiled prompt unreadable") from None
+        if inv.prompt_sha and "sha256:" + hashlib.sha256(data).hexdigest() != inv.prompt_sha:
+            raise DriverError("compiled prompt changed since load (promptSha mismatch)")
+        try:
+            base = data.decode("utf-8")
+        except UnicodeDecodeError:
             raise DriverError("compiled prompt unreadable") from None
         header = (f"## 本次呼叫\ntier={inv.tier} effectiveAutonomy={inv.effective_autonomy} "
                   f"tainted={'yes' if inv.tainted else 'no'} predictFirst={'yes' if inv.predict_first else 'no'}\n"

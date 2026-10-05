@@ -316,6 +316,11 @@ cases:
       team/roster.example.yaml: [['reviewedOn: "2026-09-20"', 'reviewedOn: "2026-9-1"']]
     args: [check, --ci]
     expect: { exit: 1, codes: [E005] }
+  - id: e005-invalid-calendar-date-no-traceback
+    replace:
+      team/roster.example.yaml: [['reviewedOn: "2026-09-20"', 'reviewedOn: 2026-02-30']]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E005] }
   - id: iso-date-normalised-ok
     replace:
       team/roster.example.yaml: [['reviewedOn: "2026-09-20"', 'reviewedOn: 2026-09-20']]
@@ -602,6 +607,23 @@ cases:
       team/twins/qa-manager.md: [["tierCeiling: T1", "tierCeiling: T3"]]
     args: [check]
     expect: { exit: 1, codes: [E043, W001] }
+  - id: e047-cloud-tier-ceiling-above-t1
+    replace:
+      team/roster.example.yaml: [["cloudTierCeiling: T1", "cloudTierCeiling: T2"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E047] }
+  - id: e047-cloud-tier-ceiling-t2-local-roster-too
+    copy:
+      team/local/roster.local.yaml: team/roster.example.yaml
+    replace:
+      team/local/roster.local.yaml: [["cloudTierCeiling: T1", "cloudTierCeiling: T2"]]
+    args: [check]
+    expect: { exit: 1, codes: [E047] }
+  - id: e047-saas-tier-ceiling-above-t1
+    replace:
+      team/roster.example.yaml: [["saasTierCeiling: T1", "saasTierCeiling: T2"]]
+    args: [check, --ci]
+    expect: { exit: 1, codes: [E047] }
   - id: e044-roster-ceiling-above-twin-file
     replace:
       team/twins/qa-manager.md: [["autonomyCeiling: draft\n", "autonomyCeiling: suggest\n"]]
@@ -730,6 +752,13 @@ cases:
     expect: { exit: 0, codes: [W007] }
 
   # ---- E060 .gitignore ----------------------------------------------------
+  - id: w008-local-roster-json-twin-entry-over-600-is-warning
+    copy:
+      team/local/roster.local.yaml: team/roster.example.yaml
+    replace:
+      team/twins/qa-manager.md: [["decisionRights:", "aliases: [@@GEN:ALIASES:40@@]\ndecisionRights:"]]
+    args: [check]
+    expect: { exit: 0, codes: [W008] }
   - id: e060-gitignore-missing-entry
     replace:
       .gitignore: [["logs/\n", ""]]
@@ -859,7 +888,7 @@ deid:
       customer,desc
       Foo Corp,此為機密圖面
     args: []
-    expect: { exit: 1, output: null, stdout: ["residual hits=1", "confidential-word"] }
+    expect: { exit: 1, output: null, stdout: ["residual hits=1", "confidential-zh"] }
   - id: residual-denylist-pattern-blocks-output
     denylist: "# project codes\nDWG-\\d+\n"
     input: |
@@ -872,13 +901,13 @@ deid:
       customer,desc
       Foo Corp,"id A123456789 paid NT$ 12,000"
     args: []
-    expect: { exit: 1, output: null, stdout: ["tw-national-id", "nt-amount"] }
+    expect: { exit: 1, output: null, stdout: ["tw-national-id", "amount-ntd"] }
   - id: residual-business-id-with-valid-checksum
     input: |
       customer,desc
       Foo Corp,tax id 10000004 on invoice
     args: []
-    expect: { exit: 1, output: null, stdout: ["tw-business-id"] }
+    expect: { exit: 1, output: null, stdout: ["tw-ubn"] }
   - id: eight-digit-number-with-bad-checksum-is-not-flagged
     input: |
       customer,desc
@@ -891,6 +920,59 @@ deid:
       Foo Corp,fine,此為機密
     args: ["--text", "desc"]
     expect: { exit: 0, output: "customer,desc,memo\nCUST-01,fine,此為機密\n" }
+  # ---- F02 fail-closed: the security reviewer's bypasses ----------------
+  - id: deid-whitespace-and-fullwidth-names-fold-to-one-id
+    input: "customer,desc\nAcme Precision,ok\nAcme  Precision,\"Acme   precision called\"\nＡＣＭＥ Precision,x\n"
+    args: []
+    expect:
+      exit: 0
+      output: "customer,desc\nCUST-01,ok\nCUST-01,CUST-01 called\nCUST-01,x\n"
+      stdout: ["customers replaced=3", "in-text=1", "residual hits=0"]
+  - id: deid-short-name-is-token-matched-not-substring
+    input: |
+      customer,desc
+      AB,ABOUT cable AB123 for AB today
+    args: []
+    expect:
+      exit: 0
+      output: "customer,desc\nCUST-01,ABOUT cable AB123 for CUST-01 today\n"
+  - id: deid-email-phone-landline-are-residual
+    input: |
+      customer,desc
+      Foo Corp,"mail wang@beta.com or call 0912 345 678 / (02) 2345-6789"
+    args: []
+    expect: { exit: 1, output: null, stdout: ["email", "tw-mobile", "tw-landline", "residual column 'desc'"] }
+  - id: deid-name-with-title-is-residual
+    input: |
+      customer,desc
+      Foo Corp,請王小明經理確認
+    args: []
+    expect: { exit: 1, output: null, stdout: ["name-with-title"] }
+  - id: deid-contact-and-ship-to-columns-are-residual
+    input: |
+      customer,ship_to,聯絡人,desc
+      Foo Corp,Beta Works,王小明,ok
+    args: []
+    expect: { exit: 1, output: null, stdout: ["column 'ship_to' matches contact-column", "column '聯絡人' matches contact-column"] }
+  - id: deid-contact-column-with-known-customer-is-ok
+    input: |
+      customer,ship_to,desc
+      Foo Corp,Foo Corp,ok
+    args: []
+    expect: { exit: 0, output: "customer,ship_to,desc\nCUST-01,CUST-01,ok\n" }
+  - id: deid-invisible-chars-do-not-hide-markers
+    input: "customer,desc\nFoo Corp,\"機\u00ad密 drawing, mail wang\u200b@beta.com\"\n"
+    args: []
+    expect: { exit: 1, output: null, stdout: ["confidential-zh", "email"] }
+  - id: deid-allow-residual-writes-and-still-reports
+    input: |
+      customer,desc
+      Foo Corp,call 0912-345-678
+    args: ["--allow-residual"]
+    expect:
+      exit: 0
+      output: "customer,desc\nCUST-01,call 0912-345-678\n"
+      stdout: ["residual hits=1", "tw-mobile", "WARNING --allow-residual"]
   - id: missing-input-file-is-usage-error
     input: null
     args: []

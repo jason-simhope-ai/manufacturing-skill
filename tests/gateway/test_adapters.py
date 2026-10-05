@@ -11,7 +11,6 @@ Usage:
 """
 from __future__ import annotations
 
-import datetime as dt
 import inspect
 import json
 import shutil
@@ -31,7 +30,6 @@ from chat_gateway import ConfigRefused  # noqa: E402
 from chat_gateway.adapters import load_adapter_class  # noqa: E402
 from chat_gateway_ext import discord as dmod  # noqa: E402
 from chat_gateway_ext import slack as smod  # noqa: E402
-from chat_gateway_ext._saas import RISK_FLAG_VAR  # noqa: E402
 from chat_gateway.adapters.base import ApprovalCard, ApprovalClick, InboundMessage, Reply  # noqa: E402
 from chat_gateway.audit import AuditLog  # noqa: E402
 from chat_gateway.core import Gateway, load_roster  # noqa: E402
@@ -53,15 +51,6 @@ D_BOT, D_CH, D_GUILD, D_USER, D_THREAD = (snowflake(i) for i in (1, 2, 3, 4, 5))
 APV, NONCE = "apv-0a1b2c3d", "0123456789abcdef0123456789abcdef"
 SLACK_BINDINGS = {"schema": 1, "channels": {"qa-floor": {"platform": "slack", "ref": SLACK_CH}}}
 DISCORD_BINDINGS = {"schema": 1, "channels": {"qa-floor": {"platform": "discord", "ref": D_CH}}}
-
-
-def risk_block(**over) -> dict:
-    today = dt.date.today()
-    block = {"platform": "slack", "maxTier": "T2", "acceptedBy": "qa-manager",
-             "acceptedOn": (today - dt.timedelta(days=1)).isoformat(),
-             "expiresOn": (today + dt.timedelta(days=90)).isoformat(), "reference": "RISK-0001"}
-    block.update(over)
-    return block
 
 
 class FakeTransport:
@@ -300,33 +289,18 @@ class TestConstruction(unittest.TestCase):
     def test_default_tiers(self):
         self.assertEqual(slack_adapter().max_tier, "T1")
         self.assertEqual(discord_adapter().max_tier, "T1")
-        with_block = {**SLACK_BINDINGS, "riskAcceptance": risk_block()}
-        self.assertEqual(slack_adapter(bindings=with_block).max_tier, "T1")   # block alone never raises
 
-    def test_slack_t2_needs_flag_and_block(self):
-        env = {**SLACK_ENV, RISK_FLAG_VAR: "1"}
-        self.assertEqual(slack_adapter(bindings={**SLACK_BINDINGS, "riskAcceptance": risk_block()}, env=env).max_tier,
-                         "T2")
-        today = dt.date.today()
-        bad_blocks = [None, {}, risk_block(maxTier="T3"), risk_block(platform="discord"),
-                      risk_block(acceptedBy=""), risk_block(expiresOn=(today - dt.timedelta(days=1)).isoformat()),
-                      risk_block(acceptedOn=(today + dt.timedelta(days=2)).isoformat()),
-                      risk_block(expiresOn=(today + dt.timedelta(days=400)).isoformat()), risk_block(acceptedOn="soon")]
-        for block in bad_blocks:
-            b = dict(SLACK_BINDINGS) if block is None else {**SLACK_BINDINGS, "riskAcceptance": block}
-            with self.assertRaises(ConfigRefused, msg=block) as cm:
-                slack_adapter(bindings=b, env=env)
+    def test_saas_is_t1_hard_and_risk_block_refused(self):
+        """Alpha: no Slack-T2 path; a leftover riskAcceptance block (or env flag) never raises the tier."""
+        block = {"platform": "slack", "maxTier": "T2", "acceptedBy": "qa-manager", "acceptedOn": "2026-10-01",
+                 "expiresOn": "2026-12-01", "reference": "RISK-0001"}
+        for make, bindings, env in ((slack_adapter, SLACK_BINDINGS, SLACK_ENV),
+                                    (discord_adapter, DISCORD_BINDINGS, DISCORD_ENV)):
+            with self.assertRaises(ConfigRefused) as cm:
+                make(bindings={**bindings, "riskAcceptance": block})
             self.assertEqual(cm.exception.exit, 78)
-        for flag in ("yes", "true", "2"):
-            with self.assertRaises(ConfigRefused):
-                slack_adapter(env={**SLACK_ENV, RISK_FLAG_VAR: flag})
-
-    def test_discord_never_above_t1(self):
-        for env in (DISCORD_ENV, {**DISCORD_ENV, RISK_FLAG_VAR: "1"}):
-            with self.assertRaises(ConfigRefused):
-                discord_adapter(bindings={**DISCORD_BINDINGS, "riskAcceptance": risk_block(platform="discord")},
-                                env=env)
-        self.assertEqual(discord_adapter(env={**DISCORD_ENV, RISK_FLAG_VAR: "1"}).max_tier, "T1")
+            self.assertIn("T1", str(cm.exception))
+            self.assertEqual(make(env={**env, "MFG_TEAM_SLACK_T2_RISK_ACCEPTED": "1"}).max_tier, "T1")
 
     def test_missing_secrets_refused_without_values(self):
         for make, env, names in ((slack_adapter, {}, list(SLACK_ENV)), (discord_adapter, {}, [dmod.TOKEN_VAR]),
@@ -484,15 +458,6 @@ class TestGatewayEndToEnd(unittest.TestCase):
         with self.assertRaises(ConfigRefused) as cm:
             self.gateway("slack", a, tier="T2")
         self.assertIn("max T1", str(cm.exception))
-
-    def test_slack_t2_still_capped_by_roster_saas_ceiling(self):
-        env = {**SLACK_ENV, RISK_FLAG_VAR: "1"}
-        a = smod.SlackAdapter(bindings={**SLACK_BINDINGS, "riskAcceptance": risk_block()},
-                              transport=FakeTransport(SLACK_BOT), env=env)
-        self.assertEqual(a.max_tier, "T2")
-        with self.assertRaises(ConfigRefused) as cm:
-            self.gateway("slack", a, tier="T2")
-        self.assertIn("saasTierCeiling", str(cm.exception))
 
 
 if __name__ == "__main__":

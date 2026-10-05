@@ -11,6 +11,7 @@ Layers:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import tempfile
@@ -192,7 +193,9 @@ class RealExampleAcceptance(unittest.TestCase):
                     "ref/hooks/on-error.md", "ref/agents/quality-inspector.md"):
             self.assertIn(rel, c.files)
         qa = c.files["twins/qa-manager.prompt.md"].decode("utf-8")
-        self.assertIn("ref/skills/spc-basics.md — ", qa)
+        # index lines are relative to team/.build/ref/ (the driver's cwd): no `ref/` prefix
+        self.assertIn("\nskills/spc-basics.md — ", qa)
+        self.assertNotIn("ref/skills/", qa)
 
     def test_engineering_twin_compiles_within_budget_when_enabled(self):
         """Wave 1b: enabling engineering-manager must still fit 12,000 B."""
@@ -221,6 +224,7 @@ class RealExampleAcceptance(unittest.TestCase):
             self.assertLessEqual(len(text.encode()), 12000)
             self.assertIn("ref/agents/engineering-change-manager.md",
                           "".join(c.files))
+            self.assertNotIn("ref/agents/", text)   # cwd-relative index lines only
 
     def test_source_hash_changes_with_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -438,10 +442,11 @@ class LoaderAndHelpers(unittest.TestCase):
                        "E012", "E013", "E014", "E020", "E021", "E022", "E023",
                        "E024", "E030", "E031", "E032", "E033", "E034", "E035",
                        "E036", "E037", "E038", "E039", "E040", "E041", "E042",
-                       "E043", "E044", "E045", "E046", "E050", "E051", "E060"}
+                       "E043", "E044", "E045", "E046", "E047", "E050", "E051",
+                       "E060"}
         self.assertEqual({c for c in lib.CODES if c[0] == "E"}, spec_errors)
         self.assertEqual({c for c in lib.CODES if c[0] == "W"},
-                         {f"W00{i}" for i in range(1, 8)})
+                         {f"W00{i}" for i in range(1, 9)})
 
     def test_finding_render_is_ci_annotation(self):
         f = lib.Finding("E012", "error", "team/x.md", "line 3: x")
@@ -473,6 +478,18 @@ class DeidUnit(unittest.TestCase):
         self.assertEqual(residual, [])
         self.assertEqual(mapping, {"Alpha Co": "CUST-01", "Beta Co": "CUST-02"})
 
+    def test_outputs_are_private_and_names_fold(self):
+        import stat
+        with tempfile.TemporaryDirectory() as tmp:
+            src, out = Path(tmp) / "in.csv", Path(tmp) / "o.csv"
+            mp = Path(tmp) / "deid-map.local.yaml"
+            src.write_text("customer,desc\nＡＣＭＥ  Co,ok\n", encoding="utf-8")
+            self.assertEqual(deid.main(["--in", str(src), "--out", str(out),
+                                        "--map", str(mp)]), 0)
+            for f in (out, mp):
+                self.assertEqual(stat.S_IMODE(f.stat().st_mode), 0o600, f)
+            self.assertIn("ACME Co: CUST-01", mp.read_text(encoding="utf-8"))
+
     def test_unsafe_map_path_is_exit_2(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = Path(tmp) / "in.csv"
@@ -501,11 +518,33 @@ class CliExitCodes(unittest.TestCase):
             log = audit.AuditLog(tmp, b"k" * 32)
             log.append(action="msg_in", event_id="e1")
             log.append(action="msg_out", event_id="e1")
-            self.assertEqual(teamctl.main(["audit-verify", tmp]), 0)
+            from unittest import mock
+            import io
+            from contextlib import redirect_stderr, redirect_stdout
+            with mock.patch.dict(os.environ, {"MFG_TEAM_AUDIT_HMAC_KEY": "k" * 32}), \
+                    redirect_stdout(io.StringIO()):
+                self.assertEqual(teamctl.main(["audit-verify", tmp]), 0)
+            # without the key (demo key fallback) the keyed chain does not verify
+            env = {k: v for k, v in os.environ.items() if k != "MFG_TEAM_AUDIT_HMAC_KEY"}
+            with mock.patch.dict(os.environ, env, clear=True), \
+                    redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(teamctl.main(["audit-verify", tmp]), 1)
             f = next(Path(tmp).glob("*/audit.jsonl"))
-            f.write_text(f.read_text(encoding="utf-8").replace(
-                "msg_out", "msg_oXt"), encoding="utf-8")
-            self.assertEqual(teamctl.main(["audit-verify", str(f)]), 1)
+            lines = f.read_text(encoding="utf-8").splitlines()
+            with mock.patch.dict(os.environ, {"MFG_TEAM_AUDIT_HMAC_KEY": "k" * 32}), \
+                    redirect_stdout(io.StringIO()) as buf:
+                f.write_text(lines[0] + "\n", encoding="utf-8")       # tail truncated
+                self.assertEqual(teamctl.main(["audit-verify", tmp]), 1)
+                f.write_text("[]\n" + "\n".join(lines) + "\n", encoding="utf-8")
+                self.assertEqual(teamctl.main(["audit-verify", str(f)]), 1)
+            self.assertIn("not a JSON object", buf.getvalue())
+
+    def test_invalid_calendar_date_is_e005_not_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "r.yaml"
+            p.write_text("schema: 1\nreviewedOn: 2026-02-30\n", encoding="utf-8")
+            self.assertEqual(lib.load_roster(p)["reviewedOn"], "2026-02-30")
+            self.assertFalse(lib._valid_date("2026-02-30"))
 
     def test_check_unknown_roster_is_io_error(self):
         self.assertEqual(teamctl.main(["check", "--roster", "/no/such.yaml"]), 2)

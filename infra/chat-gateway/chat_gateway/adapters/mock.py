@@ -126,5 +126,9 @@ class MockAdapter:
                        + "".join(f"    {l}\n" for l in card.lines))
         return f"mock-card-{len(self.posted)}"
 
+    def notice_dropped(self, action: str, reason: str, seq: int) -> None:
+        """Mock only: say why nothing was posted (real adapters stay silent on denials)."""
+        self.out.write(f"  (no reply: {action} {reason} · audit #{seq})\n")
+
     def close(self) -> None:
         self.out.flush()

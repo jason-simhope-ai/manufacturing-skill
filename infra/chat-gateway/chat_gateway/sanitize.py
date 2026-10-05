@@ -8,26 +8,51 @@ from __future__ import annotations
 import re
 import secrets
 import unicodedata
+from pathlib import Path
 from typing import Callable, Iterable
 
 from . import tier_rank
 from .patterns import DLP_PATTERNS, DLP_TIERS, GENERIC_SECRET, SECRET_PATTERNS, valid_ubn
 
 # ── inbound normalisation ────────────────────────────────────────────
-_INVISIBLE = re.compile(
-    "[​-‏⁠﻿‪-‮⁦-⁩\U000e0000-\U000e007f]"
+# Invisible / format characters that can split a marker ("機\u00ad密") without being
+# seen. Every Unicode category-Cf character (zero-width, bidi controls, soft hyphen,
+# U+2060–2064, U+180E, tags U+E0000–E007F, …) is removed, plus these non-Cf ones:
+# combining grapheme joiner, variation selectors, Mongolian FVS, Hangul fillers.
+_INVISIBLE_EXTRA = re.compile(
+    "[\u034f\u115f\u1160\u180b-\u180d\u3164\ufe00-\ufe0f\uffa0\U000e0100-\U000e01ef]"
 )
 _HTML_COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.DOTALL)
 
 
-def normalize(text: str) -> str:
-    """Drop zero-width, bidi-control, Unicode-tag characters and HTML comments."""
-    return _HTML_COMMENT.sub("", _INVISIBLE.sub("", text))
+def strip_invisible(text: str) -> str:
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return _INVISIBLE_EXTRA.sub("", text)
+
+
+def sanitize_for_model(text: str) -> str:
+    """Text actually sent to the driver and echoed in replies: drop only format /
+    zero-width / bidi / tag / CGJ / variation-selector / Hangul-filler characters and
+    HTML comments (hidden content). No NFKC, so zh-TW full-width punctuation stays."""
+    return _HTML_COMMENT.sub("", strip_invisible(text))
+
+
+_SPACES = re.compile(r"\s+")
+
+
+def normalize_for_match(text: str) -> str:
+    """Detection view for DLP, tripwires, the denylist and @-mention parsing:
+    sanitize_for_model + NFKC + whitespace runs folded to one space."""
+    text = unicodedata.normalize("NFKC", sanitize_for_model(text))
+    return _SPACES.sub(" ", strip_invisible(text))
+
+
+normalize = normalize_for_match      # backwards-compatible name (detection view)
 
 
 def _fold(text: str) -> str:
-    """Detection-only view: NFKC + casefold so full-width tricks still trip."""
-    return unicodedata.normalize("NFKC", text).casefold()
+    """Detection-only view: normalize_for_match + casefold."""
+    return normalize_for_match(text).casefold()
 
 
 # ── UNTRUSTED envelopes ──────────────────────────────────────────────
@@ -35,8 +60,10 @@ _BOUNDARY = re.compile(r"<<\s*/?\s*UNTRUSTED[^>]*>>", re.IGNORECASE)
 
 
 def strip_envelopes(text: str) -> tuple[str, int]:
-    """Remove forged envelope boundaries; returns (clean_text, n_removed)."""
-    return _BOUNDARY.subn("", text)
+    """Remove forged envelope boundaries; returns (clean_text, n_removed). Full-width
+    look-alikes (＜＜UNTRUSTED…＞＞) are counted via the match view so they still flag."""
+    clean, n = _BOUNDARY.subn("", text)
+    return clean, n or len(_BOUNDARY.findall(normalize_for_match(clean)))
 
 
 def wrap_untrusted(text: str, source: str, nonce: str | None = None) -> str:
@@ -109,18 +136,42 @@ def tripwire(text: str) -> bool:
 
 
 # ── DLP ──────────────────────────────────────────────────────────────
+_WORD_MARKERS = frozenset({"confidential-zh", "restricted-zh", "defense-zh", "confidential-en", "restricted-en"})
+_WS = re.compile(r"\s+")
+
+
 def dlp_hits(text: str, extra: Iterable[tuple[str, re.Pattern]] = ()) -> list[tuple[str, str]]:
-    """[(pattern_name, tier)] for every DLP hit. `extra` = local denylist (tier T2)."""
-    folded = unicodedata.normalize("NFKC", text)
+    """[(pattern_name, tier)] for every DLP hit. `extra` = local denylist (tier T2).
+
+    Scans the normalized text; word markers and the denylist are also matched on a
+    whitespace-free copy so "機 密" or "DWG- 123" still trip."""
+    folded = normalize_for_match(text)
+    squeezed = _WS.sub("", folded)
     hits = []
     for name, pat in DLP_PATTERNS:
-        for m in pat.finditer(folded):
-            if name == "tw-ubn" and not valid_ubn(m.group(0)):
-                continue
-            hits.append((name, DLP_TIERS[name]))
-            break
-    hits.extend((name, "T2") for name, pat in extra if pat.search(folded))
+        views = (folded, squeezed) if name in _WORD_MARKERS else (folded,)
+        for view in views:
+            m = next((m for m in pat.finditer(view) if name != "tw-ubn" or valid_ubn(m.group(0))), None)
+            if m:
+                hits.append((name, DLP_TIERS[name]))
+                break
+    hits.extend((name, "T2") for name, pat in extra if pat.search(folded) or pat.search(squeezed))
     return hits
+
+
+def load_denylist(path: str | Path) -> list[tuple[str, re.Pattern]]:
+    """Local denylist (`team/local/names.denylist`): one regex per line, `#` comments.
+    Raises ValueError naming the line number only (never the line's content)."""
+    pats: list[tuple[str, re.Pattern]] = []
+    for n, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        try:
+            pats.append((f"denylist:{n}", re.compile(unicodedata.normalize("NFKC", s))))
+        except re.error:
+            raise ValueError(f"denylist line {n}: bad regex") from None
+    return pats
 
 
 def dlp_tier(text: str, extra: Iterable[tuple[str, re.Pattern]] = ()) -> str | None:
@@ -138,8 +189,10 @@ _MASS_MENTION = re.compile(r"@(everyone|here|channel)\b|<!(channel|here|everyone
 MAX_REPLY_CHARS = 3000
 
 
-def filter_output(text: str, channel_tier: str) -> tuple[str, dict]:
-    """Strip URLs/images → neutralise mass mentions → mask secrets → tier block → cap length."""
+def filter_output(text: str, channel_tier: str,
+                  extra: Iterable[tuple[str, re.Pattern]] = ()) -> tuple[str, dict]:
+    """Strip URLs/images → neutralise mass mentions → mask secrets → tier block → cap length.
+    `extra` = local denylist (tier T2), same as inbound DLP."""
     stats = {"urls": 0, "mentions": 0, "secret": 0, "blocked": None, "truncated": False}
     text, n1 = _MD_IMAGE.subn("[圖片已移除]", text)
     text, n2 = _MD_LINK.subn(lambda m: m.group(1), text)
@@ -151,7 +204,7 @@ def filter_output(text: str, channel_tier: str) -> tuple[str, dict]:
     for name, pat in [*SECRET_PATTERNS, GENERIC_SECRET]:
         text, n = pat.subn(f"[REDACTED:{name}]", text)
         stats["secret"] += n
-    tier = dlp_tier(text)
+    tier = dlp_tier(text, extra)
     if tier and tier_rank(tier) > tier_rank(channel_tier):
         stats["blocked"] = tier
     if len(text) > MAX_REPLY_CHARS:

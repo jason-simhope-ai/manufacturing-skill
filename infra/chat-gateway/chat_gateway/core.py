@@ -29,7 +29,7 @@ from . import sanitize
 from .adapters.base import (ApprovalCard, ApprovalClick, ChatAdapter, Event, InboundMessage,
                             Reply, ScheduledPost)
 from .approvals import ApprovalBook, Executor, NoopExecutor, args_hash
-from .audit import AuditLog, content_sha256
+from .audit import AuditLog
 from .drivers.base import DriverError, HarnessDriver, TwinInvocation, TwinResult
 from .formatter import format_reply, notice
 from .patterns import find_secrets
@@ -38,12 +38,13 @@ from .prompt import PROMPT_BUDGET_BYTES
 __all__ = [
     "ApprovalCard", "ApprovalClick", "ConfigRefused", "Event", "Gateway", "InboundMessage",
     "Reply", "ScheduledPost", "TwinInvocation", "TwinResult", "effective_autonomy",
-    "load_roster", "validate_roster", "RateLimiter",
+    "load_roster", "validate_roster", "RateLimiter", "synthetic_mock_identities",
 ]
 
 MAX_CONFIG_BYTES = 1_000_000
 TIER_CAP = {"T0": "act", "T1": "act", "T2": "act-with-approval", "T3": "draft"}
 LOCAL_DRIVERS = frozenset({"mock"})
+ALPHA_MAX_OFFPREM_TIER = "T1"     # SaaS chat platforms and cloud models: T1 at most in alpha
 T3_DOC = "docs/superpowers/specs/2026-10-05-digital-twin-team-design.md §11.2"
 T3_REPLY = "此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理"
 _TEXT_APPROVAL = re.compile(r"^\s*(?:核准|批准|同意|approved?|lgtm)\s*[。.!！]?\s*$", re.IGNORECASE)
@@ -101,6 +102,9 @@ def validate_roster(roster: dict, base_dir: Path) -> dict:
     _need(isinstance(policy, dict), "roster.policy missing")
     for key in ("saasTierCeiling", "cloudTierCeiling"):
         _need(policy.get(key) in TIERS, f"policy.{key} must be a tier")
+        # Alpha hard cap (§11.1): SaaS chat and cloud models never see T2+ (lint E047 too).
+        _need(tier_rank(policy[key]) <= tier_rank(ALPHA_MAX_OFFPREM_TIER),
+              f"policy.{key} {policy[key]} is above {ALPHA_MAX_OFFPREM_TIER}; refused in alpha")
     window = policy.get("channelWindow", 10)
     _need(isinstance(window, int) and 1 <= window <= 20, "policy.channelWindow must be 1–20")
 
@@ -151,6 +155,19 @@ def validate_roster(roster: dict, base_dir: Path) -> dict:
     out = dict(roster)
     out["_prompts"] = prompts
     return out
+
+
+def synthetic_mock_identities(roster: dict) -> dict:
+    """Mock-only fallback when no identities.json was built (example roster): one
+    synthetic user `mock-<position>` per position the roster's channels name."""
+    positions: set[str] = set()
+    for c in roster.get("channels") or []:
+        for key in ("askers", "approvers", "requesters"):
+            if isinstance(c.get(key), list):
+                positions.update(str(x) for x in c[key])
+    positions.update(str(t.get("id")) for t in roster.get("twins") or [] if t.get("id"))
+    return {"synthetic": True, "users": [{"platform": "mock", "userId": f"mock-{p}", "positions": [p]}
+                                         for p in sorted(positions)]}
 
 
 # ── autonomy ─────────────────────────────────────────────────────────
@@ -254,7 +271,7 @@ class Gateway:
         self.aliases: dict[str, str] = {}
         for t in roster["twins"]:
             for name in [t["id"], t["title"], *t.get("aliases", [])]:
-                self.aliases[name] = t["id"]
+                self.aliases[sanitize.normalize_for_match(name)] = t["id"]
         self.channels = {c["id"]: c for c in roster["channels"] if c.get("adapter") == adapter.name}
         bindings = (roster.get("_bindings") or {}).get("channels", {})
         self._chan_by_ref = {(b["platform"], b["ref"]): cid for cid, b in bindings.items() if cid in self.channels}
@@ -272,6 +289,7 @@ class Gateway:
         self._rl_noticed: dict[str, float] = {}
         self._failures: dict[str, int] = {}
         self._spend: dict[tuple[str, str], float] = {}
+        self.last_deny: tuple[str, str, int] | None = None
         self._startup_checks()
 
     # ── startup ──
@@ -306,7 +324,7 @@ class Gateway:
         text = text_for_seq(seq)
         tier = ctx.tier or "sys"
         got = self._audit("msg_out", ctx, twin=twin_id or None, decision=kw.pop("decision", "allow"),
-                          content_sha256=content_sha256(text),
+                          content_sha256=self.audit.content_tag(text),
                           content_len=None if tier in ("T2", "T3") else len(text), **kw)
         if got != seq:
             raise RuntimeError("audit seq raced")
@@ -317,7 +335,8 @@ class Gateway:
         return self._say(ctx, twin_id, lambda seq: notice(title, text, seq), **kw)
 
     def _deny(self, ctx: _Ctx, reason: str, action: str = "policy_denied", **kw) -> list:
-        self._audit(action, ctx, decision="deny", deny_reason=reason, **kw)
+        seq = self._audit(action, ctx, decision="deny", deny_reason=reason, **kw)
+        self.last_deny = (action, reason, seq)
         return []
 
     def _is_replay(self, event_id: str, now: float) -> bool:
@@ -365,8 +384,13 @@ class Gateway:
         try:
             for ev in self.adapter.events():
                 n += 1
-                for out in self.handle(ev):
+                self.last_deny = None
+                outs = self.handle(ev)
+                for out in outs:
                     (self.adapter.post_approval if isinstance(out, ApprovalCard) else self.adapter.post)(out)
+                dropped = getattr(self.adapter, "notice_dropped", None)   # mock REPL only: never silent
+                if not outs and self.last_deny and callable(dropped):
+                    dropped(*self.last_deny)
                 if pace:
                     time.sleep(pace)
         finally:
@@ -392,8 +416,8 @@ class Gateway:
             return self._deny(ctx, "no_mention")
         if not self._identify(ctx, ev.platform, ev.user_ref, now):
             return self._deny(ctx, "unknown_identity")
-        text = sanitize.normalize(ev.text)
-        self._audit("msg_in", ctx, content_sha256=content_sha256(text),
+        text = sanitize.sanitize_for_model(ev.text)      # no NFKC: full-width punctuation kept
+        self._audit("msg_in", ctx, content_sha256=self.audit.content_tag(text),
                     content_len=None if tier_rank(ctx.tier) >= 2 else len(text))
         ukey = f"{ev.platform}:{ev.user_ref}"
         ok_u, ok_c = self.user_rl.check(ukey, now), self.channel_rl.check(cid, now)
@@ -408,7 +432,7 @@ class Gateway:
         self.channel_rl.hit(cid, now)
 
         head, rest = (text.strip().split(None, 1) + [""])[:2] if text.strip() else ("", "")
-        twin_id = self.aliases.get(head.lstrip("@＠"))
+        twin_id = self.aliases.get(sanitize.normalize_for_match(head).lstrip("@"))
         if twin_id is None:
             twin_id, rest = channel["defaultTwin"], text.strip()
         rest = rest.strip()
@@ -421,7 +445,7 @@ class Gateway:
         if askers != "members" and not set(ctx.positions) & set(askers):
             self._deny(ctx, "not_asker", twin=twin_id)
             return [self._notice(ctx, twin_id, "你的職位不在本頻道的提問名單，分身不回答", decision="deny")]
-        if _TEXT_APPROVAL.match(rest):
+        if _TEXT_APPROVAL.match(sanitize.normalize_for_match(rest)):
             self._deny(ctx, "text_approval", twin=twin_id)
             return [self._notice(ctx, twin_id, "聊天文字不能核准任何事；核准只接受核准卡上的按鈕點擊",
                                  decision="deny")]
@@ -473,13 +497,16 @@ class Gateway:
         if self.daily_budget_usd is not None and self._spend.get((tid, day), 0.0) >= self.daily_budget_usd:
             self._deny(ctx, "daily_budget", twin=tid)
             return [self._notice(ctx, tid, "今日預算已用完，明天再問", decision="deny")]
+        common = dict(twin=tid, twin_prompt_sha=twin.get("promptSha"), capability=cap["id"],
+                      category=cap.get("category"), effective_autonomy=level, tainted=tainted)
+        if not self._prompt_intact(tid, twin.get("promptSha")):
+            self._audit("driver_error", ctx, decision="deny", deny_reason="prompt_sha_mismatch", **common)
+            return [self._notice(ctx, tid, "暫時無法回應", decision="deny")]
         inv = TwinInvocation(
-            twin_id=tid, prompt_path=self.prompts.get(tid, ""), user_text=user_text,
+            twin_id=tid, prompt_path=self.prompts.get(tid, ""), user_text=user_text, prompt_sha=twin.get("promptSha"),
             channel_window=tuple(dict(e) for e in window), tier=channel["tier"], effective_autonomy=level,
             tools=tools_for(level, tainted), read_roots=self.read_roots, tainted=tainted,
             predict_first=predict_first, timeout_s=self.timeout_s, max_budget_usd=self.max_budget_usd)
-        common = dict(twin=tid, twin_prompt_sha=twin.get("promptSha"), capability=cap["id"],
-                      category=cap.get("category"), effective_autonomy=level, tainted=tainted)
         started = time.perf_counter()
         try:
             result = self.driver.run(inv)
@@ -501,7 +528,8 @@ class Gateway:
         seq = self.audit.next_seq
         text, stats = sanitize.filter_output(format_reply(
             twin["title"], level, result, category=cap.get("category"), seq=seq, tainted=tainted,
-            add_generic_decision=add_generic, suggest_title=self.twins[sugg]["title"] if sugg else None), ctx.tier)
+            add_generic_decision=add_generic, suggest_title=self.twins[sugg]["title"] if sugg else None), ctx.tier,
+            self.extra_dlp)
         if stats["blocked"]:
             self._audit("dlp_blocked", ctx, decision="deny", deny_reason=f"output:{stats['blocked']}", **common)
             text = None
@@ -517,8 +545,21 @@ class Gateway:
             reply = self._say(ctx, tid, lambda s: text, usage=usage, latency_ms=latency, redactions=redactions,
                               **{k: v for k, v in common.items() if k != "twin"})
         window.append({"role": "user", "text": user_text, "tainted": own_taint})
-        window.append({"role": "twin", "twin": tid, "text": reply.text, "tainted": tainted})
+        # The reply carries only this turn's own taint, so a taint leaves the channel once the
+        # offending message rolls out of the window (it does not re-infect every later reply).
+        window.append({"role": "twin", "twin": tid, "text": reply.text, "tainted": own_taint})
         return [reply]
+
+    def _prompt_intact(self, tid: str, want: str | None) -> bool:
+        """Re-hash the compiled prompt on every invocation (it was pinned at load)."""
+        path = self.prompts.get(tid)
+        if not path or not want:
+            return False
+        try:
+            data = Path(path).read_bytes()
+        except OSError:
+            return False
+        return "sha256:" + hashlib.sha256(data).hexdigest() == want
 
     def _validate(self, ctx: _Ctx, r: TwinResult, common: dict) -> tuple[TwinResult, list[str]]:
         fixes: list[str] = []

@@ -3,15 +3,13 @@
 NOT exercised against the real platforms in CI; the real adapters need credentials.
 
 * Secrets come only from the environment; refusals name the variable, never its value.
-* `max_tier` is T1. Slack may run at T2 only with `MFG_TEAM_SLACK_T2_RISK_ACCEPTED=1`
-  AND a valid `riskAcceptance` block in bindings.json (spec §11.1 / §14); Discord never.
+* `max_tier` is T1 for every SaaS adapter, hard (spec §11.1; T2 on SaaS is deferred, §14).
 * Events reach the adapter through a `transport` (real SDK wrapper, or a test fake):
   `listen(sink)` delivers raw platform dicts to `sink` (None = disconnected),
   `send(kind, payload) -> str`, `identity() -> str` (bot user id), `close()`.
 """
 from __future__ import annotations
 
-import datetime as _dt
 import os
 import queue
 import re
@@ -22,9 +20,6 @@ from chat_gateway import ConfigRefused
 from chat_gateway.adapters.base import ApprovalCard, Event, Reply
 
 PIP_HINT = "pip install -r infra/chat-gateway/requirements-optional.txt"
-RISK_FLAG_VAR = "MFG_TEAM_SLACK_T2_RISK_ACCEPTED"
-RISK_FIELDS = ("platform", "maxTier", "acceptedBy", "acceptedOn", "expiresOn", "reference")
-RISK_MAX_DAYS = 365
 APPROVAL_ID_RE = re.compile(r"^apv-[0-9a-f]{4,32}$")
 NONCE_RE = re.compile(r"^[0-9a-f]{16,64}$")
 DECISIONS = ("approve", "deny")
@@ -44,38 +39,12 @@ def sdk_missing(adapter: str, module: str) -> ConfigRefused:
                          f"installed; run: {PIP_HINT}")
 
 
-def _date(value: object, where: str) -> _dt.date:
-    try:
-        return _dt.date.fromisoformat(str(value))
-    except ValueError:
-        raise ConfigRefused(f"bindings.riskAcceptance.{where} must be YYYY-MM-DD") from None
-
-
-def resolve_max_tier(platform: str, bindings: Mapping[str, Any], env: Mapping[str, str],
-                     today: _dt.date | None = None) -> str:
-    """T1 by default. T2 only for slack, only with the env flag AND a valid, current block."""
-    flag = env.get(RISK_FLAG_VAR, "")
-    if flag not in ("", "0", "1"):
-        raise ConfigRefused(f"{RISK_FLAG_VAR} must be 0 or 1")
-    block = bindings.get("riskAcceptance")
-    if platform != "slack":
-        if block is not None:
-            raise ConfigRefused(f"bindings.riskAcceptance is not accepted for {platform}: max tier is T1")
-        return "T1"
-    if flag != "1":
-        return "T1"                       # a block alone never raises the tier
-    if not isinstance(block, dict):
-        raise ConfigRefused(f"{RISK_FLAG_VAR}=1 but bindings.json has no riskAcceptance block")
-    missing = [k for k in RISK_FIELDS if not isinstance(block.get(k), str) or not block[k].strip()]
-    if missing:
-        raise ConfigRefused("bindings.riskAcceptance missing fields: " + ", ".join(missing))
-    if block["platform"] != "slack" or block["maxTier"] != "T2":
-        raise ConfigRefused("bindings.riskAcceptance must say platform: slack, maxTier: T2")
-    today = today or _dt.date.today()
-    start, end = _date(block["acceptedOn"], "acceptedOn"), _date(block["expiresOn"], "expiresOn")
-    if not start <= today < end or (end - start).days > RISK_MAX_DAYS:
-        raise ConfigRefused(f"bindings.riskAcceptance is not current (valid ≤ {RISK_MAX_DAYS} days)")
-    return "T2"
+def check_bindings_tier(platform: str, bindings: Mapping[str, Any]) -> None:
+    """Alpha caps every SaaS chat adapter at T1 (spec §11.1; T2-on-SaaS deferred to §14).
+    A leftover `riskAcceptance` block is refused rather than silently ignored."""
+    if isinstance(bindings, Mapping) and "riskAcceptance" in bindings:
+        raise ConfigRefused(f"bindings.riskAcceptance is not supported: {platform} is capped at T1 in alpha "
+                            "(T2 on SaaS chat is deferred, spec §14)")
 
 
 def bound_refs(bindings: Mapping[str, Any], platform: str) -> frozenset[str]:
@@ -105,7 +74,7 @@ class SaasAdapterBase:
 
     def __init__(self, bindings: Mapping[str, Any], transport: Any, *, env: Mapping[str, str] | None = None):
         env = os.environ if env is None else env
-        self.max_tier = resolve_max_tier(self.name, bindings or {}, env)
+        check_bindings_tier(self.name, bindings or {})
         self.refs = bound_refs(bindings or {}, self.name)
         self._secrets = require_env(env, *self.SECRET_VARS)  # type: ignore[attr-defined]
         self._transport = transport if transport is not None else self._real_transport()
