@@ -23,7 +23,7 @@
 
 | # | 標準 | 驗收方式 |
 | - | ---- | -------- |
-| A1 | 安裝成功，且 `claude plugin list` 顯示 plugin 已載入 | 現場執行並截圖。**前提**：使用含載入修正的版本（`plugin-layout-loadable` †）；舊版安裝訊息成功但 Claude Code 什麼都沒載入 |
+| A1 | 安裝成功，且 `claude plugin list` 顯示 plugin 已載入 | 現場執行並截圖。**前提**：以 `claude plugin list` 的實際輸出為準；安裝訊息顯示成功但 Claude Code 什麼都沒載入的版本不算通過 |
 | A2 | `/quote` 以 `examples/` 合成資料跑出結構化報價，假設有標註 | 現場 demo；**只用合成資料** |
 | A3 | N 個職位各有一份閘門紀錄（結果、理由、日期、複審日） | 書面 |
 | A4 | pilot 每週記錄三項指標：人修改結論的比例、人先寫（如 D4）的比例、review 出席率，連續 N 週 | 每週記錄表；**驗收的是「有量、有如實回報」，不是數字達標** |
@@ -36,7 +36,7 @@
 
 ## 5. 排除事項
 
-ERP / MES connector 開發（repo 僅有 stub 與介面契約）；地端模型的隔離驗證；T3 資料處理；LINE / Teams 整合；profile 內容的正確性背書；第三方服務條款解釋；硬體與 Claude 帳號 / API 費用（由甲方自付，☐ 另列）。
+ERP / MES connector 開發（repo 僅有唯讀的 scheduler MCP 參考實作（mock data）與 ERP 介面契約）；地端模型的隔離驗證；T3 資料處理；LINE / Teams 整合；profile 內容的正確性背書；第三方服務條款解釋；硬體與 Claude 帳號 / API 費用（由甲方自付，☐ 另列）。
 
 ## 6. 假設
 

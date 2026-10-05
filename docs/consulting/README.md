@@ -14,7 +14,7 @@
 
 ## 檔案與導入階段的對應
 
-導入階段沿用 [導入指南](../adoption-guide.md) 的 W0–W6；「團隊層」指 `team/` 分身 alpha 的 Wave 0 / Wave 1（選配，見下方現況表）。
+導入階段沿用 [導入指南](../adoption-guide.md) 的 W0–W6；「團隊層」指 `team/` 分身 alpha 的 Wave 0 / Wave 1（選配；先照上方「帶去客戶前」確認 `team/` 在你手上的版本存在）。
 
 | 階段（導入指南） | 目標 | 用哪份文件 |
 | ---------------- | ---- | ---------- |
@@ -26,28 +26,21 @@
 
 建議順序：**先工作坊，再問卷，簽完 SOW 才碰客戶環境**。工作坊的閘門若判「流程修正」，就不要進 SOW。
 
-## 現況：哪些成品在 main、哪些還在 PR
+## 帶去客戶前：先確認你手上的版本
 
-本套文件引用的成品並不都已合併到 `main`。引用處標 `†` 的，代表「寫文件當下在開放中的 PR 分支，不在 `main`」。
-**帶去客戶前請先在你手上的版本確認檔案存在**（`ls` 即可）；不存在就不要承諾，改用「規劃中」的說法。
+本套文件引用的檔案與行為會隨 repo 版本增減。**帶去客戶前，請在你手上的版本逐項確認**；確認不了就不要承諾，改用「規劃中」或「未交付」的說法。
 
-| 成品 | 狀態 | 來源分支（概略） |
-| ---- | ---- | ---------------- |
-| `install.sh`、`examples/`、`docs/explainers/` | main | — |
-| 安裝後會被 Claude Code 載入的 layout（`claude plugin list` 看得到） † | PR | `plugin-layout-loadable` |
-| 誠實的資料流向說明（雲端預設、地端選配未驗證） † | PR | `docs-honest-data-flow` |
-| `docs/data-classification.md`、`examples/company-facts.template.md` † | PR | `adoption-company-facts` |
-| `docs/permissions-template.md` † | PR | `adoption-backlog-round1` |
-| `adapters/generic/export.py`（generic export bundle） † | PR | `adapter-generic-export` |
-| `team/`（閘門、roster、稽核檢查點）、`infra/chat-gateway/` † | PR | `manufacturing-ai-plugin-architecture` |
-
-**已知會讓顧問講錯話的地方（在 main 上）**：`README.zh-TW.md`、`manufacturing.md`、`docs/explainers/01`、`02` 仍寫
-「資料不出公司」「完全 air-gap」。在 `docs-honest-data-flow` 合併前，**不要把 explainer 01 / 02 交給客戶的稽核員或 IT**。
+| 要確認的事 | 怎麼確認 |
+| ---------- | -------- |
+| 安裝後 plugin 真的被 Claude Code 載入 | 安裝後執行 `claude plugin list`，確認看得到；安裝訊息顯示成功不等於已載入 |
+| explainer 01 / 02 呈現的是真實資料流向 | 開啟 `docs/explainers/01`、`02`，確認寫的是「雲端預設、地端選配且未端到端驗證」，沒有「資料不出公司」「完全 air-gap」；`README.zh-TW.md`、`manufacturing.md` 同樣檢查。確認前不要把它們交給客戶的稽核員或 IT |
+| 引用的檔案存在 | 文件裡寫到的路徑（例：`docs/data-classification.md`、`docs/permissions-template.md`、`examples/company-facts.template.md`、`adapters/generic/export.py`、`team/`、`infra/chat-gateway/`）逐一 `ls`；不存在就標「未交付」 |
+| scheduler MCP 唯讀 | 用 `claude mcp list` 確認伺服器 `manufacturing-scheduler` 已註冊；它唯讀、讀 mock data，沒有寫入工具，也沒有接真實 MES |
 
 ## 這套文件不做的事
 
 - 不替你報價：沒有任何一個數字是「建議價」；費用表只給結構。
 - 不是法律文件：保密、責任上限、智慧財產、個資條款都只是提問清單，請法務審閱。
-- 不保證 repo 沒有的能力：scheduler-mcp 與 erp-connector 在 repo 內只是 stub / 介面契約，沒有特定 ERP 的現成實作；
-  報價時把 ERP 串接當成「自寫 connector」另列，不要放進固定價。
+- 不保證 repo 沒有的能力：scheduler MCP（`manufacturing-scheduler`）唯讀、讀 mock data、未接真實 MES（用 `claude mcp list` 確認）；erp-connector 只有介面契約；沒有任何特定 ERP 的現成實作。
+  報價時把 ERP / MES 串接當成「自寫 connector」另列，不要放進固定價。
 - 不含「沖壓、食品等非機加廠」的專屬範本：`company-facts` 範本偏機加 / 壓鑄 / 射出，其他產業要自己補欄位（在工作坊就要講明）。

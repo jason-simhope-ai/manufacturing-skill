@@ -2,7 +2,7 @@
 
 > 給客戶的 IT / 資安負責人，也給顧問準備答案。「repo 今天能回答」欄只寫**有檔案或程式碼可對照**的事；
 > 沒有依據的，直接寫「本 repo 未驗證」，**不要補一個聽起來安心的答案**。`___` 是客戶要填的政策決定。
-> 標 `†` 的成品在開放中的 PR 分支，不一定在你手上的版本（見 [README](README.md) 現況表）。
+> 引用的檔案不一定都在你手上的版本；回答前先 `ls` 確認（見 [README](README.md)「帶去客戶前」）。
 > 本文不是法律意見；是否可用某 AI 服務，以客戶合約與該服務當下的官方條款為準。
 
 ## 一、資料去哪裡
@@ -10,12 +10,12 @@
 | # | IT 會問 | repo 今天能給的誠實答案 | 客戶決定 |
 | - | ------- | ----------------------- | -------- |
 | 1 | 預設模型在哪？ | 雲端：預設用 Anthropic 的雲端模型（Claude Code）。你貼進對話或用 `@` 附上的內容，等同送給模型供應商 | 接受 / 不接受：___ |
-| 2 | 能不能地端？ | 選配，且**本專案沒有端到端驗證**（尤其「讓 Claude Code 改用地端模型」與「完全隔離外網」）。要用，IT 須自己做封鎖外連並觀察流量（`infra/on-prem/gb10-setup.md` 的「自行驗證隔離」†） | 是否要求地端：___；驗證負責人與日期：___ |
-| 3 | 什麼留在本機？ | plugin 的 prompt、skills、know-how、hooks；你的圖紙與 BOM 檔案本身（沒附上就不送）；`company-facts.md`（放 repo 外、`.gitignore` 擋真實資料）† | 真實資料放置位置：___ |
+| 2 | 能不能地端？ | 選配，且**本專案沒有端到端驗證**（尤其「讓 Claude Code 改用地端模型」與「完全隔離外網」）。要用，IT 須自己做封鎖外連並觀察流量（`infra/on-prem/gb10-setup.md` 的「自行驗證隔離」） | 是否要求地端：___；驗證負責人與日期：___ |
+| 3 | 什麼留在本機？ | plugin 的 prompt、skills、know-how、hooks；你的圖紙與 BOM 檔案本身（沒附上就不送）；`company-facts.md`（放 repo 外、`.gitignore` 擋真實資料） | 真實資料放置位置：___ |
 | 4 | Claude Code 自己的遙測、自動更新、登入連線？ | **本 repo 沒有回答**，也沒有驗證。請向供應商官方文件確認，並由 IT 實測 | 結論與確認日：___ |
-| 5 | MCP 連線去哪？ | repo 內 scheduler-mcp 是 stub（`SECURITY.md` 說明不供正式使用）、erp-connector 只有介面契約。沒有任何特定 ERP 的現成實作 | 是否允許自寫 connector：___ |
+| 5 | MCP 連線去哪？ | scheduler MCP（`manufacturing-scheduler`）唯讀、讀 mock data、未接真實 MES，用 `claude mcp list` 確認（`SECURITY.md` 說明不供正式使用）；erp-connector 只有介面契約。沒有任何特定 ERP 的現成實作 | 是否允許自寫 connector：___ |
 | 6 | 帳號與方案的資料條款？ | 個人方案、團隊 / 企業方案、API 的保留與訓練規則不同，且會變。本 repo 不為任何條款背書。**不要用個人方案處理 T2 以上資料** | 使用方案：___；條款確認日：___；是否需零留存 / DPA：___ |
-| 7 | git、GitHub Pages、explainers 有沒有外連？ | 本 repo 未逐項審查。explainers 是靜態 HTML，但在 main 上其內文仍有錯誤的「不外流」宣稱，**不要當作稽核文件** | IT 自行檢視結論：___ |
+| 7 | git、GitHub Pages、explainers 有沒有外連？ | 本 repo 未逐項審查。explainers 是靜態 HTML；請先確認 explainer 01 / 02 顯示的是真實資料流向，沒有「不外流」「完全 air-gap」宣稱，**確認前不要當作稽核文件** | IT 自行檢視結論：___ |
 
 ## 二、分級：T0–T3
 
@@ -28,8 +28,8 @@
 
 **重要：repo 內兩份分級規則對 T2 不同（今天就會被問倒的點）**
 
-- 通則（`docs/data-classification.md` †）：T2 雲端「預設不可」，須 (a) 客戶合約 / NDA 未禁止、(b) 已確認服務條款、(c) 負責人書面核准；地端可（限授權人員並留紀錄）。
-- 團隊層 alpha（`team/README.zh-TW.md` †）：T2 **只能在本機 mock**，不能上聊天平台、不能給雲端模型，無豁免；T1 才會送雲端。
+- 通則（`docs/data-classification.md`）：T2 雲端「預設不可」，須 (a) 客戶合約 / NDA 未禁止、(b) 已確認服務條款、(c) 負責人書面核准；地端可（限授權人員並留紀錄）。
+- 團隊層 alpha（`team/README.zh-TW.md`）：T2 **只能在本機 mock**，不能上聊天平台、不能給雲端模型，無豁免；T1 才會送雲端。
 - 麻煩在於：plugin 的主用途（報價、讀圖紙）本身就是 T2。所以客戶必須**先決定**：
 
 | 決定 | 客戶填 |
@@ -61,8 +61,8 @@ alpha 實驗性，只在測試工作區與合成 / 去識別資料上試；Slack
 
 ## 四、權限與端點（Claude Code 端）
 
-- 權限範本（`docs/permissions-template.md` †）有可貼的 allow / ask / deny 與其限制；**權限只管動作，不管「哪些資料被送給模型」**。
-- 核心 agent 在 `adoption-backlog-round1` † 已移除 `Bash`，但 profile 內的 agent 是否仍宣告 `Bash` 要逐一檢查，不要預設已清乾淨。
+- 權限範本（`docs/permissions-template.md`）有可貼的 allow / ask / deny 與其限制；**權限只管動作，不管「哪些資料被送給模型」**。
+- 核心 agent 與 profile 內的 agent 是否宣告 `Bash`，要逐一檢查實際檔案，不要預設已清乾淨。
 - 客戶決定：Claude Code 設定由誰管（個人 / 統一下發）：___；是否禁用 `WebFetch`、`Bash`：___
 
 ## 五、今天不能回答的清單（原樣告訴客戶）
