@@ -368,6 +368,47 @@ class Determinism(unittest.TestCase):
         self.assertTrue(lib.check_deterministic(REPO, EXAMPLE))
 
 
+# Public names of team/tools/_teamlib.py before it became a shim over team/tools/teamlib/
+# (snapshot taken at 6351d8b). The shim must keep exporting exactly these.
+SHIM_PUBLIC_NAMES = (
+    "ACTING_MAX_DAYS", "ADAPTERS", "ADAPTER_MAX_TIER", "AUTONOMY", "Any", "BUDGETS", "BUILT_BY",
+    "BuildError", "BuildResult", "CATEGORY_LABEL", "CATEGORY_VALUES", "CODES", "Compiled", "Finding",
+    "GATE_RESULTS", "GATE_STALE_DAYS", "IDENTITY_KEYS", "LoadError", "NAME_OTHER", "NAME_ZH",
+    "OUTSOURCE_MAX_DAYS", "OUTSOURCE_WARN_DAYS", "PII_PATTERNS", "Path", "REF_PREFIX",
+    "REQUIRED_GITIGNORE", "REQUIRED_SECTIONS", "SAFETY_KEYWORDS", "SECRET_PATTERNS", "TIERS",
+    "TIER_CAP", "TOOL_REPO", "VERSION", "annotations", "build", "canon", "check_deterministic",
+    "compile_all", "dataclasses", "default_roster", "dlp_scan", "effective_autonomy", "est_tokens",
+    "find_ref", "fnmatch", "hashlib", "importlib", "json", "load_lint_allow", "load_roster",
+    "load_twin", "re", "render_summary", "resolved_text", "shared_secret_patterns", "shutil",
+    "split_frontmatter", "subprocess", "sys", "validate", "validate_ex", "yaml", "yaml_load",
+)
+
+
+class TeamlibShim(unittest.TestCase):
+    def test_shim_exports_the_same_public_names(self):
+        public = sorted(n for n in dir(lib) if not n.startswith("_"))
+        self.assertEqual(public, sorted(SHIM_PUBLIC_NAMES))
+
+    def test_shim_names_are_the_package_objects(self):
+        import importlib
+        pkg = importlib.import_module("teamlib")
+        for name in pkg.__all__:
+            self.assertIs(getattr(lib, name), getattr(pkg, name), name)
+        for name in ("_render_prompt", "_Validator", "_date", "_sha", "_valid_date", "_tw_business_id_ok"):
+            self.assertTrue(callable(getattr(lib, name)), name)
+
+    def test_shim_assignment_reaches_the_defining_module(self):
+        import importlib
+        compile_mod = importlib.import_module("teamlib.compile")
+        real = lib.render_summary
+        lib.render_summary = sentinel = lambda *a, **k: "patched\n"
+        try:
+            self.assertIs(compile_mod.render_summary, sentinel)
+        finally:
+            lib.render_summary = real
+        self.assertIs(compile_mod.render_summary, real)
+
+
 class EffectiveAutonomy(unittest.TestCase):
     policy = {"autonomyCeiling": "draft"}
     twin = {"autonomyCeiling": "draft"}

@@ -487,7 +487,8 @@ class TestApprovals(unittest.TestCase):
         return self.book.create(self.ACTION, requester, "qa-floor", ["qa-manager"], tier=tier)
 
     def click(self, card, user="u-boss", nonce=None, decision="approve", eid="c1"):
-        return ApprovalClick(eid, "mock", card.approval_id, nonce or card.nonce, user, decision, self.clock())
+        return ApprovalClick(eid, "mock", card.approval_id, nonce or card.nonce, user, decision, self.clock(),
+                             card.channel_ref)
 
     def test_shape(self):
         c = self.card()
@@ -543,14 +544,17 @@ class TestApprovalsThroughGateway(HarnessCase):
         [r] = h.msg("@品保 核准", user="mock-qa-lead", channel="qa-design")
         self.assertIn("只接受核准卡上的按鈕", r.text)
         self.assertEqual(h.executor.calls, [])
-        same_user = ApprovalClick("k1", "mock", card.approval_id, card.nonce, "mock-qa-lead", "approve", h.clock())
+        same_user = ApprovalClick("k1", "mock", card.approval_id, card.nonce, "mock-qa-lead", "approve", h.clock(),
+                                  card.channel_ref)
         h.gw.handle(same_user)
         self.assertEqual(h.records[-2]["deny_reason"], "approval_forbidden")
-        ok = ApprovalClick("k2", "mock", card.approval_id, card.nonce, "mock-prod-lead", "approve", h.clock())
+        ok = ApprovalClick("k2", "mock", card.approval_id, card.nonce, "mock-prod-lead", "approve", h.clock(),
+                           card.channel_ref)
         [r] = h.gw.handle(ok)
         self.assertIn("granted", r.text)
         self.assertEqual(h.executor.calls, [TestApprovals.ACTION])
-        again = ApprovalClick("k3", "mock", card.approval_id, card.nonce, "mock-prod-lead", "approve", h.clock())
+        again = ApprovalClick("k3", "mock", card.approval_id, card.nonce, "mock-prod-lead", "approve", h.clock(),
+                              card.channel_ref)
         h.gw.handle(again)
         self.assertIn("replay_rejected", h.actions())
         self.assertEqual(len(h.executor.calls), 1)
@@ -1059,12 +1063,12 @@ class TestRound2Hardening(HarnessCase):
         action = {"name": "erp.set", "args": {"v": 1}}
         card = book.create(action, "u-req", "qa-floor", ["qa-manager"])
         action["args"]["v"] = 999999                              # caller mutates after hashing
-        click = ApprovalClick("c1", "mock", card.approval_id, card.nonce, "u-boss", "approve", T0)
+        click = ApprovalClick("c1", "mock", card.approval_id, card.nonce, "u-boss", "approve", T0, "qa-floor")
         self.assertEqual(book.resolve(click, ex, roles=["qa-manager"]), "granted")
         self.assertEqual(ex.calls, [{"name": "erp.set", "args": {"v": 1}}])
         card2 = book.create({"name": "erp.set", "args": {"v": 1}}, "u-req", "qa-floor", ["qa-manager"])
         book.get(card2.approval_id).action["args"]["v"] = 999999  # stored copy tampered
-        click2 = ApprovalClick("c2", "mock", card2.approval_id, card2.nonce, "u-boss", "approve", T0)
+        click2 = ApprovalClick("c2", "mock", card2.approval_id, card2.nonce, "u-boss", "approve", T0, "qa-floor")
         self.assertEqual(book.resolve(click2, ex, roles=["qa-manager"]), "mismatch")
         self.assertEqual(len(ex.calls), 1)
 
@@ -1253,6 +1257,82 @@ class TestStaticSecurity(unittest.TestCase):
 
 
 # ── CLI and demo golden ──────────────────────────────────────────────
+def with_approvers(r: dict) -> None:
+    for cid in ("qa-floor", "daily-ops"):
+        chan(r, cid)["approvers"] = ["qa-manager"]
+
+
+# ── SECURITY-REVIEW-EXT follow-up (EXT-03, -05, -15, -16) ────────────
+class TestExtFollowUp(HarnessCase):
+    def click(self, h, card, eid, user="mock-qa-lead", channel=None):
+        return ApprovalClick(eid, "mock", card.approval_id, card.nonce, user, "approve", h.clock(),
+                             card.channel_ref if channel is None else channel)
+
+    def test_ext03_click_from_another_channel_is_denied_and_not_consumed(self):
+        """Reviewer's repro: a copy of a qa-floor card clicked in a second bound channel was granted."""
+        h = self.make(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", TestApprovals.ACTION, twin_id="qa-manager")
+        [r] = h.gw.handle(self.click(h, card, "x1", channel="daily-ops"))
+        self.assertIn("mismatch", r.text)
+        self.assertEqual(h.records[-2]["deny_reason"], "approval_channel")
+        self.assertEqual(h.executor.calls, [])
+        # the book enforces the same binding on its own (defence in depth)
+        self.assertEqual(h.book.resolve(self.click(h, card, "x2", channel=""), h.executor, roles=["qa-manager"]),
+                         "mismatch")
+        self.assertEqual(h.executor.calls, [])
+        [r] = h.gw.handle(self.click(h, card, "x3"))            # the real card's channel still works
+        self.assertIn("granted", r.text)
+        self.assertEqual(h.executor.calls, [TestApprovals.ACTION])
+
+    def test_ext16_repeated_clicks_post_one_notice_per_outcome(self):
+        h = self.make(mutate=with_approvers)
+        card = h.gw.request_approval("qa-floor", "mock-prod-lead", TestApprovals.ACTION, twin_id="qa-manager")
+        posted = [h.gw.handle(self.click(h, card, f"s{i}", user="mock-qa-eng")) for i in range(5)]
+        self.assertEqual([len(p) for p in posted], [1, 0, 0, 0, 0])
+        self.assertEqual(h.reasons().count("approval_forbidden"), 5)          # every click is still audited
+        self.assertEqual(len(h.gw.handle(self.click(h, card, "ok"))), 1)       # a new outcome gets its notice
+        self.assertEqual([len(h.gw.handle(self.click(h, card, f"r{i}"))) for i in range(3)], [1, 0, 0])
+        self.assertEqual(h.reasons().count("single_use"), 3)
+
+    def test_ext05_state_dir_created_0700_and_loose_modes_refused(self):
+        from chat_gateway.config import ensure_state_dir
+        base = Path(tempfile.mkdtemp(prefix="state-mode-"))
+        self.addCleanup(shutil.rmtree, base, True)
+        made = ensure_state_dir(base / "a" / "state")
+        self.assertEqual(made.stat().st_mode & 0o777, 0o700)
+        for mode in (0o770, 0o777, 0o722):
+            with self.subTest(mode=oct(mode)):
+                d = base / f"m{mode:o}"
+                d.mkdir()
+                d.chmod(mode)
+                with self.assertRaises(ConfigRefused) as cm:
+                    ensure_state_dir(d)
+                self.assertIn("chmod 700", str(cm.exception))
+        (base / "ok755").mkdir(mode=0o755)
+        ensure_state_dir(base / "ok755")                                     # readable is fine, writable is not
+        (base / "link").symlink_to(made)
+        with self.assertRaises(ConfigRefused):
+            ensure_state_dir(base / "link")
+        loose = base / "loose"
+        loose.mkdir()
+        loose.chmod(0o777)
+        p = run_cli(["-m", "chat_gateway", "self-check", "--roster", str(FIXTURES / "roster.json")],
+                    {"MFG_TEAM_STATE_DIR": str(loose)}, cwd=REPO_ROOT)
+        self.assertEqual(p.returncode, 78, p.stderr)
+        self.assertIn("group- or world-writable", p.stderr)
+
+    def test_ext15_internal_error_prints_the_class_name_only(self):
+        from unittest import mock
+        import chat_gateway.__main__ as cli
+        err = io.StringIO()
+        with mock.patch.object(cli, "build_gateway", side_effect=RuntimeError("xoxb-SECRET request context")), \
+                contextlib.redirect_stderr(err):
+            rc = cli.main(["self-check"], env={"MFG_TEAM_STATE_DIR": str(Path(tempfile.gettempdir()) / "x")})
+        self.assertEqual(rc, 70)
+        self.assertIn("internal error: RuntimeError", err.getvalue())
+        self.assertNotIn("SECRET", err.getvalue())
+
+
 def run_cli(args, env_extra=None, **kw):
     env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(GW_DIR)}
     env.update(env_extra or {})

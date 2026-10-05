@@ -23,7 +23,8 @@ from .adapters.base import ScheduledPost
 from .adapters.mock import MockAdapter, ScriptError
 from .approvals import ApprovalBook
 from .audit import AuditLog, heads, verify_report
-from .config import AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, stale_state_help
+from .config import (AUDIT_KEY_VAR, DEMO_AUDIT_KEY, GatewayConfig, config_from_env, ensure_state_dir,
+                     stale_state_help)
 from .core import Gateway, load_roster, synthetic_mock_identities
 from .sanitize import load_denylist
 from .drivers import load_driver_class
@@ -47,11 +48,12 @@ def _make_driver(cfg: GatewayConfig, env: Mapping[str, str]):
         raise ConfigRefused("missing required environment variables: MFG_TEAM_CLAUDE_CONFIG_DIR")
     return cls(bin=env.get("MFG_TEAM_CLAUDE_BIN", "claude"), config_dir=env["MFG_TEAM_CLAUDE_CONFIG_DIR"],
                max_budget_usd=cfg.max_budget_usd, timeout_s=cfg.timeout_s,
-               data_root=env.get("MFG_TEAM_DATA_T1") or None)
+               data_root=env.get("MFG_TEAM_DATA_T1") or None, state_dir=cfg.state_dir, env=env)
 
 
 def build_gateway(cfg: GatewayConfig, env: Mapping[str, str], script: str | None = None) -> Gateway:
     roster = load_roster(cfg.roster)
+    ensure_state_dir(cfg.state_dir)
     if cfg.demo_keys:
         print("DEMO KEYS — mock mode only; set MFG_TEAM_AUDIT_HMAC_KEY and "
               "MFG_TEAM_APPROVAL_HMAC_KEY for anything real", file=sys.stderr)
@@ -174,7 +176,8 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
         print(f"chat_gateway: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except Exception as exc:  # noqa: BLE001
-        print(f"chat_gateway: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        # EXT-15: class name only. An SDK exception's text can carry request context (ids, URLs).
+        print(f"chat_gateway: internal error: {type(exc).__name__}", file=sys.stderr)
         return EXIT_INTERNAL
 
 

@@ -82,9 +82,10 @@ def discord_interaction_to_click(d: dict, allowed_guilds: Collection[str] | None
     if not m or not user.get("id") or user.get("bot"):
         return None
     decision, approval_id, nonce = m.groups()
+    channel = str(d.get("thread_parent_id") or d.get("channel_id") or "")   # a card in a thread → its parent
     return ApprovalClick(event_id=f"discord-interaction:{d['id']}", platform="discord", approval_id=approval_id,
                          nonce=nonce, user_ref=str(user["id"]), decision=decision,  # type: ignore[arg-type]
-                         ts=snowflake_ts(d["id"]))
+                         ts=snowflake_ts(d["id"]), channel_ref=channel)
 
 
 def discord_to_event(raw: dict, bot_user_id: str, allowed_guilds: Collection[str] | None = None) -> Event | None:
@@ -213,9 +214,11 @@ class _DiscordPyTransport:                           # pragma: no cover - needs 
             if i.type != d.InteractionType.component:
                 return
             await i.response.defer()                 # ack within 3 s; the gateway posts the result
+            th = isinstance(i.channel, d.Thread)
             sink({"t": "INTERACTION_CREATE", "d": {
                 "id": str(i.id), "type": i.type.value, "guild_id": str(i.guild_id) if i.guild_id else None,
-                "channel_id": str(i.channel_id), "user": {"id": str(i.user.id), "bot": i.user.bot},
+                "channel_id": str(i.channel_id), "thread_parent_id": str(i.channel.parent_id) if th else None,
+                "user": {"id": str(i.user.id), "bot": i.user.bot},
                 "data": dict(i.data or {})}})
 
         for fn in (on_ready, on_guild_join, on_message, on_interaction):

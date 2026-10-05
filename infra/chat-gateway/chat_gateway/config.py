@@ -4,6 +4,8 @@ only the variable names, never values."""
 from __future__ import annotations
 
 import math
+import os
+import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +17,8 @@ DEFAULT_ROSTER = "team/.build/roster.json"
 DEFAULT_STATE_DIR = "~/.local/state/manufacturing-skill/team"
 DEFAULT_DENYLIST = "team/local/names.denylist"
 STATE_DIR_VAR = "MFG_TEAM_STATE_DIR"
-STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp"})  # all the gateway ever writes there
+# All the gateway (and the claude-code driver) ever writes there.
+STATE_ENTRIES = frozenset({"audit", "post-limits.json", "driver-tmp", "driver-home"})
 DENYLIST_VAR = "MFG_TEAM_DENYLIST"
 AUDIT_KEY_VAR = "MFG_TEAM_AUDIT_HMAC_KEY"
 APPROVAL_KEY_VAR = "MFG_TEAM_APPROVAL_HMAC_KEY"
@@ -35,6 +38,30 @@ def resolve_state_dir(env: Mapping[str, str]) -> Path:
     state = Path(env.get(STATE_DIR_VAR) or DEFAULT_STATE_DIR).expanduser()
     if not state.is_absolute():
         raise ConfigRefused(f"{STATE_DIR_VAR} must be an absolute path")
+    return state
+
+
+def ensure_state_dir(state: Path) -> Path:
+    """EXT-05: the state dir holds the audit log, rate-limit state, the driver's temp prompts and
+    the model process's private HOME. Create it 0700 when missing; refuse a symlink, a
+    non-directory, another owner, or a group/other-writable mode (a shared or world-writable dir
+    such as /tmp would let another account plant or swap files)."""
+    if not state.is_absolute():
+        raise ConfigRefused(f"{STATE_DIR_VAR} must be an absolute path")
+    try:
+        state.mkdir(parents=True, mode=0o700)
+        os.chmod(state, 0o700)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise ConfigRefused(f"cannot create the state directory {state} ({type(exc).__name__})") from None
+    st = os.lstat(state)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+        raise ConfigRefused(f"state directory {state} is not a plain directory (symlink or file)")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise ConfigRefused(f"state directory {state} is not owned by the user running the gateway")
+    if st.st_mode & 0o022:
+        raise ConfigRefused(f"state directory {state} is group- or world-writable; run: chmod 700 {state}")
     return state
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 import signal
 import stat
 import sys
@@ -308,7 +309,9 @@ class TestRun(Base):
         self.assertEqual(env["CLAUDE_CONFIG_DIR"], os.path.realpath(self.config_dir))
         # EXT-13: a fixed PATH (the resolved claude's directory + system dirs), not the gateway's PATH
         self.assertEqual(env["PATH"], os.pathsep.join(dict.fromkeys([str(self.bin.parent), *SAFE_PATH_DIRS])))
-        self.assertEqual(env["HOME"], self.env["HOME"])
+        # EXT-13: a private 0700 HOME under the state dir, never the operator's home
+        self.assertEqual(env["HOME"], os.path.join(os.path.realpath(self.state), "driver-home"))
+        self.assertNotEqual(env["HOME"], self.env["HOME"])
         for leak in ("AWS_SECRET_ACCESS_KEY", "SLACK_BOT_TOKEN", "MFG_TEAM_AUDIT_HMAC_KEY", "MFG_TEAM_STATE_DIR"):
             self.assertNotIn(leak, env)
         # python itself may add a few vars (LC_CTYPE, ...); nothing from our fake secrets may appear
@@ -594,6 +597,113 @@ class TestExtHardening(Base):
         self.assertTrue(any("not found" in p for p in drv.self_check()))
         with self.assertRaises(DriverError):
             drv.run(self.inv())
+
+
+class TestExtFollowUp(Base):
+    """SECURITY-REVIEW-EXT follow-up: EXT-05 (full), EXT-13 (rest), EXT-14."""
+
+    def problems(self, **kw):
+        return self.driver(**kw).self_check()
+
+    # EXT-13: private HOME, proxy variables only by opt-in
+    def test_ext13_child_home_is_private_and_not_the_operators(self):
+        op_home = Path(self.env["HOME"])
+        (op_home / ".claude").mkdir(parents=True)
+        self.driver().run(self.inv())
+        home = Path(self.call()["env"]["HOME"])
+        self.assertEqual(home, Path(os.path.realpath(self.state)) / "driver-home")
+        self.assertEqual(home.stat().st_mode & 0o777, 0o700)
+        self.assertNotIn(str(op_home), json.dumps(self.call()["env"]))
+        self.assertEqual(self.state.stat().st_mode & 0o777, 0o700)            # state dir created 0700
+
+    def test_ext13_proxy_env_passes_only_with_opt_in(self):
+        from chat_gateway_ext.claude_code import PASS_PROXY_VAR, PROXY_VARS
+        proxy = {"HTTPS_PROXY": "http://proxy.example:3128", "NO_PROXY": "localhost",
+                 "SSL_CERT_FILE": "/etc/ssl/ca.pem", "REQUESTS_CA_BUNDLE": "/etc/ssl/ca.pem",
+                 "http_proxy": "http://proxy.example:3128"}
+        self.env.update(proxy)
+        for flag in (None, "0", "yes", "true"):
+            with self.subTest(flag=flag):
+                if flag is None:
+                    self.env.pop(PASS_PROXY_VAR, None)
+                else:
+                    self.env[PASS_PROXY_VAR] = flag
+                self.driver().run(self.inv())
+                self.assertFalse(set(PROXY_VARS) & set(self.call()["env"]))
+        self.env[PASS_PROXY_VAR] = "1"
+        self.driver().run(self.inv())
+        env = self.call()["env"]
+        self.assertEqual({k: env.get(k) for k in proxy}, proxy)
+        self.assertNotIn(PASS_PROXY_VAR, env)
+        self.assertNotIn("leak", json.dumps(env))
+
+    # EXT-05: data root overlap, symlinks, state dir mode
+    def test_ext05_data_root_must_not_overlap_state_config_repo_or_home(self):
+        root = Path(self._tmp.name)
+        repo = self.build.parents[1]
+        (self.state / "sub").mkdir(parents=True)
+        (repo / "data").mkdir()
+        cases = {"state directory": self.state / "sub", "CLAUDE_CONFIG_DIR": self.config_dir,
+                 "repository": repo / "data", "$HOME": root}
+        for what, data in cases.items():
+            with self.subTest(what=what):
+                msgs = self.problems(data_root=str(data), repo_root=repo)
+                self.assertTrue(any("MFG_TEAM_DATA_T1 must not" in m and what in m for m in msgs), msgs)
+                with self.assertRaises(DriverError):
+                    self.driver(data_root=str(data), repo_root=repo).run(self.inv(read_roots=(str(data),)))
+        self.assertFalse((self.rec / "call.json").exists())
+        # at run time the repo that holds the build is checked too, whatever repo_root says
+        with self.assertRaises(DriverError) as cm:
+            self.driver(data_root=str(repo / "data")).run(self.inv(read_roots=(str(repo / "data"),)))
+        self.assertIn("repository", str(cm.exception))
+        self.assertEqual(self.problems(data_root=str(self.data), repo_root=repo), [])
+
+    def test_ext05_symlink_or_roster_file_in_data_root_refused_at_self_check(self):
+        (self.data / "deep" / "er").mkdir(parents=True)
+        link = self.data / "deep" / "er" / "escape"
+        link.symlink_to("/etc")
+        msgs = self.problems(data_root=str(self.data))
+        self.assertTrue(any("symlink" in m and "deep/er/escape" in m for m in msgs), msgs)
+        link.unlink()
+        (self.data / "deep" / "identities.json").write_text("{}", encoding="utf-8")
+        self.assertTrue(any("identity" in m for m in self.problems(data_root=str(self.data))))
+        (self.data / "deep" / "identities.json").unlink()
+        self.assertEqual(self.problems(data_root=str(self.data)), [])
+
+    def test_ext05_relative_state_dir_refused_and_nothing_created(self):
+        cwd = os.getcwd()
+        os.chdir(self._tmp.name)
+        self.addCleanup(os.chdir, cwd)
+        self.assertEqual(self.problems(state_dir="rel-state"), ["MFG_TEAM_STATE_DIR must be an absolute path"])
+        self.assertFalse(Path(self._tmp.name, "rel-state").exists())
+
+    def test_ext05_group_or_world_writable_state_dir_refused(self):
+        self.state.mkdir()
+        self.state.chmod(0o777)
+        self.assertTrue(any("world-writable" in m for m in self.problems()))
+        with self.assertRaises(DriverError):
+            self.driver().run(self.inv())
+        self.assertFalse((self.rec / "call.json").exists())
+
+    # EXT-14: driver-tmp (and driver-home) mode and symlink checks
+    def test_ext14_driver_dirs_tightened_or_refused(self):
+        self.state.mkdir(mode=0o700)
+        tmp = self.state / "driver-tmp"
+        tmp.mkdir(mode=0o755)
+        tmp.chmod(0o755)
+        self.driver().run(self.inv())
+        self.assertEqual(tmp.stat().st_mode & 0o777, 0o700)
+        for name in ("driver-tmp", "driver-home"):
+            with self.subTest(name=name):
+                d = self.state / name
+                shutil.rmtree(d)
+                elsewhere = Path(self._tmp.name) / f"elsewhere-{name}"
+                elsewhere.mkdir()
+                d.symlink_to(elsewhere)
+                with self.assertRaises(DriverError) as cm:
+                    self.driver().run(self.inv())
+                self.assertIn("symlink", str(cm.exception))
+                d.unlink()
 
 
 class TestWiring(unittest.TestCase):

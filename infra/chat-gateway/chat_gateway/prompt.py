@@ -1,6 +1,6 @@
 """Compiled twin prompt budget and token estimate (§5.5, §10.1).
 
-`team/tools/build.py` (`_teamlib._render_prompt`) owns prompt assembly; the gateway
+`team/tools/build.py` (`teamlib/compile.py` `_render_prompt`) owns prompt assembly; the gateway
 only enforces the byte budget at load (and re-checks `promptSha` per call).
 """
 from __future__ import annotations

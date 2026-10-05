@@ -51,6 +51,8 @@ D_BOT, D_CH, D_GUILD, D_USER, D_THREAD = (snowflake(i) for i in (1, 2, 3, 4, 5))
 APV, NONCE = "apv-0a1b2c3d", "0123456789abcdef0123456789abcdef"
 SLACK_BINDINGS = {"schema": 1, "channels": {"qa-floor": {"platform": "slack", "ref": SLACK_CH}}}
 DISCORD_BINDINGS = {"schema": 1, "channels": {"qa-floor": {"platform": "discord", "ref": D_CH}}}
+TWO_SLACK = {"schema": 1, "channels": {"qa-floor": {"platform": "slack", "ref": SLACK_CH},
+                                       "daily-ops": {"platform": "slack", "ref": "C0B"}}}
 
 
 class FakeTransport:
@@ -206,7 +208,7 @@ class TestSlackMapping(unittest.TestCase):
     def test_approval_click_mapping(self):
         ev = self.ev(slack_click())
         self.assertEqual(ev, ApprovalClick("slack-action:trig-1", "slack", APV, NONCE, SLACK_USER, "approve",
-                                           1791158401.0002))
+                                           1791158401.0002, SLACK_CH))
         self.assertEqual(self.ev(slack_click("mfg_deny")).decision, "deny")
 
     def test_text_approve_is_never_a_click(self):
@@ -266,7 +268,9 @@ class TestDiscordMapping(unittest.TestCase):
     def test_approval_click_mapping(self):
         ev = self.ev(d_click())
         self.assertEqual(ev, ApprovalClick(f"discord-interaction:{snowflake(200)}", "discord", APV, NONCE, D_USER,
-                                           "approve", 1791158400.2))
+                                           "approve", 1791158400.2, D_CH))
+        # a card posted inside a thread: the click carries the parent channel, like messages do
+        self.assertEqual(self.ev(d_click(channel_id=D_THREAD, thread_parent_id=D_CH)).channel_ref, D_CH)
         self.assertEqual(self.ev(d_click(f"mfg:deny:{APV}:{NONCE}")).decision, "deny")
         self.assertEqual(self.ev(d_click(member=None, user={"id": D_USER})).user_ref, D_USER)
 
@@ -515,6 +519,83 @@ class TestExtAdapters(unittest.TestCase):
         a = discord_adapter(guilds=())                   # empty while the real transport vets guilds: deny all
         self.assertIsNone(a.to_event(d_click()))
 
+
+
+# ── SECURITY-REVIEW-EXT follow-up (adapter side: EXT-03, -12, -15, -17) ──
+class TestExtFollowUpAdapters(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="gw-ext-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def slack_gateway(self, adapter):
+        """qa-floor (C0QA) and daily-ops (C0B) both bound on Slack; SLACK_USER is a qa-manager approver."""
+        from chat_gateway.approvals import ApprovalBook, NoopExecutor
+        d = self.tmp / "roster"
+        shutil.copytree(FIXTURES, d)
+        roster = json.loads((d / "roster.json").read_text(encoding="utf-8"))
+        for c in roster["channels"]:
+            if c["id"] in ("qa-floor", "daily-ops"):
+                c["adapter"], c["approvers"] = "slack", ["qa-manager"]
+        (d / "roster.json").write_text(json.dumps(roster, ensure_ascii=False), encoding="utf-8")
+        (d / "identities.json").write_text(json.dumps({"users": [
+            {"platform": "slack", "userId": SLACK_USER, "positions": ["qa-manager"]}]}), encoding="utf-8")
+        (d / "bindings.json").write_text(json.dumps(TWO_SLACK), encoding="utf-8")
+        self.records, self.executor = [], NoopExecutor()
+        audit = AuditLog(self.tmp / "audit", KEY, on_append=self.records.append)
+        return Gateway(load_roster(d / "roster.json"), adapter, MockDriver(), audit,
+                       approvals=ApprovalBook(KEY), executor=self.executor)
+
+    def test_ext03_slack_card_clicked_in_a_second_bound_channel(self):
+        """SECURITY-REVIEW-EXT p2.py: a click from C0B on a qa-floor card used to be `granted`."""
+        a = smod.SlackAdapter(bindings=TWO_SLACK, transport=FakeTransport(SLACK_BOT), env=SLACK_ENV)
+        gw = self.slack_gateway(a)
+        card = gw.request_approval("qa-floor", "UREQ", {"name": "erp.x", "args": {"v": 1}}, twin_id="qa-manager")
+        self.assertEqual(card.channel_ref, SLACK_CH)
+        value = f"{card.approval_id}:{card.nonce}"
+        other = a.to_event(slack_click(value=value, channel={"id": "C0B"}, trigger_id="t-other"))
+        self.assertEqual(other.channel_ref, "C0B")
+        gw.handle(other)
+        denied = [r for r in self.records if r["action"] == "policy_denied"]
+        self.assertEqual(denied[-1]["deny_reason"], "approval_channel")
+        self.assertEqual(self.executor.calls, [])
+        [r] = gw.handle(a.to_event(slack_click(value=value, trigger_id="t-home")))
+        self.assertIn("granted", r.text)
+        self.assertEqual(len(self.executor.calls), 1)
+
+    def test_ext12_inbox_overflow_is_dropped_and_audited(self):
+        from chat_gateway_ext._saas import INBOX_MAX
+        extra = 44
+        inbound = [slack_mention("no mention", eid=f"Ev{i}") for i in range(INBOX_MAX + extra)]
+        a = smod.SlackAdapter(bindings=TWO_SLACK, transport=FakeTransport(SLACK_BOT, inbound), env=SLACK_ENV)
+        gw = self.slack_gateway(a)
+        gw.run()
+        over = [r for r in self.records if (r["deny_reason"] or "").startswith("overflow")]
+        self.assertEqual([r["deny_reason"] for r in over], [f"overflow:{extra}"])
+        self.assertEqual(a.take_overflow(), 0)
+
+    def test_ext12_an_odd_event_does_not_end_the_stream(self):
+        good = d_message(f"<@{D_BOT}> 品保 spc-watch", mid=snowflake(100))
+        huge = d_message(f"<@{D_BOT}> x", mid="9" * 400)               # snowflake_ts → OverflowError
+        a = dmod.DiscordAdapter(bindings=DISCORD_BINDINGS, transport=FakeTransport(D_BOT, [huge, good], {D_GUILD}),
+                                env=DISCORD_ENV)
+        with mock.patch("sys.stderr") as err:
+            events = list(a.events())
+        self.assertEqual([e.event_id for e in events], [f"discord:{snowflake(100)}"])
+        self.assertIn("OverflowError", "".join(str(c) for c in err.write.call_args_list))
+
+    def test_ext15_adapter_keeps_no_token_copy(self):
+        self.assertEqual(slack_adapter()._secrets, ())
+        self.assertEqual(discord_adapter()._secrets, ())
+
+    def test_ext17_slack_card_text_fits_the_block_limit(self):
+        long = ApprovalCard(APV, NONCE, SLACK_CH, None, ("動作：" + "x" * 4000, "參數雜湊：…"), "sha256:aa", 0.0)
+        p = smod.card_payload(long)
+        block = p["blocks"][0]["text"]["text"]
+        self.assertEqual(len(block), smod.CARD_TEXT_MAX)
+        self.assertTrue(block.endswith(smod.TRUNCATED))
+        short = smod.card_payload(CARD)["blocks"][0]["text"]["text"]
+        self.assertFalse(short.endswith(smod.TRUNCATED))
+        self.assertLessEqual(len(short), smod.CARD_TEXT_MAX)
 
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=1).result

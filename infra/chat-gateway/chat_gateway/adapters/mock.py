@@ -6,7 +6,8 @@ validated before anything runs: a bad line raises ScriptError naming the line nu
 
     {"type":"message","id":"m1","channel":"qa-floor","user":"mock-qa-lead","text":"@品保 …",
      "mention":true,"bot":false,"dm":false,"external":false,"thread":null,"ts":1790000000}
-    {"type":"approval_click","id":"c1","approval_id":"apv-…","nonce":"…","user":"…","decision":"approve"}
+    {"type":"approval_click","id":"c1","approval_id":"apv-…","nonce":"…","user":"…","decision":"approve",
+     "channel":"qa-floor"}
     {"type":"scheduled","twin":"qa-manager","capability":"spc-watch","channel":"qa-floor"}
     {"type":"note", …}   # narration for demo.py; passed to `on_note`, not an Event
 
@@ -103,7 +104,8 @@ class MockAdapter:
         if kind == "approval_click":
             return ApprovalClick(event_id=str(obj["id"]), platform="mock", approval_id=str(obj.get("approval_id", "")),
                                  nonce=str(obj.get("nonce", "")), user_ref=str(obj.get("user", "")),
-                                 decision="approve" if obj.get("decision") == "approve" else "deny", ts=ts)
+                                 decision="approve" if obj.get("decision") == "approve" else "deny", ts=ts,
+                                 channel_ref=str(obj.get("channel", "")))
         if kind == "scheduled":
             return ScheduledPost(twin_id=str(obj["twin"]), capability_id=str(obj["capability"]),
                                  channel_id=str(obj["channel"]))

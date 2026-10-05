@@ -216,7 +216,7 @@ INVENTORY.md              ← 這份
 | [teamctl.py](team/tools/teamctl.py) | `check`（驗證）、`roster`（檢視）、`audit-verify`（驗稽核雜湊鏈） |
 | [build.py](team/tools/build.py) | 編譯 `team/.build/`（`roster.json`、分身 prompt、`ref/`；輸出可重現） |
 | [deid.py](team/tools/deid.py) | 來源端去識別（CSV：NFKC／空白折疊後客戶名 → `CUST-xx`、整詞比對、刪欄；殘留掃描含 email、電話、姓名＋職稱、聯絡人欄，命中即 exit 1，除非 `--allow-residual`） |
-| [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`） |
+| [teamlib/](team/tools/teamlib/) · [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`）：`schema.py`（常數、`CODES`、欄位規格、樣式橋接）· `io.py`（YAML／JSON／日期）· `compile.py`（組裝與 build）· `validate.py`（驗證器）；`_teamlib.py` 是相容 shim |
 | [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本 |
 
 **Chat gateway（[infra/chat-gateway/](infra/chat-gateway/)；Python 3.11，核心只用 stdlib）**
@@ -226,7 +226,7 @@ INVENTORY.md              ← 這份
 | [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證） |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
-| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`_teamlib` 直接載入）· 環境變數設定 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
 | `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
 | `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py` |
 | `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |

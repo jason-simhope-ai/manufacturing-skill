@@ -28,6 +28,10 @@ FORBIDDEN_SCOPES = ("channels:history", "groups:history", "im:history", "mpim:hi
 ACTION_IDS = {"mfg_approve": "approve", "mfg_deny": "deny"}
 POST_FLAGS = {"unfurl_links": False, "unfurl_media": False, "link_names": False, "parse": "none"}
 _UNESCAPE = (("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"))
+# EXT-17: a `plain_text` section block holds at most 3,000 characters; a longer card body would be
+# rejected by Slack (`invalid_blocks`). The body is cut to fit, with a visible marker.
+CARD_TEXT_MAX = 3000
+TRUNCATED = "…（已截斷）"
 
 
 def _escape(text: str) -> str:
@@ -91,7 +95,7 @@ def slack_action_to_click(payload: dict, refs: Collection[str] | None = None) ->
     ts = str(act.get("action_ts") or "0")
     return ApprovalClick(event_id=f"slack-action:{payload.get('trigger_id') or ts}", platform="slack",
                          approval_id=approval_id, nonce=nonce, user_ref=str(user["id"]),
-                         decision=decision, ts=float(ts))  # type: ignore[arg-type]
+                         decision=decision, ts=float(ts), channel_ref=channel)  # type: ignore[arg-type]
 
 
 def slack_to_event(envelope: dict, bot_user_id: str, refs: Collection[str] | None = None) -> Event | None:
@@ -108,8 +112,12 @@ def reply_payload(reply: Reply) -> dict:
     return {"channel": reply.channel_ref, "thread_ts": reply.thread_ref, "text": _escape(reply.text), **POST_FLAGS}
 
 
+def _fit(text: str, limit: int = CARD_TEXT_MAX) -> str:
+    return text if len(text) <= limit else text[:limit - len(TRUNCATED)] + TRUNCATED
+
+
 def card_payload(card: ApprovalCard) -> dict:
-    body = "\n".join((f"核准卡 {card.approval_id}", *card.lines))
+    body = _fit("\n".join((f"核准卡 {card.approval_id}", *card.lines)))
     value = f"{card.approval_id}:{card.nonce}"
     buttons = [{"type": "button", "action_id": aid, "value": value, "style": style,
                 "text": {"type": "plain_text", "text": label, "emoji": False}}

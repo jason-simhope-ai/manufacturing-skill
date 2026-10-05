@@ -13,7 +13,9 @@ Adapters translate a platform into these events and post `Reply` /
   the message's own platform ref (e.g. Slack `ts`); if left None the gateway
   threads under `event_id`, which only the mock adapter relies on.
 * Approval decisions arrive only as `ApprovalClick` (structured button
-  events), never from chat text.
+  events), never from chat text. `ApprovalClick.channel_ref` is the raw id of
+  the channel the button was clicked in (the parent channel for a thread); the
+  gateway rejects a click whose channel differs from the card's (EXT-03).
 * `post()` must post into `reply.thread_ref` when given, never change the
   display name, and return the platform message ref.
 """
@@ -47,6 +49,7 @@ class ApprovalClick:             # structured click; mock script {"type":"approv
     user_ref: str
     decision: Literal["approve", "deny"]
     ts: float
+    channel_ref: str             # where the button was clicked; must equal the card's channel
 
 
 @dataclass(frozen=True)

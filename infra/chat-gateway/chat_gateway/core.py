@@ -48,7 +48,7 @@ LOCAL_DRIVERS = frozenset({"mock"})
 ALPHA_MAX_OFFPREM_TIER = "T1"     # SaaS chat platforms and cloud models: T1 at most in alpha
 T3_DOC = "docs/superpowers/specs/2026-10-05-digital-twin-team-design.md §11.2"
 T3_REPLY = "此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理"
-# Same patterns as team/tools/_teamlib.py `_ID_RE` / `_CAPID_RE` (the linter). Duplicated, not
+# Same patterns as team/tools/teamlib/schema.py `_ID_RE` / `_CAPID_RE` (the linter). Duplicated, not
 # imported: the gateway core is stdlib-only and never imports team/tools. Re-checked at load
 # because ids reach file names (the claude-code driver's temp files) and audit records.
 ID_RE = re.compile(r"[a-z][a-z0-9-]{1,40}")          # twin and channel ids (always fullmatch)
@@ -272,6 +272,7 @@ class Gateway:
     CHANNEL_LIMIT = (60, 3600.0)      # 60 messages / channel / hour
     POST_LIMIT = (3, 86400.0)         # 3 scheduled posts / channel / day
     DEDUPE = (600.0, 1000)            # event_id kept 10 min or 1,000 entries
+    CLICK_NOTICE_CAP = 1000           # (approval, outcome) pairs already answered with a notice
     FAILURES_TO_DEGRADE = 3
 
     def __init__(self, roster: dict, adapter: ChatAdapter, driver: HarnessDriver, audit: AuditLog,
@@ -303,6 +304,7 @@ class Gateway:
         self.daily_budget_usd, self.max_budget_usd, self.timeout_s = daily_budget_usd, max_budget_usd, timeout_s
         self._windows: dict[str, deque] = {}
         self._seen: OrderedDict[str, float] = OrderedDict()
+        self._click_notices: set[tuple[str, str]] = set()
         self.user_rl = RateLimiter(*self.USER_LIMIT)
         self.channel_rl = RateLimiter(*self.CHANNEL_LIMIT)
         self.post_rl = RateLimiter(*self.POST_LIMIT)
@@ -419,12 +421,22 @@ class Gateway:
             self._audit("post_failed", ctx, decision="deny", deny_reason=type(exc).__name__, **extra)
             return False
 
+    def _audit_overflow(self) -> None:
+        """EXT-12: an adapter with a bounded inbox (SaaS) drops what arrives while it is full and
+        counts it; the drops are audited here as `policy_denied` / `overflow:<count>`."""
+        take = getattr(self.adapter, "take_overflow", None)
+        count = take() if callable(take) else 0
+        if count:
+            self._audit("policy_denied", _Ctx(platform=self.adapter.name), decision="deny",
+                        deny_reason=f"overflow:{int(count)}")
+
     def run(self, pace: float = 0.0) -> int:
         """Drive the adapter until its event stream ends; returns number of events."""
         n = 0
         try:
             for ev in self.adapter.events():
                 n += 1
+                self._audit_overflow()
                 self.last_deny = None
                 outs = self.handle(ev)
                 for out in outs:
@@ -434,6 +446,7 @@ class Gateway:
                     dropped(*self.last_deny)
                 if pace:
                     time.sleep(pace)
+            self._audit_overflow()
         finally:
             self.adapter.close()
         return n
@@ -645,16 +658,27 @@ class Gateway:
         if self._is_replay(ev.event_id, now):
             return self._deny(ctx, "duplicate_event", action="replay_rejected", approval_id=ev.approval_id)
         self._identify(ctx, ev.platform, ev.user_ref, now)
-        status = self.approvals.resolve(ev, self.executor, roles=ctx.positions)
+        wrong_channel = rec is not None and ev.channel_ref != rec.channel_ref     # EXT-03
+        status = "mismatch" if wrong_channel else self.approvals.resolve(ev, self.executor, roles=ctx.positions)
         action, decision, reason = {
             "granted": ("approval_granted", "allow", None), "denied": ("approval_denied", "deny", "approver_denied"),
             "expired": ("approval_expired", "deny", "ttl"), "replay": ("replay_rejected", "deny", "single_use"),
             "mismatch": ("policy_denied", "deny", "approval_mismatch"),
             "forbidden": ("policy_denied", "deny", "approval_forbidden"),
         }[status]
+        if wrong_channel:
+            reason = "approval_channel"
         self._audit(action, ctx, approval_id=ev.approval_id, decision=decision, deny_reason=reason,
                     args_hash=rec.args_hash if rec else None)
         if rec is None:
             return []
+        # EXT-16: one notice per (approval, outcome). Repeated clicks are audited but post nothing,
+        # so click spam cannot make the bot flood the card's channel.
+        key = (ev.approval_id, reason or status)
+        if key in self._click_notices:
+            return []
+        if len(self._click_notices) >= self.CLICK_NOTICE_CAP:
+            self._click_notices.clear()
+        self._click_notices.add(key)
         return [self._notice(ctx, rec.twin_id if rec.twin_id in self.twins else "", f"核准結果：{status}",
                              decision=decision)]

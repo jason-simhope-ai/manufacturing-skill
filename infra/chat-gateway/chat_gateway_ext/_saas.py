@@ -14,6 +14,7 @@ import os
 import queue
 import re
 import sys
+import threading
 from typing import Any, Iterator, Mapping
 
 from chat_gateway import ConfigRefused
@@ -24,6 +25,10 @@ PIP_HINT = "pip install -r infra/chat-gateway/requirements-optional.txt"
 APPROVAL_ID_RE = re.compile(r"apv-[0-9a-f]{4,32}")
 NONCE_RE = re.compile(r"[0-9a-f]{16,64}")
 DECISIONS = ("approve", "deny")
+# EXT-12: at most this many platform events wait in the inbox. The gateway handles one event at
+# a time (each may run a model call), so a burst beyond this is dropped, counted and audited by
+# the gateway as `overflow` rather than queued without bound.
+INBOX_MAX = 256
 # C0, DEL, C1 (incl. U+0085 NEL) and U+2028/U+2029: anything `str.splitlines()` breaks on, so a
 # file name can never push text out of its `[附件]` line (EXT-10).
 _CTRL = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
@@ -81,8 +86,10 @@ class SaasAdapterBase:
         self.refs = bound_refs(bindings or {}, self.name)
         self._secrets = require_env(env, *self.SECRET_VARS)  # type: ignore[attr-defined]
         self._transport = transport if transport is not None else self._real_transport()
+        self._secrets = ()                          # EXT-15: only the transport keeps the tokens
         self._inbox: queue.Queue = queue.Queue()
         self._bot_id: str | None = None
+        self._overflow, self._overflow_lock = 0, threading.Lock()
 
     def __repr__(self) -> str:                      # never show tokens
         return f"<{type(self).__name__} max_tier={self.max_tier} channels={len(self.refs)}>"
@@ -99,16 +106,31 @@ class SaasAdapterBase:
     def to_event(self, raw: dict) -> Event | None:
         raise NotImplementedError
 
+    def _sink(self, raw: Any) -> None:
+        """Called from the SDK thread. None (disconnect) always gets through; anything else is
+        dropped and counted while INBOX_MAX events are already waiting."""
+        if raw is not None and self._inbox.qsize() >= INBOX_MAX:
+            with self._overflow_lock:
+                self._overflow += 1
+            return
+        self._inbox.put(raw)
+
+    def take_overflow(self) -> int:
+        """Events dropped since the last call (the gateway audits them as `overflow`)."""
+        with self._overflow_lock:
+            count, self._overflow = self._overflow, 0
+        return count
+
     def events(self) -> Iterator[Event]:
-        self._transport.listen(self._inbox.put)
+        self._transport.listen(self._sink)
         while True:
             raw = self._inbox.get()
             if raw is None:
                 return
             try:
                 ev = self.to_event(raw)
-            except (KeyError, TypeError, ValueError, AttributeError):
-                print(f"{self.name}: dropped malformed platform event", file=sys.stderr)
+            except Exception as exc:  # noqa: BLE001 - EXT-12: one odd event must not end the stream
+                print(f"{self.name}: dropped malformed platform event ({type(exc).__name__})", file=sys.stderr)
                 continue
             if ev is not None:
                 yield ev

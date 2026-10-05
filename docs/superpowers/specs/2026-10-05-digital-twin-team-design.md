@@ -14,6 +14,7 @@
 | ------- | ---------- | ------------ |
 | v1      | 2026-10-05 | 初稿：Q1–Q9、TEAM 層、schema、chat-ops、安全、pilot、ship list。 |
 | v2      | 2026-10-05 | 依 round-2 裁決重寫：(A1) 全面去識別 — 範例公司改為通用設計假設，pilot 只用通用部門；(A2) capability 加 `today`/`humanStillDoes`，旗艦能力拆成 strengthen + 休眠 outsource；(A3) team/ 預設安裝；(A4) claude-code driver 固定受限旗標集；(A5) wave-1 品保分身降為 T1 + 來源端去識別；(A6) `/team ask` 只是預覽；(A7) 每輪必須 @mention、前綴身分；(A8) 刪 JSON Schema，改手寫驗證 + 錯誤碼；(A9) 分身互相交棒延後。B1–B17 定值（分級 T0–T3、autonomy 名稱制、bytes 預算、TTL 30 分、限流、無長期記憶、`MFG_TEAM_` 前綴、gate 欄位、outsource 每分身 ≤ 1、T3 拒載 exit 3）。新增 §14 Deferred、§15 Known gaps；§18 改為 7 個可平行實作的 WP。 |
+| v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
 
 ## 0. TL;DR
 
@@ -99,7 +100,7 @@ team/
 ├── policies/restricted.md            # T3 政策（alpha 僅政策 + lint）
 ├── gate/need-a-twin.md               # 閘門問卷 + 複審清單
 ├── twins/{_template,production-manager,qa-manager,engineering-manager}.md
-├── tools/{teamctl.py,_teamlib.py,build.py,deid.py,lint-allow.txt,pre-commit-names.sample}
+├── tools/{teamctl.py,_teamlib.py,teamlib/,build.py,deid.py,lint-allow.txt,pre-commit-names.sample}
 ├── local/                            # gitignored（僅 README.md、.gitkeep 追蹤）
 │   ├── roster.local.yaml  identities.local.yaml  bindings.local.yaml  deid-map.local.yaml
 │   ├── names.denylist     playbook.local.md      personal/<twin-id>.local.md
@@ -117,7 +118,7 @@ tests/chat_gateway/{fake_claude.py,roster_fixture.json,golden/demo.txt}
 
 `.gitignore` 新增（注意：要重新納入子檔，父目錄必須寫成 `team/local/*`，不能寫 `team/local/`）：`team/local/*`、`!team/local/README.md`、`!team/local/.gitkeep`、`team/.build/`、`*.local.yaml`、`*.local.md`、`logs/`、`**/audit/`、`**/memory/`。執行期狀態一律放在 `${MFG_TEAM_STATE_DIR}`，不放在 repo 內。
 
-## 5. Schemas（唯一真相 = `team/tools/_teamlib.py` 的手寫驗證；無 JSON Schema 檔）
+## 5. Schemas（唯一真相 = `team/tools/teamlib/` 的手寫驗證；`_teamlib.py` 為相容 shim；無 JSON Schema 檔）
 
 YAML 一律用 `yaml.SafeLoader` 載入，`date`/`datetime` 轉成 ISO 字串；預期是字串的欄位若出現非字串值 → `E005`（避免未加引號的 `7:40` 被當成 60 進位數字）。未知 key → `E002`。型別記號：`str`、`int`、`bool`、`id`（`^[a-z][a-z0-9-]{1,40}$`）、`tier`（`T0|T1|T2|T3`）、`autonomy`（`observe<suggest<draft<act-with-approval<act`）、`date`（`YYYY-MM-DD` 字串）。
 
@@ -326,6 +327,7 @@ class InboundMessage:            # adapter → gateway
 @dataclass(frozen=True)
 class ApprovalClick:             # 結構化點擊；mock 劇本 {"type":"approval_click",...}
     event_id: str; platform: str; approval_id: str; nonce: str; user_ref: str; decision: Literal["approve","deny"]; ts: float
+    channel_ref: str             # 點擊所在頻道（討論串取其父頻道）；≠ 核准卡的頻道 → 拒絕（approval_channel），核准不被消耗
 @dataclass(frozen=True)
 class ScheduledPost:             # 由 `chat_gateway post` 產生
     twin_id: str; capability_id: str; channel_id: str
@@ -602,7 +604,7 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 - `teamctl.py roster [--json] [--crontab]`；`teamctl.py audit-verify FILE`（從 `infra/chat-gateway` 匯入 `chat_gateway.audit.verify`）；`teamctl.py build …` 等同 `build.py`。
 - `python3 team/tools/build.py [--roster PATH] [--out DIR] [--summary] [--check-deterministic]`：產出 `<out>/roster.json`、`<out>/twins/<id>.prompt.md`、`<out>/ref/{agents,skills,know-how,hooks}/<id>.md`（profile 檔有 `extends:` 時用 `_resolve_extends.resolve_profile_file`，否則直接複製）、`<out>/identities.json`、`<out>/bindings.json`（僅在本機 overlay 存在時產生）；`--summary` 只輸出 ≤ 1,200 B 的摘要。
 - `python3 team/tools/deid.py --in FILE.csv --out FILE.csv --map team/local/deid-map.local.yaml [--drop COL,...] [--keep COL,...]`：客戶名 → 穩定的 `CUST-xx`（對照表存在本機 map），刪除指定欄，用 §11.1 的 DLP 樣式加本機 denylist 掃描自由文字欄；殘留命中 → exit 1；stdout 輸出各類替換次數。
-- 驗證錯誤碼：E001 YAML 解析／非 mapping、E002 未知 key、E003 缺必填、E004 型別或 enum 錯誤、E005 非字串／日期格式、E010–E014、E020 分身檔不存在或 id ≠ 檔名、E021–E024、E030–E039、E040–E046、E050 bytes 超限、E051 build 不確定、E060 .gitignore；W001–W007。錯誤碼寫在 `_teamlib.py` 的 `CODES` dict 中（code → 中文說明）。
+- 驗證錯誤碼：E001 YAML 解析／非 mapping、E002 未知 key、E003 缺必填、E004 型別或 enum 錯誤、E005 非字串／日期格式、E010–E014、E020 分身檔不存在或 id ≠ 檔名、E021–E024、E030–E039、E040–E046、E050 bytes 超限、E051 build 不確定、E060 .gitignore；W001–W007。錯誤碼寫在 `team/tools/teamlib/schema.py` 的 `CODES` dict 中（`_teamlib.CODES` 仍可用）（code → 中文說明）。
 - `tests/team/fixtures.yaml`：每個 case 為 `{id, files: {path: content}, args: [...], expect: {exit, codes: [...]}}`；`run.py` 把每個 case 寫進 tmpdir 中的迷你 repo 後執行，另含 `deid:` cases（輸入列 → 預期輸出列）。
 - 驗收：`python3 tests/team/run.py` exit 0。
 

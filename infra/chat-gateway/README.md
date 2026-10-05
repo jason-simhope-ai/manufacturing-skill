@@ -59,6 +59,7 @@ The file may be at most 2,000,000 bytes.
 | | `ts` | no | previous event + 10 s | Epoch seconds. The first event without one uses the wall clock. |
 | `approval_click` | `id` | yes | — | Event id. |
 | | `approval_id`, `nonce`, `user` | no | `""` | From the approval card the gateway printed. |
+| | `channel` | no | `""` | Channel the button was clicked in. It must equal the card's channel, otherwise the click is `approval_channel` (not consumed). |
 | | `decision` | no | `deny` | `approve`, or anything else = deny. |
 | | `ts` | no | previous + 10 s | As above. |
 | `scheduled` | `twin`, `capability`, `channel` | yes | — | A cron-style post. Limit: 3 per channel per day. |
@@ -66,7 +67,7 @@ The file may be at most 2,000,000 bytes.
 
 ```jsonl
 {"type":"message","id":"m1","channel":"qa-floor","user":"mock-qa-lead","text":"@品保 NCR-EX-012 要不要升級 8D？","ts":1791158100}
-{"type":"approval_click","id":"c1","approval_id":"apv-0000","nonce":"0000","user":"mock-qa-lead","decision":"approve","ts":1791158160}
+{"type":"approval_click","id":"c1","approval_id":"apv-0000","nonce":"0000","user":"mock-qa-lead","decision":"approve","channel":"qa-floor","ts":1791158160}
 {"type":"scheduled","twin":"production-manager","capability":"briefing-risk-check","channel":"daily-ops"}
 {"type":"note","title":"narration only"}
 ```
@@ -83,7 +84,7 @@ Rules to know before you replay NCRs:
 | -------- | ------- | ----- |
 | `MFG_TEAM_ROSTER` | `team/.build/roster.json` | The roster the build step writes. `identities.json` and `bindings.json` are read from the same directory. |
 | `MFG_TEAM_ADAPTER` / `MFG_TEAM_DRIVER` | `mock` / `mock` | |
-| `MFG_TEAM_STATE_DIR` | `~/.local/state/manufacturing-skill/team` | Must be an absolute path. The gateway writes only here: `audit/<tier>/audit.jsonl`, `audit/checkpoint.json` and `post-limits.json`. |
+| `MFG_TEAM_STATE_DIR` | `~/.local/state/manufacturing-skill/team` | Must be an absolute path. Created `0700` if missing; start is refused (exit 78) if it is a symlink, owned by another user, or group/other-writable. The gateway writes only here: `audit/<tier>/audit.jsonl`, `audit/checkpoint.json`, `post-limits.json`, and for the claude-code driver `driver-tmp/` and `driver-home/`. |
 | `MFG_TEAM_DENYLIST` | `team/local/names.denylist` if present | Local denylist (one regex per line). A hit counts as T2 for inbound DLP and the output filter. If the variable is set, the file must exist; a bad regex refuses start (exit 78), naming only the line number. |
 | `MFG_TEAM_AUDIT_HMAC_KEY`, `MFG_TEAM_APPROVAL_HMAC_KEY` | — | Required unless both adapter and driver are mock. Each must be at least 16 characters. Error messages name a missing variable but never print its value. |
 | `MFG_TEAM_DAILY_BUDGET_USD` | off | Soft daily spending cap per twin, at most 1000. |
@@ -101,7 +102,7 @@ Numbers must be finite: `nan`, `inf`, a value out of range or not a number refus
 | `chat_gateway/sanitize.py` | Text normalization, `<<UNTRUSTED>>` envelopes, tripwires, DLP, output filter |
 | `chat_gateway/approvals.py` | `ApprovalBook`: approval cards bound to an args hash, 30-minute TTL, single use; `NoopExecutor` |
 | `chat_gateway/audit.py` | Append-only audit log. Each tier is an HMAC-SHA256 chain keyed by `MFG_TEAM_AUDIT_HMAC_KEY`; `checkpoint.json` (signed, rewritten after every append) holds each tier's count, last seq and head MAC, so `verify` catches edits, deletions, reordering, truncation, a removed tier file and seq gaps. A rollback of log *and* checkpoint is only caught by an earlier off-host copy of the checkpoint: shipping it off-host is the operator's job. `content_sha256` holds a keyed content tag, never message text; at T2 and above `content_len` is dropped too. |
-| `chat_gateway/patterns.py` | `SECRET_PATTERNS`, `NAME_ZH`/`NAME_OTHER`/`NAME_PATTERNS`, `PII_PATTERNS`, `DLP_PATTERNS`, `valid_ubn`, `ubn_hit`. The single source: `team/tools/_teamlib.py` (teamctl, deid) loads this file and keeps no copy. |
+| `chat_gateway/patterns.py` | `SECRET_PATTERNS`, `NAME_ZH`/`NAME_OTHER`/`NAME_PATTERNS`, `PII_PATTERNS`, `DLP_PATTERNS`, `valid_ubn`, `ubn_hit`. The single source: `team/tools/teamlib/schema.py` (teamctl, deid) loads this file and keeps no copy. |
 | `chat_gateway/formatter.py`, `prompt.py`, `config.py` | Reply layout (`DRAFT` label at `draft`), the 12,000 B prompt budget and token estimate, environment config |
 | `chat_gateway/adapters/mock.py`, `drivers/mock.py` | Scripted/REPL adapter. The deterministic driver also has a `compliant_malicious` mode. |
 | `chat_gateway_ext/slack.py`, `discord.py`, `_saas.py` | Real-platform adapters: pure event mappings (`slack_to_event`, `discord_to_event`), the tier gate, the secret checks, and SDK transports that are imported lazily |
@@ -166,7 +167,9 @@ content, and the adapter drops it.
 - Messages from bots or webhooks, DMs, externally shared channels and non-allowlisted guilds are forwarded with their flags set but with the text removed. The gateway can then audit `policy_denied` without seeing the content.
 - Discord leaves any guild that holds no bound channel. It does this at startup and whenever it is added to a guild, and it emits an event that the gateway audits. The guild allowlist is mandatory: a transport without one is refused at construction, and until the allowlist is filled every guild is treated as foreign.
 - Attachments are reported by file name only, as a `[附件] …` line (control characters, C1 and U+2028/U+2029 replaced, so a name cannot start a new line). They are never downloaded. The gateway wraps that line in an `<<UNTRUSTED … source=attachment>>` envelope, so a message with an attachment is a tainted turn (no approval card, no URLs, autonomy at most `suggest`).
-- Approvals come only from button clicks, which the platform delivers over the authenticated socket. Chat text is never parsed as a click. A malformed or unknown button is dropped (ids and nonces must match in full; a trailing newline is malformed).
+- Approvals come only from button clicks, which the platform delivers over the authenticated socket. Chat text is never parsed as a click. A malformed or unknown button is dropped (ids and nonces must match in full; a trailing newline is malformed). A click counts only in the channel the card was posted to (Slack `channel.id`, Discord `channel_id` or the thread's parent); a copy clicked in another bound channel is denied as `approval_channel` and the approval stays open. Each approval gets at most one result notice per outcome, so repeated clicks are audited but post nothing.
+- At most 256 platform events wait for the gateway. Events arriving while that many are queued are dropped and audited as `policy_denied` / `overflow:<count>`. An event the mapping cannot parse is dropped (class name on stderr) without ending the stream.
+- A Slack approval card's text block is cut to 3,000 characters with a `…（已截斷）` marker (Slack's `plain_text` limit).
 - `post()` refuses any channel that is not in `bindings.json` by raising `PermissionError`. This also covers DMs.
 - Error messages name a missing variable but never print its value, and `repr()` never shows tokens. Do not turn on `DEBUG` logging for `slack_sdk` or `discord`.
 
@@ -194,7 +197,8 @@ Tests use a fake `claude` script (`python3 tests/gateway/test_claude_code_driver
 | `ANTHROPIC_API_KEY` | — (required) | Service-account key. `MFG_TEAM_ANTHROPIC_API_KEY` is accepted as an alias. Never printed or logged. |
 | `MFG_TEAM_CLAUDE_BIN` | `claude` | Path or name of the CLI. Resolved once to an absolute path; empty and relative `PATH` entries are ignored. |
 | `MFG_TEAM_MAX_BUDGET_USD`, `MFG_TEAM_TIMEOUT_S` | `0.10`, `60` | Per call. The smaller of the driver value and the invocation value wins. |
-| `MFG_TEAM_DATA_T1` | off | Added as `--add-dir` (realpath) only when set and granted to the invocation. Must be an absolute path. |
+| `MFG_TEAM_DATA_T1` | off | Added as `--add-dir` (realpath) only when set and granted to the invocation. Must be an absolute path. It must not overlap the state dir, the config dir, the repository or another data root, nor be or contain `$HOME`; `self_check` refuses it if it holds a symlink or a roster/identity/binding/prompt file. |
+| `MFG_TEAM_PASS_PROXY_ENV` | off | `1` forwards `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (either case), `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `NODE_EXTRA_CA_CERTS` to the child. Off: none of them. |
 
 Every call uses this fixed argument list (no shell, never built from chat text):
 
@@ -204,8 +208,8 @@ claude -p --output-format json --restricted --strict-mcp-config --tools "Read,Gr
   --max-budget-usd <n> [--add-dir <MFG_TEAM_DATA_T1>]
 ```
 
-- **Environment.** The child sees only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR` and `ANTHROPIC_API_KEY`. `PATH` is fixed: the resolved CLI's directory, then `/usr/local/bin:/usr/bin:/bin`. The user message and channel window go in through stdin.
-- **System prompt.** The compiled twin prompt plus a short header (tier, effective autonomy, taint, predict-first) is written to a `0600` file `twin-*.prompt.md` under `$MFG_TEAM_STATE_DIR/driver-tmp/` and deleted after the call, including on failure.
+- **Environment.** The child sees only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR` and `ANTHROPIC_API_KEY` (plus the proxy variables when `MFG_TEAM_PASS_PROXY_ENV=1`). `PATH` is fixed: the resolved CLI's directory, then `/usr/local/bin:/usr/bin:/bin`. `HOME` is `$MFG_TEAM_STATE_DIR/driver-home/` (`0700`), never the operator's home, so the child cannot read the operator's `~/.claude`. The user message and channel window go in through stdin.
+- **System prompt.** The compiled twin prompt plus a short header (tier, effective autonomy, taint, predict-first) is written to a `0600` file `twin-*.prompt.md` under `$MFG_TEAM_STATE_DIR/driver-tmp/` and deleted after the call, including on failure. `driver-tmp/` and `driver-home/` are checked on every call: `0700`, owned by the gateway user, never a symlink.
 - **Working directory.** `team/.build/ref/` (spec §9.5). The prompt's index lines read `<kind>/<id>.md`, relative to it. `identities.json`, `bindings.json`, `roster.json` and every twin prompt live one level up, outside the model's reach; the driver refuses to run if any of them, or any `*.prompt.md`, appears under `ref/`, or if `ref/` or anything under it is a symlink. It runs in the realpath of `ref/`.
 - **Prompt integrity.** The driver re-hashes the compiled prompt bytes it sends and refuses them if they no longer match the roster's `promptSha`.
 - **Output.** The CLI's JSON envelope is parsed; `structured_output` (or a JSON `result` string) becomes a `TwinResult`, with `usage` filled from the envelope. `TWIN_RESULT_SCHEMA` is also kept as `chat_gateway_ext/twin_result.schema.json`; a test keeps the two identical.

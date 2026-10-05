@@ -5,6 +5,7 @@ mechanism is still complete and tested:
 
 * id `apv-<8hex>`, nonce 128-bit hex; the book stores only HMAC(key, id|nonce|args_hash).
 * Decisions come only from structured `ApprovalClick` events, never chat text.
+* A click counts only in the channel the card was posted to (`click.channel_ref`, EXT-03).
 * One approver decides; at T2+ the approver must differ from the requester.
 * Any later click on a decided / expired approval → "replay".
 * Dual-approval configurations are refused at load (see core.validate_roster).
@@ -108,6 +109,8 @@ class ApprovalBook:
         if rec.done:
             return "replay"
         if not hmac.compare_digest(rec.mac, self._mac(click.approval_id, click.nonce, rec.args_hash)):
+            return "mismatch"
+        if click.channel_ref != rec.channel_ref:        # a copy of the card clicked elsewhere; not consumed
             return "mismatch"
         if self._clock() > rec.expires_at:
             rec.done = True

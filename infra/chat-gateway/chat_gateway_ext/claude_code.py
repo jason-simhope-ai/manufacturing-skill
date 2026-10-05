@@ -8,17 +8,24 @@ Pinned argv (never widened, never built from chat text):
 
 * The child environment is an allowlist: HOME, CLAUDE_CONFIG_DIR, ANTHROPIC_API_KEY (from
   `ANTHROPIC_API_KEY`, or `MFG_TEAM_ANTHROPIC_API_KEY` as an alias) and a fixed PATH (the
-  directory of the resolved `claude` binary, then /usr/local/bin:/usr/bin:/bin). Nothing else
-  from the gateway's environment reaches the model process. `claude` is resolved once to an
-  absolute path, ignoring empty and relative PATH entries, so a file planted in cwd never runs.
+  directory of the resolved `claude` binary, then /usr/local/bin:/usr/bin:/bin). HOME is a
+  private 0700 directory `<state dir>/driver-home`, never the operator's home, so the child
+  cannot find the operator's `~/.claude`, shell history or keys there. Proxy variables
+  (`PROXY_VARS`) pass through only when `MFG_TEAM_PASS_PROXY_ENV=1`. Nothing else from the
+  gateway's environment reaches the model process. `claude` is resolved once to an absolute
+  path, ignoring empty and relative PATH entries, so a file planted in cwd never runs.
 * Paths: CLAUDE_CONFIG_DIR, the data root and cwd must be absolute and are realpath-resolved;
-  the driver refuses to run if anything under cwd is a symlink.
+  the driver refuses to run if anything under cwd is a symlink. The data root must not overlap
+  the state dir, CLAUDE_CONFIG_DIR, the repository or another data root, nor contain $HOME;
+  `self_check` walks it once and refuses any symlink or roster/identity/binding file inside.
+* The state dir must not be group/other-writable; `driver-tmp/` and `driver-home/` under it are
+  0700, owned by the gateway user and never symlinks (checked on every call).
 * The child runs in its own process group, which is killed on every exit path. Stdout is
   read with a 1 MB cap and a hard deadline (a descendant holding the pipe cannot stall the
   gateway); stderr is discarded. Output with duplicate JSON keys, invalid UTF-8 or excessive
   nesting is a DriverError.
 * cwd is `team/.build/ref/` (spec §9.5), the sibling of the compiled `twins/` directory, and
-  the prompt's index lines read `<kind>/<id>.md` (`_teamlib.REF_PREFIX = ""`). `Read/Grep/Glob`
+  the prompt's index lines read `<kind>/<id>.md` (`teamlib.REF_PREFIX = ""`). `Read/Grep/Glob`
   are confined to cwd (+ `--add-dir`), so `identities.json`, `bindings.json`, `roster.json`
   and the other twins' prompts are out of reach. The driver refuses to run if any of those
   appear under cwd.
@@ -44,6 +51,7 @@ import re
 import selectors
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import time
@@ -51,6 +59,7 @@ from pathlib import Path
 from typing import Mapping
 
 from chat_gateway import EXIT_USAGE, ConfigRefused
+from chat_gateway.config import ensure_state_dir
 from chat_gateway.drivers.base import DriverError, TwinInvocation, TwinResult, result_from_json
 
 _STR_LIST = {"type": "array", "items": {"type": "string"}}
@@ -85,7 +94,11 @@ REQUIRED_FLAGS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("--max-budget-usd", ("--max-budget-usd",)),
 )
 KEY_VARS = ("ANTHROPIC_API_KEY", "MFG_TEAM_ANTHROPIC_API_KEY")
-ENV_PASSTHROUGH = ("HOME",)
+# Forwarded only with MFG_TEAM_PASS_PROXY_ENV=1 (behind a corporate proxy / TLS-inspecting CA).
+PASS_PROXY_VAR = "MFG_TEAM_PASS_PROXY_ENV"
+PROXY_VARS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy",
+              "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS")
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SAFE_PATH_DIRS = ("/usr/local/bin", "/usr/bin", "/bin")      # child PATH after the claude binary's dir
 MAX_STDOUT_BYTES = 1_000_000
 KILL_GRACE_S = 5
@@ -121,6 +134,24 @@ def _abs_real(raw: str | os.PathLike | None) -> str | None:
         return None
     path = os.path.expanduser(os.fspath(raw))
     return os.path.realpath(path) if os.path.isabs(path) else None
+
+
+def _overlaps(a: str, b: str) -> bool:
+    """True if one realpath is the other or contains it."""
+    return os.path.commonpath([a, b]) in (a, b)
+
+
+def _private_dir(path: Path) -> Path:
+    """EXT-14: make `path` a 0700 directory owned by us; refuse a symlink or a foreign owner."""
+    path.mkdir(exist_ok=True, mode=0o700)
+    st = os.lstat(path)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+        raise DriverError(f"refusing to run: {path.name} in the state dir is a symlink or not a directory")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise DriverError(f"refusing to run: {path.name} in the state dir is owned by another user")
+    if stat.S_IMODE(st.st_mode) != 0o700:
+        os.chmod(path, 0o700)
+    return path
 
 
 class _DuplicateKey(ValueError):
@@ -210,7 +241,7 @@ class ClaudeCodeDriver:
 
     def __init__(self, bin: str, config_dir: str, max_budget_usd: float, timeout_s: int,  # noqa: A002
                  data_root: str | None = None, *, state_dir: str | os.PathLike | None = None,
-                 env: Mapping[str, str] | None = None):
+                 env: Mapping[str, str] | None = None, repo_root: str | os.PathLike | None = None):
         if not _finite_in(max_budget_usd, MAX_CALL_BUDGET_USD):
             raise ConfigRefused(f"max_budget_usd must be a finite number > 0 and at most {MAX_CALL_BUDGET_USD:g}",
                                 exit=EXIT_USAGE)
@@ -224,6 +255,7 @@ class ClaudeCodeDriver:
         self.data_root = data_root or None
         self._env = os.environ if env is None else env
         self.state_dir = Path(state_dir or self._env.get("MFG_TEAM_STATE_DIR") or DEFAULT_STATE_DIR).expanduser()
+        self.repo_root = Path(repo_root or REPO_ROOT)
 
     # ── startup check ──
     def _key_var(self) -> str | None:
@@ -259,10 +291,79 @@ class ClaudeCodeDriver:
                 problems.append("MFG_TEAM_DATA_T1 must be an absolute path")
             elif not os.path.isdir(_abs_real(self.data_root) or ""):
                 problems.append("MFG_TEAM_DATA_T1 is set but is not an existing directory")
+        problems += self._overlap_problems()
         return problems
+
+    def _data_roots(self) -> list[tuple[str, str]]:
+        """(variable name, realpath) of every configured data root (alpha: MFG_TEAM_DATA_T1 only)."""
+        real = _abs_real(self.data_root)
+        return [("MFG_TEAM_DATA_T1", real)] if real else []
+
+    def _overlap_problems(self) -> list[str]:
+        """EXT-05: a data root is handed to the model (`--add-dir`). It must not reach the gateway's
+        own state, the CLI config, the repository (roster, identities, other prompts) or $HOME."""
+        roots = self._data_roots()
+        guarded = [("the state directory (MFG_TEAM_STATE_DIR)", _abs_real(self.state_dir)),
+                   ("MFG_TEAM_CLAUDE_CONFIG_DIR", _abs_real(self.config_dir)),
+                   ("the repository", _abs_real(self.repo_root))]
+        problems = []
+        for n, (var, real) in enumerate(roots):
+            for other_var, other in roots[n + 1:]:
+                if _overlaps(real, other):
+                    problems.append(f"{var} must not overlap {other_var}")
+            for what, other in guarded:
+                if other and _overlaps(real, other):
+                    problems.append(f"{var} must not overlap {what}")
+            home = _abs_real(self._env.get("HOME") or os.path.expanduser("~"))
+            if home and os.path.commonpath([real, home]) == real:
+                problems.append(f"{var} must not be $HOME or contain it")
+        return problems
+
+    def _scan_data_roots(self) -> list[str]:
+        """EXT-05 (startup only): no symlink and no roster/identity/binding file in a data root."""
+        problems: list[str] = []
+        for var, real in self._data_roots():
+            if not os.path.isdir(real):
+                continue
+
+            def walk_error(exc: OSError, var: str = var) -> None:
+                problems.append(f"{var} is not fully readable ({type(exc).__name__})")
+
+            for root, dirs, files in os.walk(real, onerror=walk_error, followlinks=False):
+                bad = next((n for n in dirs + files if os.path.islink(os.path.join(root, n))), None)
+                if bad is not None:
+                    rel = os.path.relpath(os.path.join(root, bad), real)
+                    problems.append(f"{var} contains a symlink ({rel}); copy the data in instead")
+                    break
+                bad = next((n for n in files if n in FORBIDDEN_IN_CWD or n.endswith(".prompt.md")), None)
+                if bad is not None:
+                    problems.append(f"{var} contains roster, identity, binding or prompt files ({bad})")
+                    break
+        return problems
+
+    def _private_dirs(self) -> tuple[Path, Path]:
+        """(driver-tmp, driver-home) under the state dir, created 0700 and verified on each call."""
+        if not self.state_dir.is_absolute():         # never create anything relative to the gateway's cwd
+            raise DriverError("MFG_TEAM_STATE_DIR must be an absolute path")
+        try:
+            state = ensure_state_dir(Path(os.path.realpath(self.state_dir)))
+        except ConfigRefused as exc:
+            raise DriverError(str(exc)) from None
+        try:
+            return _private_dir(state / "driver-tmp"), _private_dir(state / "driver-home")
+        except OSError as exc:
+            raise DriverError(f"driver I/O error ({type(exc).__name__})") from None
+
+    @property
+    def home_dir(self) -> Path:
+        return Path(os.path.realpath(self.state_dir)) / "driver-home"
 
     def self_check(self) -> list[str]:
         problems: list[str] = []
+        try:
+            self._private_dirs()                     # the probe below already runs with the private HOME
+        except DriverError as exc:
+            return [str(exc)]
         if self._resolve_bin() is None:
             problems.append(f"claude binary not found: {self.bin}")
         else:
@@ -281,6 +382,7 @@ class ClaudeCodeDriver:
             except OSError as exc:
                 problems.append(f"cannot execute claude binary ({type(exc).__name__})")
         problems += self._path_problems()
+        problems += self._scan_data_roots()
         if self._key_var() is None:
             problems.append("ANTHROPIC_API_KEY (or MFG_TEAM_ANTHROPIC_API_KEY) is not set")
         return problems
@@ -291,8 +393,9 @@ class ClaudeCodeDriver:
         return os.pathsep.join(dict.fromkeys(dirs))
 
     def _child_env(self) -> dict[str, str]:
-        env = {k: self._env[k] for k in ENV_PASSTHROUGH if self._env.get(k)}
-        env["PATH"] = self._child_path()
+        env = {"HOME": str(self.home_dir), "PATH": self._child_path()}
+        if self._env.get(PASS_PROXY_VAR) == "1":
+            env.update({k: self._env[k] for k in PROXY_VARS if self._env.get(k)})
         cfg = _abs_real(self.config_dir)
         if cfg:
             env["CLAUDE_CONFIG_DIR"] = cfg
@@ -372,6 +475,9 @@ class ClaudeCodeDriver:
     def run(self, inv: TwinInvocation) -> TwinResult:
         cwd = self._cwd(inv)
         problems = self._path_problems()
+        build_repo = str(cwd.parents[2]) if len(cwd.parents) > 2 else str(cwd)   # <repo>/team/.build/ref
+        problems += [f"{var} must not overlap the repository" for var, real in self._data_roots()
+                     if _overlaps(real, build_repo)]
         if problems:
             raise DriverError(problems[0])
         if self._resolve_bin() is None:
@@ -379,10 +485,9 @@ class ClaudeCodeDriver:
         if not _finite_in(inv.timeout_s, math.inf):
             raise DriverError("invocation timeout must be a finite number > 0")
         timeout = max(1, min(self.timeout_s, int(inv.timeout_s)))
-        tmp_dir = self.state_dir / "driver-tmp"
+        tmp_dir, _home = self._private_dirs()
         fd, tmp_path = -1, ""
         try:
-            tmp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             fd, tmp_path = tempfile.mkstemp(prefix=TMP_PREFIX, suffix=".prompt.md", dir=str(tmp_dir))
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fd = -1

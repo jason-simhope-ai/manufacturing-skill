@@ -1,7 +1,7 @@
 """Single source of truth for secret / name / PII / DLP regexes (§11.1, §11.4).
 
 Used by the gateway (inbound DLP, outbound masking, config scanning) and by
-`team/tools/_teamlib.py` (teamctl repo hygiene, deid residual scan), which loads
+`team/tools/teamlib/schema.py` (teamctl repo hygiene, deid residual scan), which loads
 this file directly. Lists are `list[tuple[name, re.Pattern]]`. Stdlib `re` only.
 
 Some literals are built by concatenation so this file never matches its own
