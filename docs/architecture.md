@@ -1,4 +1,4 @@
-# Architecture — manufacturing-skill 六層架構詳解
+# Architecture — manufacturing-skill 七層架構詳解
 
 > 給開發者、SI、認真要 fork 的人看的內部架構文件。
 > 老闆 / IT / 終端使用者請看 `docs/explainers/` 內的圖卡。
@@ -13,19 +13,23 @@
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 2 — FLOW        報價→接單→排程→生產→檢驗→出貨        │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 3 — ROLE        5 core agents + profile agents       │
+│  Layer 3 — ROLE        6 core agents + profile agents       │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 4 — INFRA       MCP servers, on-prem LLM, files      │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 5 — REF         ISO 9001, IATF, Lean, OEE, SPC ...   │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 6 — HOOK        pre-quote, post-order, on-error ...  │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 7 — TEAM        職位 → 分身 → 能力 → 頻道（alpha）   │
 └─────────────────────────────────────────────────────────────┘
-        │                                              │
-        ▼ (core 層) ─────────────────── ▼ (profile 層 — overlay)
-   普世製造業共通                    垂直領域加碼
-   存放：core/                      存放：profiles/<vertical>/
+        │                      │                       │
+        ▼ (core 層)            ▼ (profile 層 — overlay) ▼ (team 層 — 只引用)
+   普世製造業共通          垂直領域加碼            這家公司的職位與分身
+   存放：core/             存放：profiles/<vertical>/  存放：team/（+ infra/chat-gateway/）
 ```
+
+Layer 1–6 在 v0.1.x 不變；Layer 7 是 v0.2.0-alpha 新增的實驗性層，預設安裝但不影響既有行為。
 
 ---
 
@@ -84,13 +88,14 @@
 
 **位置**：`core/agents/` + `profiles/<vertical>/agents/`
 
-**Core 5 隻**（普世）：
+**Core 6 隻**（普世）：
 
 - `quote-specialist` — 報價師
 - `sales-coordinator` — 業助
 - `production-planner` — 生管
 - `quality-inspector` — 品管
 - `inventory-manager` — 倉管
+- `engineering-change-manager` — 工程變更（ECN）管理
 
 **CNC profile 加 4 隻**：
 
@@ -181,6 +186,44 @@
 
 ---
 
+## Layer 7 — TEAM 分身團隊層（v0.2.0-alpha，實驗性）
+
+**內容**：回答「**誰**（職位）、**用什麼**（引用哪些 id）、**做到哪**（autonomy、分類）、**在哪說話**（頻道、分級）」。TEAM 層不擁有製造知識；每個職位至多一個「分身」——職位的副駕，不是替身。
+
+**位置**：
+
+- `TEAM.md` — agent 啟動檔（≤ 6,000 B）；人讀 `team/README.zh-TW.md`
+- `team/` — `roster.example.yaml`、`twins/*.md`、`policies/`、`gate/need-a-twin.md`、`tools/`（`teamctl.py` 驗證與檢視、`build.py` 編譯、`deid.py` 去識別）；`team/local/`（gitignored，放真實 roster、身分與綁定）
+- `infra/chat-gateway/` — 聊天 gateway（Python 3.11、核心只用 stdlib）：mock / Slack / Discord adapter、`HarnessDriver`（mock + claude-code）、稽核、核准、輸出過濾
+- `core/commands/team.md` — `/team` 指令（預覽用，不經 gateway）
+
+**設計原則**：
+
+- **賦能不取代**：每項能力必標 `strengthen` / `create` / `outsource`，並寫 `today`（今天誰在做）與 `humanStillDoes`；`outsource` 在分身檔中必須休眠，只能由 roster opt-in（每分身 ≤ 1 項、上限 `draft`、90 天內複審）。未標註是硬錯誤
+- **流程優先**：先過「需要分身嗎？」閘門，`needsTwinGate.result` 必須是 `twin` 才能啟用
+- **組合不複製**：分身只以 id 引用 core / profile 的 agents、skills、know-how、hooks；禁用 `extends` / `model` / `tools`
+- **權限由程式決定**：工具清單由 gateway 依有效 autonomy 決定，alpha 恆為 `Read, Grep, Glob`，沒有任何寫入工具
+- **Fail closed**：T3、雜湊不符、啟用 `act*`、疑似 token、缺環境變數 → 拒絕啟動
+
+**組合規則（composition rule）**：分身 = 職位 × 能力清單。`compose` 只列 id（至多 1 隻 agent，加上 skills / know-how / hooks）；`build.py` 讀**已 resolve** 的內容，把共用 `core-rules.md`、分身本文與能力表編成 `team/.build/twins/<id>.prompt.md`（≤ 12,000 B，大型 agent 改成索引、由分身延遲 `Read`）。知識改動走 profile 的 `extends:`，職位權限走 `team/`，兩者互不糾纏。
+
+**有效 autonomy = 各上限取最小值**：
+
+```
+effective = min(capability.autonomy, 分身檔上限, roster 內該分身上限, policy 全 org 上限,
+                頻道上限, 分級上限(T0/T1→act、T2→act-with-approval、T3→draft),
+                提問者上限)
+另外：outsource ≤ draft；職位 VACANT → observe；本回合疑似被注入（tainted）→ ≤ suggest；alpha 再封頂在 draft
+```
+
+**資料分級**：T0–T3；Slack / Discord 與雲端模型上限 T1，T2 只在本機 mock，T3（高安規客製專案）在 alpha 一律拒載（exit 3）。repo 內只有職稱與合成資料，沒有真名、平台 id、secret。
+
+**延後（不在 v0.2.0-alpha）**：T3 執行期與隔離主機、動作執行與核准落地（目前沒有可寫入的工具）、長期記憶、Slack 上的 T2、gateway 內建 cron、分身互相交棒、DM、其他 LLM driver、LINE / Teams adapter。完整清單見[設計 spec §14](superpowers/specs/2026-10-05-digital-twin-team-design.md)與 [ROADMAP](ROADMAP.md)。
+
+**現況**：mock adapter 與 mock driver 有完整離線測試；Slack / Discord adapter 與 Claude Code driver 已隨附，但未在 CI 對真實平台測試、需要憑證。
+
+---
+
 ## Core + Profile Overlay 規則
 
 ### 啟用單一 profile
@@ -195,6 +238,14 @@
 2. **新名檔案 = 加碼**：profile 內 `agents/cnc-programmer.md` 在 core 沒有 → 純加
 3. **不允許跨 profile 繼承**（避免菱形繼承）
 4. **profile.json 宣告 `extends-core: false` = 完全取代**（少用）
+
+### 第三階：team 層（不覆寫，只引用）
+
+`team/` 是 core → profile 之後的第三階，但**不是 overlay**：
+
+- 不放進 `agents/`、不覆寫任何同名檔，也不參與上面的 override 規則
+- 分身只以 **id 引用** core 與已啟用 profile 中的 agents / skills / know-how / hooks；id 必須可解析，且分身 id 不得與任何 agent 的 basename 相同
+- 想改某隻 agent 懂什麼 → 照舊走 profile `extends:`；想改某個職位的分身能做什麼 → 改 `team/twins/` 或本機 `team/local/roster.local.yaml`（只能收緊或 opt-in）
 
 ### 為什麼這樣設計
 
@@ -225,7 +276,7 @@
 | 專案                      | 差異                                                                  |
 | ------------------------- | --------------------------------------------------------------------- |
 | `addyosmani/agent-skills` | 那是給 AI coding agent 的工程系統；我們是給製造業的 domain agent 系統 |
-| `superpowers` plugin      | 那是純技能集；我們有 6 層 + 兩階 overlay                              |
+| `superpowers` plugin      | 那是純技能集；我們有 7 層 + 三階（core → profile overlay → team 引用）                              |
 | `OpenManufacturing`       | （概念）— 我們具體 + 可 install + 含 profile                          |
 | 廠商客製 SI 案            | 那是一次性閉源；我們是開源 framework + 客製 profile                   |
 

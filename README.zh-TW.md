@@ -57,6 +57,41 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ---
 
+## 虛實整合團隊（v0.2.0-alpha，實驗性）
+
+> 每個職位一個**副駕分身**，住在公司的聊天工作區。**副駕不是替身**：判斷永遠由人做，分身只負責補資料、挑戰假設、定時提醒。
+
+- **分身是什麼**：一個職位一個分身（例：品保部主管分身），由既有的 agents、skills、know-how 以 id **組合**而成，不複製、不覆寫。只在被 @ 時回答，回覆一律標明「【某某分身】」，遇到決策點就停下來把選項交還給人（`🧭 需要你判斷`）。
+- **三分類**：分身的每項能力必標 `strengthen`（強化既有優勢：人仍親手判斷）、`create`（創造新能力：以前沒人做）或 `outsource`（外包既有工作：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。`outsource` 預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判 `outsource`。
+- **先過閘門**：流程修正或既有 `/command` 能解決的，就不開分身（`team/gate/need-a-twin.md`）。
+
+**2 分鐘離線試玩**（零憑證、零網路、純 Python 標準庫）：
+
+```bash
+python3 infra/chat-gateway/demo.py
+```
+
+會重播 8 個情境（排程貼文、@ 路由、「我先說」、注入攻擊被擋、跨分級內容被攔、限流、忽略 bot 與未 @ 的訊息……），最後驗證稽核鏈。
+
+**怎麼開始**
+
+| 你是 | 路徑 |
+| ---- | ---- |
+| **AI agent** | 讀 [TEAM.md](TEAM.md)（≤ 6,000 B）：照啟動演算法 `teamctl check` → `build` → 讀 roster，再依漸進揭露地圖往下讀 |
+| **人（10 分鐘）** | [TEAM.md](TEAM.md) → [team/README.zh-TW.md](team/README.zh-TW.md) → 任選一個分身檔，例如 [team/twins/qa-manager.md](team/twins/qa-manager.md) |
+
+**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 一律不處理**（gateway 啟動即拒絕，exit 3）。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 強制）。
+
+**誠實的現況（alpha）**
+
+- mock adapter、mock driver、team 工具與稽核／核准／過濾邏輯有完整的離線測試，CI 可重現。
+- Slack / Discord adapter 與 Claude Code driver 已隨附，但**未在 CI 對真實平台或真實 `claude` 測試，需要憑證**，只以假 transport 驗證事件對應與指令參數。
+- 沒有長期記憶（只有行程內的短頻道窗，重啟即清空）。
+- 沒有任何寫入動作：分身工具恆為唯讀（`Read, Grep, Glob`），上限 `draft`。
+- 完整設計與延後項目見 [設計 spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md)、[ROADMAP](docs/ROADMAP.md)。
+
+---
+
 <details>
 <summary>給工程師看的架構細節（決策者跟導入者可以跳過）</summary>
 
@@ -232,14 +267,20 @@ manufacturing-skill/
 │   ├── injection-molding/    # Stub
 │   ├── food-processing/      # Stub
 │   └── pharma/               # Stub
+├── TEAM.md                   # 數位分身團隊 — agent 啟動檔（人讀 team/README.zh-TW.md）
+├── team/                     # 第三階 team tier：roster、分身檔、政策、閘門、teamctl/build/deid 工具
 ├── adapters/claude-code/     # 一鍵安裝
 ├── infra/                    # MCP server、地端 LLM 設定
+│   └── chat-gateway/         # 分身聊天 gateway（mock / Slack / Discord adapter、離線 demo）
 ├── docs/
 │   ├── explainers/           # 三張可印 A3 的繁中說明卡
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
+├── tests/
+│   ├── team/                 # team 檔案 lint 與工具測試
+│   └── gateway/              # gateway 單元／安全測試與 demo golden
 └── examples/                 # 合成 demo data — 絕對不要放真實客戶資料
 ```
 

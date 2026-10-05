@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+**Digital-twin team (v0.2.0-alpha, experimental).** A seventh layer (TEAM) and a third tier (`team/`) that give each position a copilot "twin" in chat — a copilot, not a replacement. Alpha stops at `observe / suggest / draft`: there are no write tools, no long-term memory, and T3 (high-assurance custom projects) is always refused. Design: [spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md).
+
+### Added
+
+- **`TEAM.md`** — agent bootstrap (≤ 6,000 B): one-line definition, six inviolable rules, startup algorithm, progressive-disclosure map. Humans start at `team/README.zh-TW.md` (10 minutes).
+- **`team/`** — the third tier. `roster.example.yaml` (synthetic, generic departments and job titles), `twins/` (`_template.md` plus three example twins: production, QA and engineering department heads), `policies/` (`core-rules.md` shared preamble, `restricted.md` T3 policy), `gate/need-a-twin.md` (the "do we need a twin?" gate), `local/README.md` (gitignored local overlays).
+- **Three categories** on every capability — `strengthen` / `create` / `outsource` — with mandatory `today` and `humanStillDoes`. `outsource` must be dormant in a twin file and can only be woken by a roster opt-in: at most one per twin, capped at `draft`, review within 90 days, mandatory teach-back and manual practice. Missing labels are hard errors.
+- **`team/tools/`** — `teamctl.py` (`check`, `roster`, `audit-verify`), `build.py` (deterministic `team/.build/`), `deid.py` (source-side de-identification), `_teamlib.py` (hand-written validator with error codes `E0xx` / `W0xx`), `lint-allow.txt`, `pre-commit-names.sample`.
+- **`infra/chat-gateway/`** — stdlib-only Python 3.11 chat gateway: routing (@mention every turn), identity and tier filters, rate limits, sanitizer (`<<UNTRUSTED>>` envelopes, tripwires, DLP), output filter, approval book (structured clicks only, args-hash bound, 30-minute TTL, single use; no executable actions in alpha), hash-chained audit log, mock adapter and mock driver. Slack and Discord adapters and the Claude Code driver (fixed restricted flag set) ship but are **not exercised in CI against real platforms and need credentials**.
+- **`python3 infra/chat-gateway/demo.py`** — a two-minute offline demo (no credentials, no network) with a golden transcript check.
+- **`/team` command** (`core/commands/team.md`) — `status`, `ask <twin> <message>`, `check`, `gate <position>`, `demo`. `ask` is a preview that bypasses the gateway (no tier routing, no audit); twins with a tier ceiling above T1 are refused.
+- **Tests** — `tests/team/` (fixture runner and unit tests for the validator, build and deid) and `tests/gateway/` (gateway unit, security and driver tests, plus the demo golden transcript).
+- **CI steps 18–22** — team check (schema, refs, categories, budgets, names, secrets); team lint fixtures; chat gateway unit and security tests (offline); chat gateway demo golden transcript; `install.sh` team-tier smoke test.
+- **Docs** — new README sections (EN / zh-TW), Layer 7 in `docs/architecture.md`, a v0.2.0-alpha entry and v0.2.x candidates in `docs/ROADMAP.md`, "導入分身團隊的順序" in `docs/adoption-guide.md`, a Team tier section in `INVENTORY.md`.
+
+### Changed
+
+- **`install.sh` copies `team/` by default** (without `team/.build/` and `team/local/`; `.installed` gains `"team": true`). Claude Code does not auto-load it, so v0.1.5 behavior is unchanged and the core-only agent count stays 6.
+- **`docs/architecture.md`** — corrects the core agent count from 5 to 6 (`engineering-change-manager` was missing); now describes seven layers and three tiers.
+- **`SECURITY.md`** — scope table and "Operating securely" extended for `team/` and `infra/chat-gateway/`.
+
+### Security
+
+- **Data tiers T0–T3.** Slack, Discord and cloud models are capped at T1; T2 is allowed only on the local mock adapter; unsure means one tier up.
+- **T3 is refused.** Any T3 channel or twin in the roster makes the gateway exit 3; `act` and `act-with-approval` autonomy, dual-approval settings, hash mismatches, suspected tokens and missing environment variables make it exit 78 (fail closed).
+- **No secrets, names or platform ids in the repo.** Credentials come only from `MFG_TEAM_*` environment variables; real rosters, identities and bindings live in gitignored `team/local/`; CI scans tracked files for tokens, names and platform ids. The name denylist is local, so the real name defense is the pre-commit hook.
+- **Audit.** Append-only, hash-chained, stores hashes and never message text; keep it on a separate host.
 
 ## [0.1.5] — 2026-05-09
 

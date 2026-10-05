@@ -22,6 +22,8 @@ You should get a response within 5 working days. If you don't, send a follow-up 
 | `infra/mcp-servers/scheduler-mcp/server.py` (the stub)                         | Memory-safety, input validation — though the stub is not intended for production                                              |
 | `infra/mcp-servers/erp-connector/contract.py`                                  | Interface design that would make secure implementation hard                                                                   |
 | Example data in `examples/`                                                    | Accidental inclusion of real customer data                                                                                    |
+| `team/` manifests, twin files and roster (`team/tools/` included)              | Prompt-injection via twin or roster content; category mislabelling (an `outsource` capability labelled `strengthen`/`create`); real names or ids slipping past the lint |
+| `infra/chat-gateway/`                                                          | Authentication bypass (identity or channel spoofing), approval forgery or replay, audit-log tampering, tier bypass (T2/T3 content reaching a SaaS channel or cloud model) |
 | The four `docs/explainers/*.html` and `docs/demo/*.html` and `docs/index.html` | Cross-site scripting via injected content (currently no JS executes user-controlled data, but if that changes, file an issue) |
 
 ## What's out of scope
@@ -60,5 +62,11 @@ If you're an enterprise IT team adopting `manufacturing-skill`:
 - Your ERP connector implementation handles real customer data. Use a service account with **read-only access** for queries; restrict write tools (`create_sales_order`, etc.) by role.
 - Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` includes an `operator` audit field on every write tool — keep it.
 - Customer drawings, BOMs, and pricing are sensitive. Verify `.gitignore` excludes your real data directories before any team member runs `git add`.
+
+For the digital-twin gateway (`infra/chat-gateway/`, experimental):
+
+- **Secrets come from environment variables only** (`MFG_TEAM_*`: platform tokens, HMAC keys, API key). Never put them in the roster, twin files, bindings or any tracked file; run the bot under a dedicated service account, not a personal login.
+- **T3 (high-assurance custom project data) never goes on SaaS chat or a cloud model.** Slack/Discord and cloud models are capped at T1; the alpha gateway refuses to start if the roster contains any T3 channel or twin. When unsure of a tier, go one tier up.
+- **Keep the audit log on a separate host** (or write-once storage) from the gateway, and have someone other than the adoption lead verify the hash chain (`audit-verify`) on a schedule. The log stores hashes, not message text.
 
 For a deeper deployment-security checklist, see [`infra/on-prem/gb10-setup.md`](infra/on-prem/gb10-setup.md).

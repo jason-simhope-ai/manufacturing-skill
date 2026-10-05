@@ -2,8 +2,8 @@
 
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
-> 規模：v0.1.5 · MIT （multi-profile active experimental ship）
-> 最後更新：2026-05-09
+> 規模：v0.1.5 + Unreleased（v0.2.0-alpha 數位分身團隊，實驗性）· MIT
+> 最後更新：2026-10-05
 
 ---
 
@@ -17,6 +17,7 @@
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
 | AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
+| 要導入分身團隊（agent / 人）  | [TEAM.md](TEAM.md)（agent）· [team/README.zh-TW.md](team/README.zh-TW.md)（人，10 分鐘）                                                      |
 | 想 fork 開新 vertical         | [docs/profile-development.md](docs/profile-development.md)                                                                                    |
 | 開發者讀架構                  | [docs/architecture.md](docs/architecture.md)                                                                                                  |
 | 看設計脈絡 / decision history | [docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md)            |
@@ -52,6 +53,7 @@ manufacturing.md          ← 靈魂入口文件，先讀
 README.md                 ← 英文介紹
 README.zh-TW.md           ← 繁中介紹
 plugin.json               ← Claude Code plugin manifest
+TEAM.md                   ← 數位分身團隊 agent 啟動檔（v0.2.0-alpha，見 Team tier）
 LICENSE                   ← MIT
 INVENTORY.md              ← 這份
 ```
@@ -190,12 +192,60 @@ INVENTORY.md              ← 這份
 
 ---
 
+### Team tier — 數位分身團隊（v0.2.0-alpha，實驗性）
+
+第 7 層 TEAM 與第三階 `team/`。設計見 [spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md)。
+
+**入口與資料（`TEAM.md`、`team/`）**
+
+| 檔 | 用途 |
+| -- | ---- |
+| [TEAM.md](TEAM.md) | agent 啟動檔（≤ 6,000 B）：六條規則、啟動演算法、漸進揭露地圖 |
+| [team/README.zh-TW.md](team/README.zh-TW.md) | 人讀的 10 分鐘說明 |
+| [team/roster.example.yaml](team/roster.example.yaml) | 範例 roster（synthetic：7 個通用部門、7 個職位、3 個頻道） |
+| [team/twins/](team/twins/) | `_template.md` + 3 個範例分身：[production-manager](team/twins/production-manager.md) · [qa-manager](team/twins/qa-manager.md) · [engineering-manager](team/twins/engineering-manager.md) |
+| [team/policies/core-rules.md](team/policies/core-rules.md) · [restricted.md](team/policies/restricted.md) | 所有分身共用 preamble · T3 政策 |
+| [team/gate/need-a-twin.md](team/gate/need-a-twin.md) | 「需要分身嗎？」閘門問卷與季複審清單 |
+| [team/local/README.md](team/local/README.md) | 本機專屬設定說明（`team/local/*` 與 `team/.build/` 皆 gitignored） |
+| [core/commands/team.md](core/commands/team.md) | `/team status \| ask \| check \| gate \| demo`（預覽用，不經 gateway） |
+
+**工具（`team/tools/`）**
+
+| 檔 | 用途 |
+| -- | ---- |
+| [teamctl.py](team/tools/teamctl.py) | `check`（驗證）、`roster`（檢視）、`audit-verify`（驗稽核雜湊鏈） |
+| [build.py](team/tools/build.py) | 編譯 `team/.build/`（`roster.json`、分身 prompt、`ref/`；輸出可重現） |
+| [deid.py](team/tools/deid.py) | 來源端去識別（CSV：客戶名 → `CUST-xx`、刪欄、殘留掃描） |
+| [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`） |
+| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本 |
+
+**Chat gateway（[infra/chat-gateway/](infra/chat-gateway/)；Python 3.11，核心只用 stdlib）**
+
+| 路徑 | 用途 |
+| ---- | ---- |
+| [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證） |
+| `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
+| `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化／`<<UNTRUSTED>>` 信封／tripwire／DLP／輸出過濾 · 回覆版型 · prompt 組裝與 12,000 B 預算 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· 雜湊鏈稽核 · secret／名稱／DLP 樣式唯一來源 · 環境變數設定 |
+| `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試）、`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**） |
+| `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`claude_code.py`（固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
+| `fixtures/` | 範例 roster 快照、`demo.jsonl` 劇本、`mock_driver.json` |
+
+**測試**
+
+| 套件 | 內容 | 怎麼跑（CI Step） |
+| ---- | ---- | ----------------- |
+| [tests/team/](tests/team/) | `fixtures.yaml` 105 個 lint case + 10 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 40 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code） | `python3 tests/team/run.py`（Step 19）· `python3 -m unittest tests/team/test_team.py` |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 82 個 unittest（路由、autonomy、核准、限流、taint、DLP、稽核、prompt 預算、靜態安全檢查、CLI、demo golden）；`test_claude_code_driver.py` 36 個 unittest（假 `claude` 驗 argv、環境、`self_check`）；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
+
+---
+
 ### `docs/` — 文件層
 
 | 檔                                                                                                                            | 對象 / 用途                                                     |
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
-| [architecture.md](docs/architecture.md)                                                                                       | 開發者：六層架構詳解                                            |
+| [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
 | [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |

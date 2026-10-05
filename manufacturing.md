@@ -53,7 +53,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 ---
 
-## 架構一頁總覽（六層）
+## 架構一頁總覽（七層）
 
 | 層                | 內容                                                      | 在哪                                      |
 | ----------------- | --------------------------------------------------------- | ----------------------------------------- |
@@ -63,8 +63,9 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 | 4. INFRA 基礎設施 | MCP server / 地端 LLM / 檔案規範                          | `infra/`                                  |
 | 5. REF 知識庫     | ISO / IATF / Lean / OEE / SPC                             | `core/know-how/` + `profiles/*/know-how/` |
 | 6. HOOK 生命週期  | pre-quote / post-order / pre-ship / on-error              | `core/hooks/` + `profiles/*/hooks/`       |
+| 7. TEAM 分身團隊  | 職位 → 分身 → 能力（三分類）→ 頻道；alpha、實驗性         | `TEAM.md` + `team/` + `infra/chat-gateway/` |
 
-兩階：**core**（普世製造業）+ **profile**（垂直領域）。
+三階：**core**（普世製造業）→ **profile**（垂直領域）→ **team**（這家公司的職位；只以 id 引用既有的 agents / skills，不覆寫）。
 
 ---
 
@@ -102,6 +103,14 @@ bash adapters/claude-code/install.sh
 2. 改 `profile.json`
 3. 改裡面的 agent / skill / know-how
 4. PR 回來分享給社群（可選）
+
+---
+
+## 我是要導入分身團隊的人
+
+讀 [TEAM.md](TEAM.md)（agent 入口），人讀 [team/README.zh-TW.md](team/README.zh-TW.md)（10 分鐘）。
+離線試玩：`python3 infra/chat-gateway/demo.py`（零憑證、零網路）。
+v0.2.0-alpha 實驗性：只到 observe / suggest / draft，沒有任何寫入動作；T3 一律拒載。
 
 ---
 

@@ -39,6 +39,41 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ---
 
+## Digital-twin team (v0.2.0-alpha, experimental)
+
+> One **copilot twin** per position, living in the company's chat workspace. **A copilot, not a replacement**: people keep the judgement; the twin adds data, challenges assumptions and posts scheduled reminders.
+
+- **What a twin is.** One twin per position (e.g. the QA department head's twin), composed by id from the existing agents, skills and know-how, never copied or overridden. It answers only when @-mentioned, labels every reply `【… twin】`, and stops at decision points to hand the options back to the human (`🧭`).
+- **Three categories.** Every capability is labelled `strengthen` (a human still does the judging), `create` (nobody did this before) or `outsource` (someone does this today and will stop once the twin exists), plus `today` (who does it now) and `humanStillDoes` (what the human still does by hand). `outsource` is dormant by default and can only be woken by an explicit opt-in in the roster: at most one per twin, capped at `draft`, reviewed within 90 days, with mandatory teach-back and manual practice. When in doubt, a capability counts as `outsource`.
+- **Gate first.** If a process fix or an existing `/command` solves it, do not build a twin (`team/gate/need-a-twin.md`).
+
+**2-minute offline demo** (no credentials, no network, stdlib-only Python):
+
+```bash
+python3 infra/chat-gateway/demo.py
+```
+
+It replays 8 beats (scheduled post, @-routing, "I go first", an injection attempt, a tier-mismatch block, rate limits, ignored bots and un-mentioned messages, ...) and ends by verifying the audit chain.
+
+**Where to start**
+
+| You are | Path |
+| ------- | ---- |
+| **An AI agent** | Read [TEAM.md](TEAM.md) (≤ 6,000 B): run `teamctl check`, then `build`, read the roster, and follow the progressive-disclosure map |
+| **A human (10 minutes)** | [TEAM.md](TEAM.md) → [team/README.zh-TW.md](team/README.zh-TW.md) (Traditional Chinese) → one twin file, e.g. [team/twins/qa-manager.md](team/twins/qa-manager.md) |
+
+**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (high-assurance custom projects). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is never processed** (the gateway refuses to start, exit 3). When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (enforced in CI).
+
+**Honest status (alpha)**
+
+- The mock adapter, the mock driver, the team tools and the audit / approval / filtering logic are fully tested offline and reproducible in CI.
+- The Slack and Discord adapters and the Claude Code driver ship in the repo but are **not exercised in CI against the real platforms or a real `claude` binary and need credentials**; they are tested only against fake transports (event mapping, argv).
+- No long-term memory (only a short in-process channel window, cleared on restart).
+- No write actions: twin tools are read-only (`Read, Grep, Glob`) and autonomy is capped at `draft`.
+- Full design and deferred items: [design spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md), [ROADMAP](docs/ROADMAP.md).
+
+---
+
 ## Why this exists
 
 Manufacturing AI adoption usually fails on three things:
@@ -135,14 +170,20 @@ manufacturing-skill/
 │   ├── injection-molding/    # Stub
 │   ├── food-processing/      # Stub
 │   └── pharma/               # Stub
+├── TEAM.md                   # Digital-twin team — agent bootstrap (humans: team/README.zh-TW.md)
+├── team/                     # Third tier: roster, twin files, policies, gate, teamctl/build/deid tools
 ├── adapters/claude-code/     # Plugin install adapter
 ├── infra/                    # MCP servers, on-prem LLM setup
+│   └── chat-gateway/         # Twin chat gateway (mock / Slack / Discord adapters, offline demo)
 ├── docs/
 │   ├── explainers/           # Four printable Traditional-Chinese cards (boss / IT / operator / quick start)
 │   ├── architecture.md
 │   ├── adoption-guide.md     # For consultants deploying to customers
 │   ├── profile-development.md  # For people creating new vertical profiles
 │   └── ROADMAP.md
+├── tests/
+│   ├── team/                 # Team-file lint and tooling tests
+│   └── gateway/              # Gateway unit / security tests and the demo golden transcript
 └── examples/                 # Synthetic demo data — never put real customer data here
 ```
 
