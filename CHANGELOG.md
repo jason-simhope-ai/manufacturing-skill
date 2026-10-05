@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`profiles/pcb-assembly/` promoted from stub to alpha** (`0.1.0-alpha`): 2 agents (`smt-process-engineer` — print / placement / reflow reasoning and DFM feedback; `ems-quality-analyst` — AOI / SPI / ICT / FCT defect analysis, first-article checks, MSL handling), 2 skills (`smt-dfm-review` — land pattern / stencil / spacing / MSL / panelization checklist; `aoi-defect-pareto` — exported CSV → per-station FPY, DPMO, Pareto and action list), 2 know-how docs (`ipc-a-610-basics` — classes, conditions, criteria families without reproducing clause text; `smt-common-defects` — tombstoning, bridging, head-in-pillow, voids, insufficient solder). Every file carries an alpha header; numbers are labelled 範例 (example) or 需驗證 (needs verification). Both agents refuse to change a line reflow profile without human sign-off and never approve deviations. No MES integration yet — data must be exported; a read-only `mes-connector` following the `erp-connector` contract pattern is listed in `wantedContributions`.
+- `profile.json` for pcb-assembly gains `complianceFrameworks` (IPC-A-610, J-STD-001, IPC-7711/7721, J-STD-020/033, ESD, ISO 9001, IATF 16949 optional, RoHS / REACH), `warnings` and an updated `wantedContributions` list.
+
+### Changed
+
+- `plugin.json`: `pcb-assembly` moved from `profiles.stub` to `profiles.alpha`.
+- `scripts/regen_explainers.py` now sums alpha counts across every profile in `profiles.alpha` instead of hard-coding injection-molding; explainer 01 stat panel regenerated, and its agent / know-how overlay rows and legend now show the PCB alpha items.
+- `INVENTORY.md`, `README.md`, `README.zh-TW.md`, `core/commands/install-profile.md` and the profile-contribution issue template list pcb-assembly as alpha (READMEs also correct injection-molding, which was still shown as stub).
 
 ## [0.1.5] — 2026-05-09
 

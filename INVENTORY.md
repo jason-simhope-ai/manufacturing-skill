@@ -147,11 +147,22 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於公開資料，未經實際射出廠工程師驗證。歡迎射出廠師傅 PR 修正。
 
-#### Stub profiles（3 個 — 歡迎 contribute）
+#### `profiles/pcb-assembly/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)                                                            |
+| Agents (2)   | [smt-process-engineer](profiles/pcb-assembly/agents/smt-process-engineer.md) · [ems-quality-analyst](profiles/pcb-assembly/agents/ems-quality-analyst.md)     |
+| Skills (2)   | [smt-dfm-review](profiles/pcb-assembly/skills/smt-dfm-review.md) · [aoi-defect-pareto](profiles/pcb-assembly/skills/aoi-defect-pareto.md)                     |
+| Know-how (2) | [ipc-a-610-basics](profiles/pcb-assembly/know-how/ipc-a-610-basics.md) · [smt-common-defects](profiles/pcb-assembly/know-how/smt-common-defects.md)           |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)                                                                            |
+
+> **Alpha 警告**：內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師驗證；數字標「範例 / 需驗證」。尚無 MES 連線 — AOI/SPI/ICT/FCT 分析需先匯出 CSV。
+
+#### Stub profiles（2 個 — 歡迎 contribute）
 
 | Profile                                      | manifest                                                                                                | 預留範本                                                                             |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
 | [food-processing](profiles/food-processing/) | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md) | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md) |
 | [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
 
@@ -259,7 +270,8 @@ core/  know-how         : 8
 core/  hooks            : 4
 CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
-Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
+Stub profiles           : 2 (food / pharma — manifest + README + _templates)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + CAPTURE-GUIDE.md

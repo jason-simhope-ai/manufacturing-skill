@@ -57,13 +57,16 @@ def gather_metrics() -> dict:
     cnc_kh = count_md(REPO / "profiles" / "cnc-machining" / "know-how")
     cnc_hooks = count_md(REPO / "profiles" / "cnc-machining" / "hooks")
 
-    # Injection profile (alpha)
-    inj_agents = count_md(REPO / "profiles" / "injection-molding" / "agents")
-    inj_skills = count_md(REPO / "profiles" / "injection-molding" / "skills")
-    inj_kh = count_md(REPO / "profiles" / "injection-molding" / "know-how")
-    inj_hooks = count_md(REPO / "profiles" / "injection-molding" / "hooks")
-
     profiles = plugin_json.get("profiles", {})
+
+    # Alpha profiles (summed across every entry in plugin.json
+    # `profiles.alpha`, e.g. injection-molding + pcb-assembly)
+    alpha_dirs = [REPO / "profiles" / n for n in profiles.get("alpha", [])]
+    inj_agents = sum(count_md(d / "agents") for d in alpha_dirs)
+    inj_skills = sum(count_md(d / "skills") for d in alpha_dirs)
+    inj_kh = sum(count_md(d / "know-how") for d in alpha_dirs)
+    inj_hooks = sum(count_md(d / "hooks") for d in alpha_dirs)
+
     n_complete = len(profiles.get("complete", []))
     n_alpha = len(profiles.get("alpha", []))
     n_stub = len(profiles.get("stub", []))

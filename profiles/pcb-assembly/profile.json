@@ -1,30 +1,53 @@
 {
   "name": "pcb-assembly",
   "displayName": "PCB 組裝",
-  "displayNameEn": "PCB Assembly",
-  "version": "0.0.1-stub",
-  "status": "stub",
+  "displayNameEn": "PCB Assembly (SMT / EMS)",
+  "version": "0.1.0-alpha",
+  "status": "alpha",
   "extends-core": true,
-  "description": "電子產品 PCB 組裝（SMT + DIP + 測試）。歡迎 contribute。",
-  "applicableTo": ["smt", "dip", "box-build", "ems"],
-  "tags": ["electronics", "pcb", "smt", "ems"],
-  "agents": [],
-  "skills": [],
-  "knowHow": [],
+  "description": "電子組裝 / EMS（SMT、THT/DIP、box build）。Alpha — 內容基於公開 IPC 標準摘要與業界通識，需要 EMS 製程/品質工程師驗證。尚無 MES 連線，品質分析需先從 MES 匯出 CSV。",
+  "applicableTo": ["smt", "tht", "dip", "box-build", "ems"],
+  "tags": ["electronics", "pcb", "pcba", "smt", "ems", "ipc"],
+  "agents": ["smt-process-engineer", "ems-quality-analyst"],
+  "skills": ["smt-dfm-review", "aoi-defect-pareto"],
+  "knowHow": ["ipc-a-610-basics", "smt-common-defects"],
   "hooks": [],
+  "mcp": {
+    "recommended": ["erp-connector"],
+    "optional": ["scheduler-mcp"]
+  },
   "wantedContributions": [
-    "smt-process-engineer agent",
-    "solder-paste-inspection skill",
-    "ipc-a-610 know-how",
-    "j-std-001 know-how",
-    "rework-process know-how",
-    "msl-management (Moisture Sensitivity Level) know-how"
+    "mes-connector contract (infra/mcp-servers/mes-connector/contract.py — 唯讀工單 / 設備狀態 / AOI·SPI·ICT·FCT 結果，比照 erp-connector/contract.py)",
+    "smt-line-scheduling skill (SMT 線換線、飼料架/feeder 準備、MSL 烘烤、鋼板壽命等有限產能限制)",
+    "pcb-test-engineer agent (ICT / FCT 測試程式、治具、測試覆蓋率)",
+    "box-build-coordinator agent (整機組裝、線束、包裝排程)",
+    "reflow-profile-review skill (溫度曲線量測判讀，對照錫膏 datasheet 與 J-STD-020 元件耐溫)",
+    "msl-management know-how (J-STD-033 floor life / 烘烤 / 乾燥櫃管理)",
+    "esd-control know-how (ANSI/ESD S20.20 / IEC 61340-5-1 防護區管理)",
+    "j-std-001 know-how (焊接製程要求)",
+    "rework-process know-how (IPC-7711/7721 返修與修補)",
+    "pre-smt-line-start hook (開線前：鋼板/錫膏/程式版本/首件確認)",
+    "Validation by an active EMS process / quality engineer of all alpha content"
   ],
   "complianceFrameworks": [
-    "IPC-A-610 (acceptability)",
-    "IPC-A-600 (PCB)",
-    "J-STD-001 (soldering)",
-    "RoHS / REACH",
-    "MSL (Moisture Sensitivity Level)"
-  ]
+    "IPC-A-610 (電子組裝可接受性；版本以 IPC 官方最新版為準，需驗證)",
+    "IPC J-STD-001 (焊接電氣與電子組件要求，需驗證版本)",
+    "IPC-7711/7721 (電子組件返修、修改與修補)",
+    "IPC J-STD-020 / J-STD-033 (MSL 分級與濕敏元件處理)",
+    "ANSI/ESD S20.20 或 IEC 61340-5-1 (ESD 防護，依客戶要求擇一，需驗證)",
+    "ISO 9001",
+    "IATF 16949 (汽車電子 EMS，optional)",
+    "RoHS / REACH (EU 銷售；豁免條款與 SVHC 清單會更新，需驗證)"
+  ],
+  "warnings": [
+    "Alpha 內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師實戰驗證；標『需驗證』的數字與條款務必對照你購買的標準原文",
+    "IPC 標準為付費文件，本 profile 不重製條文，只做摘要與導讀；允收判定以客戶指定的版本與 Class 為準",
+    "回焊溫度曲線、鋼板開孔、空洞率等『範例』數值僅供討論，量產請以錫膏 datasheet、元件 datasheet 與實測 profile 為準",
+    "尚無 MES 連線：AOI/SPI/ICT/FCT 分析須先從 MES 或設備匯出 CSV；匯出前請移除客戶名稱與序號等敏感資料",
+    "core production-planner 是 job-shop 啟發式，不是 SMT 線有限產能排程；換線/feeder/MSL 限制只能討論，不能自動排"
+  ],
+  "createdBy": {
+    "organization": "SIMHOPE",
+    "context": "Alpha profile assembled from public IPC summaries and general SMT/EMS practice; not validated by a practitioner"
+  }
 }
