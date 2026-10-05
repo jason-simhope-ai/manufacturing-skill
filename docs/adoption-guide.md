@@ -39,10 +39,17 @@ W3：profile 客製
   └─ 改 know-how 內的 SOP（公司專屬）
 
 W4：MCP 接資料
-  ├─ scheduler-mcp 接你的 MES / 排程系統
-  ├─ erp-connector 接你的 ERP（最花時間，常 1-2 週）
-  └─ 把 mock data 換成真資料（mock 在 `infra/mcp-servers/scheduler-mcp/mock-data/`，
-     只是示範用的負載與工單；未接上前，所有狀態類輸出都會標示「模擬資料」）
+  ├─ scheduler-mcp 接你的 MES / 排程系統：把 `infra/mcp-servers/scheduler-mcp/mock-data/`
+  │    （示範用的負載與工單）換成你 MES 的資料來源；未接上前，所有狀態類輸出都會標示「模擬資料」
+  ├─ erp-connector 接你的 ERP（最花時間，常 1-2 週）：**不是換 mock data**，
+  │    而是自己實作一個符合 `infra/mcp-servers/erp-connector/contract.py` 的連接器
+  │    ├─ 讀取：走唯讀 view 或唯讀 replica，使用唯讀服務帳號
+  │    └─ 寫入：只能走 ERP 官方 API，使用另一組只給連接器的服務帳號，不得直寫資料庫
+  └─ 註冊 MCP server：plugin 安裝程式**不會**佈署 `infra/`，也不會註冊 MCP server。
+       請用 `claude mcp add` 另外註冊，指令請用 server 的絕對路徑，例如
+       `claude mcp add manufacturing-scheduler -s project -- python3 /abs/path/to/infra/mcp-servers/scheduler-mcp/server.py`
+       （`-s local` 預設只對註冊時的那個資料夾有效；`-s project` 產生 `.mcp.json` 供團隊共用、成員須核准；
+       `-s user` 對這個使用者的所有專案有效。確切選項以 `claude mcp add --help` 為準）
 
 W5：使用者試跑
   ├─ 業助試報價（同時人工跑一次對照）
@@ -94,8 +101,11 @@ W6：上線 + 文件
 
 ### 3. 機台費率、毛利、料價
 
-機台費率、毛利帶、風險加成、標準料價**沒有放在 mock data 裡**。
+機台費率、毛利帶、風險加成、標準料價**沒有放在 scheduler 的 mock data 裡**。
 `infra/mcp-servers/scheduler-mcp/mock-data/machine_loads.json` 只是機台「負載」的示範資料，不含費率。
+機台費率在 ERP 端（`ErpConnector.get_machine_rate`，見 `infra/mcp-servers/erp-connector/contract.py`）；
+連接器範例實作的 mock 若存在，費率放在 `infra/mcp-servers/erp-connector/mock-data/erp_mock.json` 的 `machine_rates`
+（此檔隨 ERP 連接器範例實作提供，clone 裡沒有該檔就代表尚未包含該實作）。
 請改為填寫 [`examples/company-facts.template.md`](../examples/company-facts.template.md)（見下一節），
 存成 `company-facts.md` 放在 repo 之外，報價時用 `@` 附上。
 
