@@ -9,13 +9,15 @@ Audience is Taiwan manufacturing (zh-TW first). Current version lives in [plugin
 
 ## Repo map
 
+Top-level layout; not exhaustive. [INVENTORY.md](INVENTORY.md) is the current map of every directory and file, so check it (or `ls`) before assuming a path exists or does not.
+
 - `core/` universal agents, skills, commands, know-how, hooks (apply to any factory)
 - `profiles/<vertical>/` overlay: `profile.json` + `agents/ skills/ know-how/ hooks/`; `_templates/` is exempt from CI
-- `adapters/claude-code/` `install.sh`, `_resolve_extends.py`, `_multiprofile.py`, [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)
-- `infra/` MCP server templates (`mcp-servers/`) and on-prem LLM guides (`on-prem/`)
+- `adapters/` one directory per target; `adapters/claude-code/` holds `install.sh`, `_resolve_extends.py`, `_multiprofile.py`, [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)
+- `infra/` MCP server templates (`mcp-servers/`), on-prem LLM guides (`on-prem/`) and other deployable services; see INVENTORY.md
 - `docs/` [architecture](docs/architecture.md), [profile-development](docs/profile-development.md), [adoption-guide](docs/adoption-guide.md), [ROADMAP](docs/ROADMAP.md), `explainers/` (HTML cards)
-- `tests/` `extends/` resolver golden files, `multiprofile/` helper unit tests
-- `scripts/` `regen_explainers.py`
+- `tests/` one subdirectory per area (resolver golden files, helper unit tests, ...); which ones CI runs is listed in `ci.yml`
+- `scripts/` maintenance scripts such as `regen_explainers.py`
 - `examples/` synthetic demo data only
 - Entry points: [manufacturing.md](manufacturing.md), [INVENTORY.md](INVENTORY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md)
 
@@ -28,9 +30,9 @@ Audience is Taiwan manufacturing (zh-TW first). Current version lives in [plugin
 
 ## What CI enforces (replay locally before pushing)
 
-Workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml). Needs `python3` and PyYAML (`pip install pyyaml`).
+Workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml); it is the source of truth for the step list, which grows over time, so read it rather than trusting a list here. Needs `python3` and PyYAML (`pip install pyyaml`).
 
-Replay every `run:` block (skips the PR-only core-heading-anchor step and the pip step):
+Replay every `run:` block (skips steps with an `if:` condition, such as PR-only checks, and the pip step; steps that need the network cannot be replayed offline, so note them in the PR instead):
 
 ```bash
 python3 - <<'PY'
@@ -49,7 +51,7 @@ sys.exit(bool(bad))
 PY
 ```
 
-Or run single checks:
+Or run single checks (examples of what the steps cover; `ci.yml` has the full set):
 
 - JSON: every `*.json` parses (`python3 -m json.tool <file>`); 2-space indent.
 - `plugin.json` has `name displayName version license profiles` and `profiles.available`.
@@ -93,9 +95,16 @@ Detail: [docs/profile-development.md](docs/profile-development.md). Start from `
 
 Outside this repo (private fork, private repo, or local path). `.gitignore` blocks `.env*`, `**/secrets/`, `**/credentials/`, `examples/**/real_*`, `*_real.*`, `customer_*`, runtime data and logs, but it is only a safety net: check `git status` and `git diff --cached` yourself. Found real data already committed: stop and follow [SECURITY.md](SECURITY.md).
 
-## Coming in open PRs (not on main yet)
+## Areas under active change
 
-A `team/` tier, `infra/chat-gateway/`, `tests/team`, `tests/gateway`, `tests/mcp`, `tests/generic`, and `adapters/generic`. Do not document or reference them as present until merged; this file will be updated by those PRs.
+These parts of the repo are moving. Before you document, reference or depend on any of them, check that the path exists in your checkout and look at the open PR list (`gh pr list`) for work in flight:
+
+- team tier and chat gateway
+- the scheduler MCP server and other MCP server templates
+- adapters for other tools (a generic adapter)
+- profile layout, loadable plugin packaging, and profile status (alpha profiles, new verticals)
+
+Do not describe something as present because a PR mentions it; describe what is in your checkout. When your change touches one of these areas, re-read the matching section of [INVENTORY.md](INVENTORY.md) and `ci.yml`.
 
 ## Before you push
 
