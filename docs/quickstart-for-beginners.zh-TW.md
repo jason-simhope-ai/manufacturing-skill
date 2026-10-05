@@ -132,10 +132,10 @@ bash adapters/claude-code/install.sh
 ════════════════════════════════════════════════
 
   1) ✅ cnc-machining
-  2) 🔶 alpha food-processing
-  3) 🔶 alpha injection-molding
-  4) 🔶 alpha pcb-assembly
-  5) 🔶 alpha pharma
+  2) 🧪 alpha food-processing
+  3) 🧪 alpha injection-molding
+  4) 🧪 alpha pcb-assembly
+  5) 🧪 alpha pharma
   0) 🧪 (core-only, no profile)     — try the framework first
 
   Default: cnc-machining  (press Enter to accept)
