@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Added
+
+- **`docs/consulting/`** — consultant deliverables kit (zh-TW, generic, placeholder fees only): 90-minute discovery workshop, IT / security data-flow questionnaire, SOW template, one-page pilot sign-off, per-wave deliverables checklist; linked from `docs/adoption-guide.md`.
 
 ## [0.1.5] — 2026-05-09
 

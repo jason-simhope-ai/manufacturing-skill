@@ -171,6 +171,7 @@ W6：上線 + 文件
 - 加入製造業 AI 導入經驗交流群（如有）
 - 每季 sync 一次 best practice
 - 準備好客戶稽核時隨時拿出來的「AI 應用說明書」
+- 顧問交付包（探索工作坊、IT 問卷、SOW 範本、pilot 一頁紙、交付物清單）：[docs/consulting/](consulting/README.md)
 
 ---
 
