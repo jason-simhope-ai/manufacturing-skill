@@ -68,6 +68,7 @@ Body (when needed): explain _why_, not _what_. Wrap at ~72 chars.
 ### For code (install.sh, MCP servers, etc.)
 
 - **install.sh** must stay POSIX-bash-3.2 compatible (macOS default bash).
+- **Line endings are LF** (`.gitattributes`: `* text=auto eol=lf`, plus `*.sh` / `*.py`): a Windows `autocrlf` checkout would turn `---` into `---\r` and break the installer's frontmatter parsing and shell shebangs. `install.sh` also strips `\r` defensively when sniffing `extends:`.
 - **Python MCP servers** target Python 3.10+ (the manufacturing GitHub runner standard). Type-hint public functions.
 - **JSON files** must be valid (CI checks this). Indent 2 spaces.
 
