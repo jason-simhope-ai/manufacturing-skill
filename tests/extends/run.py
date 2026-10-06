@@ -12,8 +12,16 @@ Each case directory follows the convention:
         profile.md
         expected_error.txt   # substring that must appear in stderr
 
-Runs all cases. Exit 0 on full pass; exit 1 with diff/diagnostic on
-the first failure.
+An optional `extra/` directory inside a case is copied verbatim into the
+fake repo root (e.g. `extra/core-evil/agents/subject.md`) for cases that
+need additional files. An optional `case.cfg` holds key=value overrides
+(kind, profile, basename).
+
+Runs all cases. Exit 0 on full pass; exit 1 on any failure. Also exits
+non-zero when no cases are discovered, or when the discovered cases do not
+exercise every directive type (canary: the suite cannot pass vacuously).
+Error cases must exit non-zero with exactly one `::error` line and no
+traceback.
 
 Usage:
     python tests/extends/run.py
@@ -24,6 +32,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -55,6 +64,9 @@ def build_fake_repo(case_dir: Path, dst: Path,
 
     shutil.copyfile(core_src, core_dst)
     shutil.copyfile(profile_src, profile_dst)
+    extra = case_dir / "extra"
+    if extra.is_dir():
+        shutil.copytree(extra, dst, dirs_exist_ok=True)
     return profile_dst, f"core/{profile_kind}/{file_basename}"
 
 
@@ -70,6 +82,11 @@ def run_case(case_dir: Path, verbose: bool = False) -> tuple[bool, str]:
                 config[k.strip()] = v.strip()
 
     is_error_case = (case_dir / "expected_error.txt").exists()
+    if not is_error_case and not (case_dir / "expected.md").exists():
+        return False, (f"{name}: needs expected.md or expected_error.txt")
+    for req in ("core.md", "profile.md"):
+        if not (case_dir / req).exists():
+            return False, f"{name}: missing {req}"
 
     with tempfile.TemporaryDirectory() as tmpd:
         tmp = Path(tmpd)
@@ -109,6 +126,27 @@ def run_case(case_dir: Path, verbose: bool = False) -> tuple[bool, str]:
                     f"{name}: error message did not contain "
                     f"{expected_err!r}.\nGot stderr:\n{proc.stderr}"
                 )
+            if "Traceback" in proc.stderr:
+                return False, (
+                    f"{name}: error case crashed with a traceback "
+                    f"instead of a clean error:\n{proc.stderr}"
+                )
+            n_err = sum(1 for ln in proc.stderr.splitlines()
+                        if ln.startswith("::error"))
+            if n_err != 1:
+                return False, (
+                    f"{name}: expected exactly one ::error line, got "
+                    f"{n_err}:\n{proc.stderr}"
+                )
+            # `lint` (what CI runs) must agree with `resolve`.
+            lint = subprocess.run(
+                [sys.executable, str(RESOLVER), "--repo-root", str(tmp),
+                 "lint", str(profile_path)],
+                capture_output=True, text=True, timeout=15,
+                encoding="utf-8", env=env,
+            )
+            if lint.returncode == 0:
+                return False, f"{name}: `lint` passed but `resolve` failed"
             return True, f"{name}: ok (error {expected_err!r} matched)"
 
         # Success case
@@ -116,6 +154,17 @@ def run_case(case_dir: Path, verbose: bool = False) -> tuple[bool, str]:
             return False, (
                 f"{name}: expected success but got exit "
                 f"{proc.returncode}.\nstderr:\n{proc.stderr}"
+            )
+        lint = subprocess.run(
+            [sys.executable, str(RESOLVER), "--repo-root", str(tmp),
+             "lint", str(profile_path)],
+            capture_output=True, text=True, timeout=15,
+            encoding="utf-8", env=env,
+        )
+        if lint.returncode != 0:
+            return False, (
+                f"{name}: `resolve` passed but `lint` failed:\n"
+                f"{lint.stderr}"
             )
         expected = (case_dir / "expected.md").read_text(encoding="utf-8")
         actual = proc.stdout
@@ -136,6 +185,30 @@ def normalize(s: str) -> str:
     return "\n".join(line.rstrip() for line in s.splitlines()).rstrip()
 
 
+# Raw-text patterns (deliberately independent of the resolver's own
+# scanner). Each directive type must appear in at least one success case.
+CANARY_MARKERS = {
+    "inherit": re.compile(r"<!--\s*inherit\s*-->"),
+    "override-body": re.compile(r"<!--\s*override-body\s*-->"),
+    "replace-section": re.compile(r"<!--\s*replace-section:"),
+}
+
+
+def canary(cases: list[Path]) -> list[str]:
+    """Return problems if the suite would pass without covering a
+    directive type or the error path."""
+    problems = []
+    success = [c for c in cases if (c / "expected.md").exists()]
+    errors = [c for c in cases if (c / "expected_error.txt").exists()]
+    for label, rx in CANARY_MARKERS.items():
+        if not any(rx.search((c / "profile.md").read_text(encoding="utf-8"))
+                   for c in success):
+            problems.append(f"no success case exercises `{label}`")
+    if not errors:
+        problems.append("no error case (expected_error.txt) present")
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--case", help="run a single case by directory name")
@@ -144,17 +217,30 @@ def main() -> int:
 
     cases = sorted(p for p in CASES_DIR.iterdir()
                    if p.is_dir() and p.name.startswith("case-"))
+    if not cases:
+        print(f"::error::no cases discovered under {CASES_DIR} "
+              f"(expected case-*/ directories) — refusing to pass "
+              f"vacuously", file=sys.stderr)
+        print("0 cases discovered")
+        return 1
+    print(f"discovered {len(cases)} cases")
     if args.case:
         cases = [c for c in cases if c.name == args.case]
         if not cases:
             print(f"no case named {args.case!r}", file=sys.stderr)
             return 2
+    else:
+        problems = canary(cases)
+        if problems:
+            for pr in problems:
+                print(f"::error::canary: {pr}", file=sys.stderr)
+            return 1
 
     fail = 0
     for case_dir in cases:
         ok, msg = run_case(case_dir, args.verbose)
         symbol = "PASS" if ok else "FAIL"
-        print(f"  {symbol}  {msg}" if ok else f"  {symbol}  {msg}")
+        print(f"  {symbol}  {msg}")
         if not ok:
             fail += 1
     print(f"\n{len(cases) - fail}/{len(cases)} passed")

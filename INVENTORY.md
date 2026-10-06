@@ -100,11 +100,12 @@ INVENTORY.md              ← 這份
 | [8d-report-writing](core/skills/8d-report-writing.md)                   | 8D 八步驟 + customer-deliverable template     |
 | [engineering-change-process](core/skills/engineering-change-process.md) | ECN/ECO 5 步驟 SOP + 13-item impact checklist |
 
-#### `core/know-how/` — 7 份普世知識
+#### `core/know-how/` — 9 份普世知識
 
 | 檔                                        | 內容                                            |
 | ----------------------------------------- | ----------------------------------------------- |
 | [iso-9001](core/know-how/iso-9001.md)     | 品質管理體系 7 原則 + PDCA                      |
+| [iatf-16949](core/know-how/iatf-16949.md) | IATF 16949 + PPAP 18 要素 / 5 級 + 各製程差異   |
 | [lean-5s](core/know-how/lean-5s.md)       | 5S + 7 大浪費 + JIT                             |
 | [oee](core/know-how/oee.md)               | 設備總效率公式 + 改善方向                       |
 | [mrp-basics](core/know-how/mrp-basics.md) | MRP / Lead time / ABC 分類                      |
@@ -133,7 +134,7 @@ INVENTORY.md              ← 這份
 | Manifest     | [profile.json](profiles/cnc-machining/profile.json) + [manufacturing.md](profiles/cnc-machining/manufacturing.md)                                                                                                                                                                                       |
 | Agents (4)   | [cnc-programmer](profiles/cnc-machining/agents/cnc-programmer.md) · [tool-life-engineer](profiles/cnc-machining/agents/tool-life-engineer.md) · [fixture-designer](profiles/cnc-machining/agents/fixture-designer.md) · [prototype-coordinator](profiles/cnc-machining/agents/prototype-coordinator.md) |
 | Skills (3)   | [g-code-review](profiles/cnc-machining/skills/g-code-review.md) · [cutting-parameter-calc](profiles/cnc-machining/skills/cutting-parameter-calc.md) · [fixture-design-patterns](profiles/cnc-machining/skills/fixture-design-patterns.md)                                                               |
-| Know-how (4) | [iatf-16949](profiles/cnc-machining/know-how/iatf-16949.md) · [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
+| Know-how (3) | [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
 | Hooks (1)    | [pre-cnc-program-checkin](profiles/cnc-machining/hooks/pre-cnc-program-checkin.md)                                                                                                                                                                                                                      |
 
 #### `profiles/injection-molding/` — 🧪 v0.1.1 alpha profile
@@ -147,13 +148,54 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於公開資料，未經實際射出廠工程師驗證。歡迎射出廠師傅 PR 修正。
 
-#### Stub profiles（3 個 — 歡迎 contribute）
+#### `profiles/food-processing/` — 🧪 v0.1 alpha profile
 
-| Profile                                      | manifest                                                                                                | 預留範本                                                                             |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
-| [food-processing](profiles/food-processing/) | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md) | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md) |
-| [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
+| 類別         | 內容                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md)                                                                               |
+| Agents (2)   | [haccp-coordinator](profiles/food-processing/agents/haccp-coordinator.md) · [traceability-officer](profiles/food-processing/agents/traceability-officer.md)                           |
+| Skills (2)   | [haccp-plan-review](profiles/food-processing/skills/haccp-plan-review.md) · [batch-traceability-recall-drill](profiles/food-processing/skills/batch-traceability-recall-drill.md)     |
+| Know-how (2) | [haccp-iso22000-basics](profiles/food-processing/know-how/haccp-iso22000-basics.md) · [food-defects-and-ccp-examples](profiles/food-processing/know-how/food-defects-and-ccp-examples.md) |
+| Hooks (1)    | [pre-ship](profiles/food-processing/hooks/pre-ship.md)（取代 core `pre-ship`，加食品批次放行要件）                                                                                  |
+
+> **Alpha 警告**：內容基於 Codex / ISO 22000 公開資料，未經食品廠 HACCP 小組驗證；管制界限皆為範例，法規細節標「需驗證」。不可取代 HACCP 管制小組或法規顧問，AI 不簽核 CCP 偏差、不決定回收。
+
+#### `profiles/pcb-assembly/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)                                                            |
+| Agents (2)   | [smt-process-engineer](profiles/pcb-assembly/agents/smt-process-engineer.md) · [ems-quality-analyst](profiles/pcb-assembly/agents/ems-quality-analyst.md)     |
+| Skills (2)   | [smt-dfm-review](profiles/pcb-assembly/skills/smt-dfm-review.md) · [aoi-defect-pareto](profiles/pcb-assembly/skills/aoi-defect-pareto.md)                     |
+| Know-how (2) | [ipc-a-610-basics](profiles/pcb-assembly/know-how/ipc-a-610-basics.md) · [smt-common-defects](profiles/pcb-assembly/know-how/smt-common-defects.md)           |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)                                                                            |
+
+> **Alpha 警告**：內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師驗證；數字標「範例 / 需驗證」。尚無 MES 連線 — AOI/SPI/ICT/FCT 分析需先匯出 CSV。
+
+#### `profiles/pharma/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                                                                                                                          |
+| Agents (2)   | [deviation-capa-coordinator](profiles/pharma/agents/deviation-capa-coordinator.md) · [batch-record-reviewer](profiles/pharma/agents/batch-record-reviewer.md)                                                   |
+| Skills (2)   | [deviation-investigation-5whys-fishbone](profiles/pharma/skills/deviation-investigation-5whys-fishbone.md) · [batch-record-completeness-review](profiles/pharma/skills/batch-record-completeness-review.md)     |
+| Know-how (2) | [gmp-gxp-basics](profiles/pharma/know-how/gmp-gxp-basics.md) · [validation-and-change-control](profiles/pharma/know-how/validation-and-change-control.md)                                                       |
+| Hooks (1)    | [pre-batch-release](profiles/pharma/hooks/pre-batch-release.md)（新增，不覆寫 core `pre-ship`；QA 放行前文件齊備檢查）                                                                                         |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)                                                                                                                                    |
+
+> **Alpha 警告**：內容基於 PIC/S GMP、ICH Q7/Q9/Q10、資料完整性指引公開摘要，未經 GMP QA / 確效人員驗證；數字標「範例 / 需驗證」。AI 輸出永遠不是 GMP 紀錄 — 不結案偏差、不核准 CAPA、不放行批次；不取代 QA / QP、法規事務或經確效的系統。
+
+#### `profiles/machinery-eto/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/machinery-eto/profile.json) · [README.md](profiles/machinery-eto/README.md)                                                                                                                                        |
+| Agents (3)   | [eto-quote-engineer](profiles/machinery-eto/agents/eto-quote-engineer.md) · [project-engineer](profiles/machinery-eto/agents/project-engineer.md) · [commissioning-service-coordinator](profiles/machinery-eto/agents/commissioning-service-coordinator.md) |
+| Skills (3)   | [eto-quote-breakdown](profiles/machinery-eto/skills/eto-quote-breakdown.md) · [spec-freeze-and-design-review](profiles/machinery-eto/skills/spec-freeze-and-design-review.md) · [fat-sat-acceptance](profiles/machinery-eto/skills/fat-sat-acceptance.md) |
+| Know-how (3) | [eto-vs-mts-quoting](profiles/machinery-eto/know-how/eto-vs-mts-quoting.md) · [machinery-safety-ce-basics](profiles/machinery-eto/know-how/machinery-safety-ce-basics.md) · [project-handover-and-after-sales](profiles/machinery-eto/know-how/project-handover-and-after-sales.md) |
+| Hooks (1)    | [pre-quote](profiles/machinery-eto/hooks/pre-quote.md)（取代 core `pre-quote`：加 ETO 閘門 — 規格未凍結不得正式報價、未定選配標 `[需澄清]`；core 零件檢查原封保留）                                                                    |
+
+> **Alpha 警告**：內容基於公開機械安全標準摘要（ISO 12100、IEC 60204-1）與設備廠一般實務，未經設備廠專案 / 報價 / 安規工程師驗證；數字標「範例」，CE（2006/42/EC、2023/1230）與台灣安全資訊申報細節標「需驗證」。報價是工程估算；AI 不承諾交期、不簽驗收、不做安全評估或 CE 判定。零件級報價仍由 core `quote-specialist` 處理。
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
 
@@ -255,11 +297,15 @@ INVENTORY.md              ← 這份
 core/  agents           : 6
 core/  commands         : 9
 core/  skills           : 11
-core/  know-how         : 8
+core/  know-how         : 9
 core/  hooks            : 4
-CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + 1 manifest
+CNC profile (complete)  : 4 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
-Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
+Pharma profile (alpha)  : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+Machinery ETO (alpha)   : 3 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
+Stub profiles           : 0
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + CAPTURE-GUIDE.md

@@ -19,7 +19,7 @@ You should get a response within 5 working days. If you don't, send a follow-up 
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | `core/` and `profiles/*/` agent prompts and skills                             | Prompt-injection, role-confusion, data-exfiltration via crafted user input                                                    |
 | `adapters/claude-code/install.sh`                                              | Path-traversal, accidental file overwrite, unsafe handling of unusual inputs                                                  |
-| `infra/mcp-servers/scheduler-mcp/server.py` (the stub)                         | Memory-safety, input validation — though the stub is not intended for production                                              |
+| `infra/mcp-servers/scheduler-mcp/server.py` (read-only stdio MCP server)       | Input validation, no write tools — runs on mock data; connecting it to a real MES/ERP is the adopter's responsibility         |
 | `infra/mcp-servers/erp-connector/contract.py`                                  | Interface design that would make secure implementation hard                                                                   |
 | Example data in `examples/`                                                    | Accidental inclusion of real customer data                                                                                    |
 | The four `docs/explainers/*.html` and `docs/demo/*.html` and `docs/index.html` | Cross-site scripting via injected content (currently no JS executes user-controlled data, but if that changes, file an issue) |
@@ -58,7 +58,7 @@ If you're an enterprise IT team adopting `manufacturing-skill`:
 - Run the local LLM (Ollama on GB10 or similar) on the **internal network only**. Never expose Ollama's port to the public internet.
 - The plugin reads agent prompts and skills as **untrusted** user-controllable text — if you customize a profile, review the prompt for injection vectors before deploying widely.
 - Your ERP connector implementation handles real customer data. Use a service account with **read-only access** for queries; restrict write tools (`create_sales_order`, etc.) by role.
-- Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` includes an `operator` audit field on every write tool — keep it.
+- Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` takes a typed `CallContext` (operator_id, role, channel, request_id, classification, approval_token) on every tool and an `idempotency_key` on every write tool — log the context on every call and keep the approval-token check.
 - Customer drawings, BOMs, and pricing are sensitive. Verify `.gitignore` excludes your real data directories before any team member runs `git add`.
 
 For a deeper deployment-security checklist, see [`infra/on-prem/gb10-setup.md`](infra/on-prem/gb10-setup.md).
