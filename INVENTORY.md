@@ -304,8 +304,7 @@ CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、�
 | `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify`、`freeze`／`unfreeze`（`state-reset` 在 `team/tools/teamctl.py`） |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
-| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` · `spend.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 · claude-code driver 的每日預算上限（持久化） |
-| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint＋主機外錨點（`--heads-out`／`--anchor`）· secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` · `spend.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint＋主機外錨點（`--heads-out`／`--anchor`）· secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 · claude-code driver 的每日預算上限（持久化） |
 | `chat_gateway/datascan.py` | `MFG_TEAM_DATA_T1` 資料夾內容掃描（DLP＋denylist，只重讀變動檔，5,000 檔上限） |
 | `chat_gateway/spend.py` | 每分身每日費用累計（`$MFG_TEAM_STATE_DIR/daily-spend.json`，0600、UTC 日期、檔案鎖，重啟不歸零） |
 | `audit-weekly.sh` | 每週稽核 systemd timer 用的腳本（`audit-verify --anchor` → `--heads-out` → 推到主機外） |
@@ -319,7 +318,6 @@ CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、�
 | 套件 | 內容 | 怎麼跑（CI Step） |
 | ---- | ---- | ----------------- |
 | [tests/team/](tests/team/) | `fixtures.yaml` 135 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 58 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code、agent 檔的 `$ROOT` 路徑） | `python3 tests/team/run.py`（Step 19）· `python3 tests/team/test_team.py` |
-| [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 44 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 60 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 | [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、每日費用上限與 `daily-spend.json`、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 50 個 unittest（Slack／Discord 事件對應、T1 上限、Slack scope 檢查與 README 一致性，假 transport）；`test_claude_code_driver.py` 90 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`、資料夾掃描、家目錄隱藏目錄）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`test_pilot.py` 40 個 unittest（starter denylist 與 7 句實測、kill switch（含凍結先於預算檢查、凍結中丟棄的回覆仍計費）、稽核錨點、symlink state dir、錯誤訊息）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
