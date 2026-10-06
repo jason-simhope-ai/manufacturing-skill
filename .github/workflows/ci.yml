@@ -347,6 +347,124 @@ jobs:
           echo "ok  .installed is valid JSON (no-python fallback) with quote/space/backslash in repo path and HOME"
 
       # ---------------------------------------------------------------
+      # Step 6c: the installed tree is something Claude Code loads:
+      # .claude-plugin/plugin.json (whitelisted fields), skills as
+      # skills/<name>/SKILL.md, ~/.claude/skills/<plugin> symlink, and
+      # command bodies rewritten to installed paths (python + no-python)
+      # ---------------------------------------------------------------
+      - name: install.sh — Claude Code layout (manifest, SKILL.md dirs, symlink)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          target="$HOME/.claude/plugins/manufacturing-skill"
+          link="$HOME/.claude/skills/manufacturing-skill"
+          check_layout() {   # $1 = label, $2.. = active profiles ("" for core-only)
+            python3 - "$target" "$@" <<'PY'
+          import glob, json, os, re, sys
+          t, label, profs = sys.argv[1], sys.argv[2], [p for p in sys.argv[3:] if p]
+          def fail(msg):
+              print(f"::error::[{label}] {msg}"); sys.exit(1)
+          mpath = os.path.join(t, ".claude-plugin", "plugin.json")
+          if not os.path.isfile(mpath): fail(".claude-plugin/plugin.json missing")
+          m = json.load(open(mpath, encoding="utf-8"))
+          allowed = {"name", "displayName", "version", "description", "author",
+                     "homepage", "repository", "license", "keywords"}
+          if set(m) - allowed: fail(f"manifest has non-whitelisted fields {sorted(set(m) - allowed)}")
+          for k in ("name", "version", "description"):
+              if not m.get(k): fail(f"manifest missing {k}")
+          if m["name"] != "manufacturing-skill": fail(f"manifest name {m['name']!r}")
+          if not isinstance(m.get("repository", ""), str): fail("manifest repository is not a string")
+          root = json.load(open(os.path.join(t, "plugin.json"), encoding="utf-8"))
+          if "available" not in root.get("profiles", {}): fail("root plugin.json not copied as-is")
+          flat = glob.glob(os.path.join(t, "skills", "*.md"))
+          if flat: fail(f"flat skills/*.md left: {flat}")
+          def fm_name(path):
+              txt = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+              mm = re.match(r"---\n(.*?)\n---", txt, re.S)
+              nm = mm and re.search(r"^name:\s*(\S.*?)\s*$", mm.group(1), re.M)
+              return nm.group(1).strip("\"'") if nm else os.path.basename(path)[:-3]
+          srcs = glob.glob("core/skills/*.md")
+          for p in profs:
+              srcs += [f for f in glob.glob(f"profiles/{p}/skills/*.md") if not os.path.basename(f).startswith("_")]
+          want = {fm_name(f) for f in srcs}
+          have = {os.path.basename(d) for d in glob.glob(os.path.join(t, "skills", "*")) if os.path.isdir(d)}
+          if want != have: fail(f"skill dirs {sorted(have)} != expected {sorted(want)}")
+          for d in have:
+              if not os.path.isfile(os.path.join(t, "skills", d, "SKILL.md")): fail(f"skills/{d}/SKILL.md missing")
+          pat = re.compile(r"(?<![A-Za-z0-9_./-])core/(skills|agents|hooks|know-how)/\S*\.md")
+          for f in glob.glob(os.path.join(t, "commands", "*.md")):
+              hits = pat.findall(open(f, encoding="utf-8").read())
+              if hits: fail(f"{os.path.basename(f)} still cites core/ paths")
+          q = open(os.path.join(t, "commands", "quote.md"), encoding="utf-8").read()
+          if "skills/01-quote/SKILL.md" not in q: fail("commands/quote.md not rewritten to skills/01-quote/SKILL.md")
+          print(f"ok  [{label}] manifest, {len(have)} skills/<name>/SKILL.md, no core/ paths in commands")
+          PY
+            if [ ! -L "$link" ] || [ "$(readlink "$link")" != "../plugins/manufacturing-skill" ]; then
+              echo "::error::[$1] $link is not a symlink to ../plugins/manufacturing-skill"
+              exit 1
+            fi
+            if [ ! -f "$link/.claude-plugin/plugin.json" ]; then
+              echo "::error::[$1] $link does not resolve to the install"
+              exit 1
+            fi
+            if command -v claude >/dev/null 2>&1; then
+              claude plugin validate "$target"
+            else
+              echo "::notice::claude CLI not on PATH — skipped 'claude plugin validate' for [$1]"
+            fi
+          }
+
+          for args in "cnc-machining" "--core-only" "cnc-machining,injection-molding"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh "$args" </dev/null >/dev/null
+            case "$args" in --core-only) profs="";; *) profs="$(printf '%s' "$args" | tr ',' ' ')";; esac
+            # shellcheck disable=SC2086
+            check_layout "$args" $profs
+          done
+
+          # Re-install keeps the link and the layout
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "re-install" cnc-machining
+
+          # No python: same skill dirs and rewrites (sed fallback), minimal manifest
+          nopy="$(mktemp -d)"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          PATH="$nopy:$PATH" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "no-python" cnc-machining
+
+          # A real directory where the link goes is left alone (warning, exit 0)
+          rm -rf "$HOME/.claude"; mkdir -p "$link"; echo keep > "$link/keep"
+          out="$(bash adapters/claude-code/install.sh --core-only </dev/null 2>&1)"
+          if [ -L "$link" ] || [ "$(cat "$link/keep")" != "keep" ] || ! printf '%s\n' "$out" | grep -qF 'is not a symlink'; then
+            echo "::error::a real directory at $link was not left alone with a warning"
+            exit 1
+          fi
+          echo "ok  real directory at the link path left alone, with a warning"
+
+          # Two skills mapping to one name: fail before the swap, install untouched
+          dup="$(mktemp -d)/repo"; mkdir -p "$dup"
+          tar --exclude=.git -cf - . | tar -xf - -C "$dup"
+          printf -- '---\nname: 01-quote\ndescription: dup\n---\n' > "$dup/profiles/cnc-machining/skills/dup-quote.md"
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          before="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if out="$(bash "$dup/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"; then
+            echo "::error::duplicate skill name installed without error"
+            exit 1
+          fi
+          after="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if [ "$before" != "$after" ] || ! printf '%s\n' "$out" | grep -qF 'both have name: 01-quote'; then
+            echo "::error::duplicate skill name did not fail cleanly before the swap"
+            printf '%s\n' "$out"
+            exit 1
+          fi
+          echo "ok  duplicate skill name fails before the swap; install untouched"
+
+      # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
       # must declare the fields install.sh + adapters expect to read
       # ---------------------------------------------------------------
@@ -512,6 +630,21 @@ jobs:
       # ---------------------------------------------------------------
       - name: Multi-profile — helper unit tests
         run: python3 tests/multiprofile/test_multiprofile.py
+
+      - name: erp-connector — contract tests
+        run: python3 tests/mcp/test_erp_contract.py
+      - name: scheduler-mcp — stdio protocol tests
+        run: python3 tests/mcp/test_scheduler_mcp.py
+
+      # ---------------------------------------------------------------
+      # Step 14: Generic adapter export tests. Exercises
+      # adapters/generic/export.py end-to-end against the real repo and
+      # synthetic mini-repos: file sets, override precedence, extends
+      # fixtures, conflict / unknown-profile exits, determinism, and
+      # MANIFEST sha256 integrity.
+      # ---------------------------------------------------------------
+      - name: Generic adapter — export tests
+        run: python3 tests/generic/test_export.py
 
       # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
@@ -703,6 +836,206 @@ jobs:
                         f"{profile_path} via replace-section; update that "
                         f"profile in this PR or restore the heading")
               fail = True
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 15: Registration guardrail. An unregistered profiles/<dir>
+      # is silently skipped by Step 3 (manifest vs filesystem), Step 11
+      # (explainer stat panel) and Step 12 (pairwise conflict scan), so
+      # CI would stay green while the profile is invisible. Every
+      # profiles/<dir>/ (dirs starting with "_" are exempt) must be in
+      # plugin.json `profiles.available`, and its `status` (missing
+      # = complete) must match the plugin.json list that names it.
+      # ---------------------------------------------------------------
+      - name: Profiles — every profiles/<dir> is registered in plugin.json
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          plugin = json.load(open("plugin.json", encoding="utf-8"))
+          reg = plugin["profiles"]
+          available = set(reg.get("available", []))
+          status_lists = {k: set(reg.get(k, [])) for k in ("complete", "alpha", "stub")}
+          fail = False
+          dirs = sorted(
+              d for d in os.listdir("profiles")
+              if os.path.isdir(os.path.join("profiles", d)) and not d.startswith("_")
+          )
+          for d in dirs:
+              pj = f"profiles/{d}/profile.json"
+              if d not in available:
+                  print(f"::error file=plugin.json::profiles/{d}/ exists but is not in "
+                        f"profiles.available — it is silently skipped by the pairwise "
+                        f"conflict scan and the explainer stats. Register it (see "
+                        f"docs/profile-development.md).")
+                  fail = True
+              if not os.path.isfile(pj):
+                  print(f"::error file=profiles/{d}::directory has no profile.json")
+                  fail = True
+                  continue
+              status = json.load(open(pj, encoding="utf-8")).get("status", "complete")
+              if status not in status_lists:
+                  print(f"::error file={pj}::status {status!r} is not one of "
+                        f"complete / alpha / stub")
+                  fail = True
+              elif d not in status_lists[status]:
+                  print(f"::error file=plugin.json::{d} has status {status!r} in "
+                        f"{pj} but is not listed in plugin.json profiles.{status}")
+                  fail = True
+              others = [k for k, v in status_lists.items() if d in v and k != status]
+              if others:
+                  print(f"::error file=plugin.json::{d} (status {status!r}) is also "
+                        f"listed under profiles.{others}")
+                  fail = True
+          for name in sorted(available - set(dirs)):
+              print(f"::error file=plugin.json::profiles.available lists {name!r} "
+                    f"but profiles/{name}/ does not exist")
+              fail = True
+          for key, names in status_lists.items():
+              for name in sorted(names - available):
+                  print(f"::error file=plugin.json::profiles.{key} lists {name!r} "
+                        f"which is not in profiles.available")
+                  fail = True
+          default = reg.get("default")
+          if default and default not in available:
+              print(f"::error file=plugin.json::profiles.default {default!r} is not "
+                    f"in profiles.available")
+              fail = True
+          print(f"{len(dirs)} profile dirs, {len(available)} registered")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 16: Agent tool allowlist (least privilege). Every agent
+      # (core/**/agents, profiles/**/agents) and every profile
+      # _templates/agent-*.md starter must declare `tools:` and keep it
+      # inside ALLOWED. Bash is opt-in per agent: the body must contain
+      #   <!-- tools: bash-justified: <reason> -->
+      # Starters under _templates/ may never opt in (they get copied).
+      # Read-only MCP tools of the reference scheduler server are also
+      # allowed, by prefix: `mcp__manufacturing-scheduler__<tool>` (the
+      # concrete tool names are pinned by tests/mcp). Any other MCP
+      # server prefix has to be added to MCP_PREFIXES in its own PR.
+      # WebFetch / Write / Edit etc. are not allowed at all — widen
+      # ALLOWED / OPT_IN / MCP_PREFIXES below only in a PR that
+      # discusses why.
+      # ---------------------------------------------------------------
+      - name: Agents — tool allowlist
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys, yaml
+          ALLOWED = {"Read", "Grep", "Glob"}
+          OPT_IN = {"Bash"}   # allowed only with the bash-justified marker
+          MCP_PREFIXES = ("mcp__manufacturing-scheduler__",)  # read-only scheduler tools
+          MARKER = re.compile(r"<!--\s*tools:\s*bash-justified:\s*\S[^>]*?-->")
+          files = sorted(set(
+              glob.glob("core/**/agents/*.md", recursive=True)
+              + glob.glob("profiles/**/agents/*.md", recursive=True)
+              + glob.glob("profiles/**/_templates/agent-*.md", recursive=True)
+          ))
+          fail = False
+          for f in files:
+              text = open(f, encoding="utf-8").read()
+              parts = text.split("---", 2)
+              if not text.startswith("---") or len(parts) < 3:
+                  continue  # Step 4 reports missing / unclosed frontmatter
+              try:
+                  fm = yaml.safe_load(parts[1]) or {}
+              except yaml.YAMLError:
+                  continue  # Step 4 reports invalid YAML
+              if "tools" not in fm:
+                  print(f"::error file={f}::agent must declare `tools:` "
+                        f"(omitting it inherits every tool); use [Read, Grep, Glob]")
+                  fail = True
+                  continue
+              raw = fm["tools"]
+              tools = ({t.strip() for t in raw.split(",") if t.strip()}
+                       if isinstance(raw, str) else {str(t) for t in (raw or [])})
+              is_template = "/_templates/" in f
+              has_marker = bool(MARKER.search(parts[2]))
+              bad = sorted(t for t in tools - ALLOWED - OPT_IN
+                           if not t.startswith(MCP_PREFIXES))
+              if bad:
+                  print(f"::error file={f}::tools {bad} are not on the allowlist "
+                        f"{sorted(ALLOWED)} (+ Bash with a justification marker, "
+                        f"+ {list(MCP_PREFIXES)} tools)")
+                  fail = True
+              if tools & OPT_IN:
+                  if is_template:
+                      print(f"::error file={f}::starter templates must not declare "
+                            f"{sorted(tools & OPT_IN)}; contributors copy this file")
+                      fail = True
+                  elif not has_marker:
+                      print(f"::error file={f}::declares Bash but the body has no "
+                            f"`<!-- tools: bash-justified: <reason> -->` marker")
+                      fail = True
+              elif has_marker:
+                  print(f"::error file={f}::has a bash-justified marker but does not "
+                        f"declare Bash in `tools:` — remove the stale marker")
+                  fail = True
+              print(f"ok  {f}  tools={sorted(tools)}")
+          print(f"checked {len(files)} agent files")
+          sys.exit(1 if fail else 0)
+          PY
+
+      # ---------------------------------------------------------------
+      # Step 17: Explainer 01 overlay rows vs stat panel. Step 11 only
+      # regenerates the stat panel; the agent / know-how / hook overlay
+      # rows (and their "CNC a + alpha α b" labels) are hand-edited.
+      # Count the item tiles per row and compare with (1) the label and
+      # (2) the regenerated stat numbers, so adding a profile cannot
+      # leave the rows stale. Skills have no row in explainer 01.
+      # ---------------------------------------------------------------
+      - name: Explainer 01 — overlay rows vs stat panel
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          path = glob.glob("docs/explainers/01-*.html")[0]
+          html = open(path, encoding="utf-8").read()
+          stats = html[html.index("AUTO-START: explainer01-stats"):html.index("AUTO-END")]
+          def stat(label, with_alpha=True):
+              m = re.search(label + r"（(\d+) \+ (\d+)(?: \+ (\d+)α)?）", stats)
+              if not m:
+                  print(f"::error file={path}::cannot find stat line {label!r}")
+                  sys.exit(1)
+              return int(m[1]), int(m[2]), int(m[3] or 0)
+          expected = {            # layer marker -> (stat label, noun)
+              "ROLE": ("Agents", "agent"),
+              "REF":  ("Know-how", "know-how"),
+              "HOOK": ("Hooks", "hook"),
+          }
+          fail = False
+          for layer, (label, noun) in expected.items():
+              m = re.search(r"<!-- LAYER \d+ " + layer + r" -->(.*?)(?=<!-- LAYER |\Z)",
+                            html, re.S)
+              if not m:
+                  print(f"::error file={path}::LAYER {layer} block not found")
+                  fail = True
+                  continue
+              core_html, _, overlay_html = m[1].partition('class="layer-overlay"')
+              n_core = len(re.findall(r'<div class="item(?: new)?">', core_html))
+              n_cnc = len(re.findall(r'<div class="item cnc">', overlay_html))
+              n_alpha = len(re.findall(r'<div class="item alpha">', overlay_html))
+              s_core, s_cnc, s_alpha = stat(label)
+              o_label = re.search(r'col-label profile">([^<]*)<', overlay_html)[1]
+              c_label = re.search(r'col-label">([^<]*)<', core_html)[1]
+              l_core = int(re.search(r"(\d+)", c_label)[1])
+              l_cnc = int((re.search(r"CNC (\d+)", o_label) or [0, 0])[1])
+              l_alpha = int((re.search(r"α (\d+)", o_label) or [0, 0])[1])
+              rows = [
+                  ("core", n_core, s_core, l_core, c_label),
+                  ("CNC", n_cnc, s_cnc, l_cnc, o_label),
+                  ("alpha", n_alpha, s_alpha, l_alpha, o_label),
+              ]
+              for what, n, s, l, text in rows:
+                  if n != s or l != s:
+                      print(f"::error file={path}::{layer} row, {what} {noun}s: "
+                            f"{n} tiles, label says {l} ({text.strip()!r}), stat panel "
+                            f"says {s} — hand-edit the overlay row/label after "
+                            f"`python3 scripts/regen_explainers.py`")
+                      fail = True
+              print(f"{layer}: tiles core/cnc/alpha = {n_core}/{n_cnc}/{n_alpha}; "
+                    f"stat = {s_core}/{s_cnc}/{s_alpha}")
           sys.exit(1 if fail else 0)
           PY
 

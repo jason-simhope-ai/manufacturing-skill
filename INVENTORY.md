@@ -3,7 +3,7 @@
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
 > 規模：v0.1.5 + Unreleased（v0.2.0-alpha 數位分身團隊，實驗性）· MIT
-> 最後更新：2026-10-05
+> 最後更新：2026-10-06
 >
 > 只列本分支 tree 內實際存在的檔案（以 `git ls-files` 為準）；其他分支或未合併 PR 新增的檔案，合併後再補進來。
 
@@ -19,9 +19,10 @@
 | 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
-| AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
+| AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md) → [docs/consulting/](docs/consulting/README.md)（工作坊、問卷、SOW、pilot 一頁紙、交付清單）     |
 | 要導入分身團隊（agent / 人）  | [TEAM.md](TEAM.md)（agent）· [team/README.zh-TW.md](team/README.zh-TW.md)（人，10 分鐘）                                                      |
 | 想 fork 開新 vertical         | [docs/profile-development.md](docs/profile-development.md)                                                                                    |
+| Coding agent / 貢獻者         | [CLAUDE.md](CLAUDE.md)（repo 地圖、語言慣例、CI 規則）                                                                                        |
 | 開發者讀架構                  | [docs/architecture.md](docs/architecture.md)                                                                                                  |
 | 看設計脈絡 / decision history | [docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md)            |
 | 看未來路線                    | [docs/ROADMAP.md](docs/ROADMAP.md)                                                                                                            |
@@ -41,15 +42,18 @@
 | 修報價邏輯          | [core/skills/01-報價.md](core/skills/01-報價.md) + [core/agents/quote-specialist.md](core/agents/quote-specialist.md)   |
 | 修排程邏輯          | [core/skills/03-排程.md](core/skills/03-排程.md) + [core/skills/capacity-planning.md](core/skills/capacity-planning.md) |
 | 修檢驗邏輯          | [core/skills/05-檢驗.md](core/skills/05-檢驗.md) + [core/skills/spc-basics.md](core/skills/spc-basics.md)               |
-| 接 ERP              | 看 [infra/mcp-servers/erp-connector/contract.py](infra/mcp-servers/erp-connector/contract.py) 介面                      |
+| 接 ERP              | 看 [infra/mcp-servers/erp-connector/contract.py](infra/mcp-servers/erp-connector/contract.py) 介面（參考實作：[mock_connector.py](infra/mcp-servers/erp-connector/mock_connector.py)） |
 | 接生產排程          | 用 [infra/mcp-servers/scheduler-mcp/server.py](infra/mcp-servers/scheduler-mcp/server.py) 當參考                        |
+| 填公司事實與資料分級 | [examples/company-facts.template.md](examples/company-facts.template.md) + [docs/data-classification.md](docs/data-classification.md) |
+| 設定工作站權限      | [docs/permissions-template.md](docs/permissions-template.md)                                                            |
+| 給其他 AI 工具用    | [adapters/generic/export.py](adapters/generic/export.py)（純 markdown 匯出，experimental）                             |
 | 看 demo 輸出長怎樣  | [examples/sample-quote-output.md](examples/sample-quote-output.md)                                                      |
 
 ---
 
 ## 完整檔案地圖
 
-### 頂層 (12)
+### 頂層 (13)
 
 ```
 manufacturing.md          ← 靈魂入口文件，先讀
@@ -63,6 +67,7 @@ CHANGELOG.md              ← 版本紀錄（Keep a Changelog；[Unreleased] 在
 CONTRIBUTING.md           ← 貢獻指南
 SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 .gitignore                ← 含 team/local/*、team/.build/
+CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、慣例、CI 規則）
 .gitattributes            ← 強制 LF（install.sh / *.py 在 CRLF checkout 下會壞）
 ```
 
@@ -111,11 +116,12 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [8d-report-writing](core/skills/8d-report-writing.md)                   | 8D 八步驟 + customer-deliverable template     |
 | [engineering-change-process](core/skills/engineering-change-process.md) | ECN/ECO 5 步驟 SOP + 13-item impact checklist |
 
-#### `core/know-how/` — 8 份普世知識
+#### `core/know-how/` — 9 份普世知識
 
 | 檔                                        | 內容                                            |
 | ----------------------------------------- | ----------------------------------------------- |
 | [iso-9001](core/know-how/iso-9001.md)     | 品質管理體系 7 原則 + PDCA                      |
+| [iatf-16949](core/know-how/iatf-16949.md) | IATF 16949 + PPAP 18 要素 / 5 級 + 各製程差異   |
 | [lean-5s](core/know-how/lean-5s.md)       | 5S + 7 大浪費 + JIT                             |
 | [oee](core/know-how/oee.md)               | 設備總效率公式 + 改善方向                       |
 | [mrp-basics](core/know-how/mrp-basics.md) | MRP / Lead time / ABC 分類                      |
@@ -144,7 +150,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | Manifest     | [profile.json](profiles/cnc-machining/profile.json) + [manufacturing.md](profiles/cnc-machining/manufacturing.md)                                                                                                                                                                                       |
 | Agents (4)   | [cnc-programmer](profiles/cnc-machining/agents/cnc-programmer.md) · [tool-life-engineer](profiles/cnc-machining/agents/tool-life-engineer.md) · [fixture-designer](profiles/cnc-machining/agents/fixture-designer.md) · [prototype-coordinator](profiles/cnc-machining/agents/prototype-coordinator.md) |
 | Skills (3)   | [g-code-review](profiles/cnc-machining/skills/g-code-review.md) · [cutting-parameter-calc](profiles/cnc-machining/skills/cutting-parameter-calc.md) · [fixture-design-patterns](profiles/cnc-machining/skills/fixture-design-patterns.md)                                                               |
-| Know-how (4) | [iatf-16949](profiles/cnc-machining/know-how/iatf-16949.md) · [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
+| Know-how (3) | [刀具壽命管理](profiles/cnc-machining/know-how/刀具壽命管理.md) · [切削參數查表](profiles/cnc-machining/know-how/切削參數查表.md) · [開發工廠-vs-量產](profiles/cnc-machining/know-how/開發工廠-vs-量產.md)                               |
 | Hooks (1)    | [pre-cnc-program-checkin](profiles/cnc-machining/hooks/pre-cnc-program-checkin.md)                                                                                                                                                                                                                      |
 
 #### `profiles/injection-molding/` — 🧪 v0.1.1 alpha profile
@@ -158,13 +164,54 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 
 > **Alpha 警告**：內容基於公開資料，未經實際射出廠工程師驗證。歡迎射出廠師傅 PR 修正。
 
-#### Stub profiles（3 個 — 歡迎 contribute）
+#### `profiles/food-processing/` — 🧪 v0.1 alpha profile
 
-| Profile                                      | manifest                                                                                                | 預留範本                                                                             |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [pcb-assembly](profiles/pcb-assembly/)       | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)       | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)    |
-| [food-processing](profiles/food-processing/) | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md) | [\_templates/agent-starter.md](profiles/food-processing/_templates/agent-starter.md) |
-| [pharma](profiles/pharma/)                   | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                   | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)          |
+| 類別         | 內容                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/food-processing/profile.json) · [README.md](profiles/food-processing/README.md)                                                                               |
+| Agents (2)   | [haccp-coordinator](profiles/food-processing/agents/haccp-coordinator.md) · [traceability-officer](profiles/food-processing/agents/traceability-officer.md)                           |
+| Skills (2)   | [haccp-plan-review](profiles/food-processing/skills/haccp-plan-review.md) · [batch-traceability-recall-drill](profiles/food-processing/skills/batch-traceability-recall-drill.md)     |
+| Know-how (2) | [haccp-iso22000-basics](profiles/food-processing/know-how/haccp-iso22000-basics.md) · [food-defects-and-ccp-examples](profiles/food-processing/know-how/food-defects-and-ccp-examples.md) |
+| Hooks (1)    | [pre-ship](profiles/food-processing/hooks/pre-ship.md)（取代 core `pre-ship`，加食品批次放行要件）                                                                                  |
+
+> **Alpha 警告**：內容基於 Codex / ISO 22000 公開資料，未經食品廠 HACCP 小組驗證；管制界限皆為範例，法規細節標「需驗證」。不可取代 HACCP 管制小組或法規顧問，AI 不簽核 CCP 偏差、不決定回收。
+
+#### `profiles/pcb-assembly/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/pcb-assembly/profile.json) · [README.md](profiles/pcb-assembly/README.md)                                                            |
+| Agents (2)   | [smt-process-engineer](profiles/pcb-assembly/agents/smt-process-engineer.md) · [ems-quality-analyst](profiles/pcb-assembly/agents/ems-quality-analyst.md)     |
+| Skills (2)   | [smt-dfm-review](profiles/pcb-assembly/skills/smt-dfm-review.md) · [aoi-defect-pareto](profiles/pcb-assembly/skills/aoi-defect-pareto.md)                     |
+| Know-how (2) | [ipc-a-610-basics](profiles/pcb-assembly/know-how/ipc-a-610-basics.md) · [smt-common-defects](profiles/pcb-assembly/know-how/smt-common-defects.md)           |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pcb-assembly/_templates/agent-starter.md)                                                                            |
+
+> **Alpha 警告**：內容基於公開 IPC 標準摘要與業界通識，未經 EMS 工程師驗證；數字標「範例 / 需驗證」。尚無 MES 連線 — AOI/SPI/ICT/FCT 分析需先匯出 CSV。
+
+#### `profiles/pharma/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest     | [profile.json](profiles/pharma/profile.json) · [README.md](profiles/pharma/README.md)                                                                                                                          |
+| Agents (2)   | [deviation-capa-coordinator](profiles/pharma/agents/deviation-capa-coordinator.md) · [batch-record-reviewer](profiles/pharma/agents/batch-record-reviewer.md)                                                   |
+| Skills (2)   | [deviation-investigation-5whys-fishbone](profiles/pharma/skills/deviation-investigation-5whys-fishbone.md) · [batch-record-completeness-review](profiles/pharma/skills/batch-record-completeness-review.md)     |
+| Know-how (2) | [gmp-gxp-basics](profiles/pharma/know-how/gmp-gxp-basics.md) · [validation-and-change-control](profiles/pharma/know-how/validation-and-change-control.md)                                                       |
+| Hooks (1)    | [pre-batch-release](profiles/pharma/hooks/pre-batch-release.md)（新增，不覆寫 core `pre-ship`；QA 放行前文件齊備檢查）                                                                                         |
+| 預留範本     | [\_templates/agent-starter.md](profiles/pharma/_templates/agent-starter.md)                                                                                                                                    |
+
+> **Alpha 警告**：內容基於 PIC/S GMP、ICH Q7/Q9/Q10、資料完整性指引公開摘要，未經 GMP QA / 確效人員驗證；數字標「範例 / 需驗證」。AI 輸出永遠不是 GMP 紀錄 — 不結案偏差、不核准 CAPA、不放行批次；不取代 QA / QP、法規事務或經確效的系統。
+
+#### `profiles/machinery-eto/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/machinery-eto/profile.json) · [README.md](profiles/machinery-eto/README.md)                                                                                                                                        |
+| Agents (3)   | [eto-quote-engineer](profiles/machinery-eto/agents/eto-quote-engineer.md) · [project-engineer](profiles/machinery-eto/agents/project-engineer.md) · [commissioning-service-coordinator](profiles/machinery-eto/agents/commissioning-service-coordinator.md) |
+| Skills (3)   | [eto-quote-breakdown](profiles/machinery-eto/skills/eto-quote-breakdown.md) · [spec-freeze-and-design-review](profiles/machinery-eto/skills/spec-freeze-and-design-review.md) · [fat-sat-acceptance](profiles/machinery-eto/skills/fat-sat-acceptance.md) |
+| Know-how (3) | [eto-vs-mts-quoting](profiles/machinery-eto/know-how/eto-vs-mts-quoting.md) · [machinery-safety-ce-basics](profiles/machinery-eto/know-how/machinery-safety-ce-basics.md) · [project-handover-and-after-sales](profiles/machinery-eto/know-how/project-handover-and-after-sales.md) |
+| Hooks (1)    | [pre-quote](profiles/machinery-eto/hooks/pre-quote.md)（取代 core `pre-quote`：加 ETO 閘門 — 規格未凍結不得正式報價、未定選配標 `[需澄清]`；core 零件檢查原封保留）                                                                    |
+
+> **Alpha 警告**：內容基於公開機械安全標準摘要（ISO 12100、IEC 60204-1）與設備廠一般實務，未經設備廠專案 / 報價 / 安規工程師驗證；數字標「範例」，CE（2006/42/EC、2023/1230）與台灣安全資訊申報細節標「需驗證」。報價是工程估算；AI 不承諾交期、不簽驗收、不做安全評估或 CE 判定。零件級報價仍由 core `quote-specialist` 處理。
 
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
 
@@ -179,13 +226,28 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [\_multiprofile.py](adapters/claude-code/_multiprofile.py)       | v0.1.5+ multi-profile helper：`scan` 衝突偵測 + `scan-all` CI 批掃 + `aggregate` 產 `active-profiles.json`                                                       |
 | [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)      | source → `~/.claude/plugins/` 映射說明（v0.1.5 加多 profile 章節）                                                                                               |
 
+### `adapters/generic/` — 純 markdown 匯出（experimental, v0.3 preview）
+
+| 檔 | 用途 |
+| -- | ---- |
+| [export.py](adapters/generic/export.py) | 把 core + profile（`extends:` 已解析、多 profile 衝突檢查同 install.sh）匯出成純 markdown：`files` 資料夾 + `MANIFEST.json` 或單一 `bundle` 檔 |
+| [README.md](adapters/generic/README.md) | 用法：Cursor、Gemini CLI / Codex、地端 Ollama / Open WebUI、列印成 SOP |
+
 ### `tests/extends/` — Inheritance resolver 測試 fixtures
 
-13 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
+24 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
 
 ### `tests/multiprofile/` — Multi-profile helper 單元測試
 
-`test_multiprofile.py` — 8 個測試 in-process 驗證 `scan_set` / `scan_pair` / `aggregate_profiles` 的行為（含合成衝突 / 三 profile 部分衝突 / list 欄位 union dedupe）。CI Step 13 會跑。
+`test_multiprofile.py` — 16 個測試 in-process 驗證 `scan_set` / `scan_pair` / `aggregate_profiles` 的行為（含合成衝突 / 三 profile 部分衝突 / list 欄位 union dedupe）。CI Step 13 會跑。
+
+### `tests/generic/` — Generic adapter 測試
+
+`test_export.py` — 12 個 stdlib unittest（匯出內容與 install.sh 一致、`extends:` 解析、衝突拒絕、bundle / files 兩種格式）。CI「Generic adapter — export tests」會跑。
+
+### `tests/mcp/` — MCP server 測試
+
+`test_erp_contract.py` — 78 個 unittest（`CallContext`、角色遮罩、寫入核准 token、`max_rows`／`fields`，含可重用的 `ConformanceSuite` 跑 `MockErpConnector`）；`test_scheduler_mcp.py` — 30 個 unittest（`manufacturing-scheduler` stdio JSON-RPC：`initialize`、`tools/list`、`tools/call`、輸入驗證、惡意輸入）。CI「erp-connector — contract tests」「scheduler-mcp — stdio protocol tests」會跑。
 
 ---
 
@@ -196,7 +258,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [mcp-servers/scheduler-mcp/](infra/mcp-servers/scheduler-mcp/)                                                                                                                                         | 範例 MCP server，含 mock data 可立即跑     |
 | `mcp-servers/scheduler-mcp/`[server.py](infra/mcp-servers/scheduler-mcp/server.py) · [README.md](infra/mcp-servers/scheduler-mcp/README.md) · [mock-data/](infra/mcp-servers/scheduler-mcp/mock-data/) |                                            |
 | [mcp-servers/erp-connector/](infra/mcp-servers/erp-connector/)                                                                                                                                         | ERP 整合介面契約（template，實作交給用戶） |
-| `mcp-servers/erp-connector/`[contract.py](infra/mcp-servers/erp-connector/contract.py) · [README.md](infra/mcp-servers/erp-connector/README.md)                                                        |                                            |
+| `mcp-servers/erp-connector/`[contract.py](infra/mcp-servers/erp-connector/contract.py) · [README.md](infra/mcp-servers/erp-connector/README.md) · [mock_connector.py](infra/mcp-servers/erp-connector/mock_connector.py) · [mock-data/erp_mock.json](infra/mcp-servers/erp-connector/mock-data/erp_mock.json) |                                            |
 | [on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md)                                                                                                                                                   | NVIDIA GB10 + Ollama 地端 LLM 安裝指南     |
 | [chat-gateway/](infra/chat-gateway/)                                                                                                                                                                   | 數位分身聊天 gateway（見下方 Team tier）；`install.sh` 不安裝 `infra/` |
 
@@ -238,7 +300,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify` |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
-| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` · `spend.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 · claude-code driver 的每日預算上限（持久化） |
 | `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
 | `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py`、`twin_result.schema.json` |
 | `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
@@ -249,7 +311,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | 套件 | 內容 | 怎麼跑（CI Step） |
 | ---- | ---- | ----------------- |
 | [tests/team/](tests/team/) | `fixtures.yaml` 135 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 58 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code、agent 檔的 `$ROOT` 路徑） | `python3 tests/team/run.py`（Step 19）· `python3 tests/team/test_team.py` |
-| [tests/gateway/](tests/gateway/) | `test_gateway.py` 129 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 44 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 60 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 44 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 60 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
 
@@ -261,6 +323,9 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
 | [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算；分身 4 週 pilot、原則與核准範本 |
 | [owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)                                                                       | 董事長：簽三件事前的一頁（費用、最壞情況、停機、第 4 週決策表） |
+| [data-classification.md](docs/data-classification.md) | 導入負責人 / IT：T0–T3 資料分級與 AI 工具使用規則 |
+| [permissions-template.md](docs/permissions-template.md) | IT：Claude Code `permissions` 最小權限範本（allow / ask / deny） |
+| [consulting/](docs/consulting/README.md) | 顧問交付包（6 份範本）：90 分鐘探索工作坊、IT 資料流問卷、SOW、pilot 一頁紙、交付物清單 |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
@@ -286,6 +351,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [sample-drawing/bracket.md](examples/sample-drawing/bracket.md)   | 模擬 CNC 件圖紙 metadata       |
 | [sample-bom/bracket-bom.csv](examples/sample-bom/bracket-bom.csv) | 對應的 BOM                     |
 | [sample-quote-output.md](examples/sample-quote-output.md)         | `/quote` 預期輸出範例          |
+| [company-facts.template.md](examples/company-facts.template.md)   | 公司事實檔填寫範本（費率、毛利、交期、核准權限；填好的檔不進 repo） |
 
 ---
 
@@ -294,6 +360,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | 檔 | 用途 |
 | -- | ---- |
 | [regen_explainers.py](scripts/regen_explainers.py) | 重生 `docs/explainers/*.html` 的 `AUTO-START`／`AUTO-END` 區塊（計數、版本、分身數）；`--check` 供 CI Step 11 |
+| [regen_screenshots.py](scripts/regen_screenshots.py) | 從 HTML 重拍已 commit 的 PNG（explainers、6-capability slide、quickstart mockups；Node Playwright）；`--check` 列出比 HTML 舊的 PNG |
 
 ---
 
@@ -324,36 +391,46 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 ## Repo metrics（本分支，`git ls-files`）
 
 ```
-頂層檔                  : 12 (README × 2, LICENSE, plugin.json, manufacturing.md, TEAM.md,
-                              INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY,
+頂層檔                  : 13 (README × 2, LICENSE, plugin.json, manufacturing.md, TEAM.md,
+                              CLAUDE.md, INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY,
                               .gitignore, .gitattributes)
 core/  agents           : 6
 core/  commands         : 11 (含 /team)
 core/  skills           : 11
-core/  know-how         : 8
+core/  know-how         : 9
 core/  hooks            : 4
-CNC profile (complete)  : 4 agents + 3 skills + 4 know-how + 1 hook + profile.json + manufacturing.md
-Injection profile (alpha): 1 agent + 1 skill + 2 know-how + profile.json + README + _templates
-Stub profiles           : 3 (PCB / food / pharma — manifest + README + _templates)
+CNC profile (complete)  : 4 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
+Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
+Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
+Pharma profile (alpha)  : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+Machinery ETO (alpha)   : 3 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
+Stub profiles           : 0
 Adapters                : claude-code (install.sh + 2 Python helpers + plugin-mapping.md)
+                              + generic (export.py + README; experimental, v0.3 preview)
 Team tier               : TEAM.md + team/ 23 files (README, for-frontline, gate, policies × 2,
                               roster.example, 3 example twins + _template, tools 11, local 2)
-Infra                   : 2 MCP servers + 1 on-prem guide + chat-gateway (31 files)
+Infra                   : 2 MCP servers (scheduler-mcp 5 files; erp-connector 4 incl.
+                              mock_connector + mock data) + 1 on-prem guide
+                              + chat-gateway (32 files)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + 4 mockup HTML + CAPTURE-GUIDE.md
 Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-claude-response.md
                               + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 6 (architecture / adoption-guide / profile-dev / ROADMAP
-                              / quickstart-for-beginners / owner-one-page) + 6 design specs
-Scripts                 : 1 (regen_explainers.py)
-Tests                   : 54 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
-                              cases + 58 unittest, gateway 266 unittest + demo golden
-Examples                : 4 files
+Docs                    : 8 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page
+                              / data-classification / permissions-template)
+                              + consulting kit 6 + 6 design specs
+Scripts                 : 2 (regen_explainers.py, regen_screenshots.py)
+Tests                   : 91 files — extends 24 cases, multiprofile 16, team 135 + 18 fixture
+                              cases + 58 unittest, gateway 266 unittest + demo golden,
+                              generic 12, mcp 78 (erp contract) + 30 (scheduler stdio)
+Examples                : 5 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template
-Tracked files           : 257
+Tracked files           : 343
 ```
 
 ---

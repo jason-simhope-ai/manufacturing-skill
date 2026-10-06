@@ -13,13 +13,14 @@ argument-hint: "<profile> 或 <p1>,<p2>,..."
 
 ## 可用 profile
 
-| profile             | 狀態     | 說明                    |
-| ------------------- | -------- | ----------------------- |
-| `cnc-machining`     | ✅ 完整  | CNC 精密加工（v1 預設） |
-| `injection-molding` | 🧪 alpha | 塑膠射出成型            |
-| `pcb-assembly`      | 🚧 stub  | PCB 組裝                |
-| `food-processing`   | 🚧 stub  | 食品加工                |
-| `pharma`            | 🚧 stub  | 製藥（GMP）             |
+| profile             | 狀態     | 說明                         |
+| ------------------- | -------- | ---------------------------- |
+| `cnc-machining`     | ✅ 完整  | CNC 精密加工（v1 預設）      |
+| `injection-molding` | 🧪 alpha | 塑膠射出成型                 |
+| `pcb-assembly`      | 🧪 alpha | PCB 組裝（SMT / EMS）        |
+| `food-processing`   | 🧪 alpha | 食品加工（HACCP）            |
+| `pharma`            | 🧪 alpha | 製藥 / 醫材（GMP）           |
+| `machinery-eto`     | 🧪 alpha | 機械設備製造（ETO 接單設計） |
 
 ## 使用範例
 
@@ -52,8 +53,9 @@ bash adapters/claude-code/install.sh --list-conflicts cnc-machining,injection-mo
 
 1. 解析 comma-separated profile list；驗證名稱格式與每個 profile 都存在
 2. 預檢（preflight）：需要時確認 python3 / PyYAML 可用；跨 profile 進行 conflict scan（多 profile 才跑）；任何失敗 → 不動既有 install、直接結束
-3. 在暫存目錄組出新的安裝樹：Stage 1 core layer，Stage 2 依序 overlay 各 profile
+3. 在暫存目錄組出新的安裝樹：Stage 1 core layer，Stage 2 依序 overlay 各 profile；接著把 `skills/<x>.md` 改成 `skills/<name>/SKILL.md`（同名 → 失敗、不動既有 install），內文的 `core/...` repo 路徑改成安裝後路徑，產生 `.claude-plugin/plugin.json`
 4. 寫 `active-profiles.json`（aggregated manifest）+ `.installed`（含 `activeProfiles` 陣列）到暫存樹
 5. 原子交換：既有 install 移到 `manufacturing-skill.bak.<timestamp>.<pid>`，暫存樹移入定位；交換失敗會自動還原備份（只保留最新 3 份備份）
+6. 確認 `~/.claude/skills/manufacturing-skill` symlink 指向 `../plugins/manufacturing-skill`（Claude Code 從這裡載入）；提醒使用者重新啟動 Claude Code 或執行 `/reload-plugins`
 
 詳細邏輯：[`docs/profile-development.md`](../../docs/profile-development.md)

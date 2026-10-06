@@ -3,7 +3,7 @@ name: fixture-designer
 displayName: 夾治具設計師 / Fixture Designer
 description: 加工夾治具設計、定位基準選擇、防呆設計、夾治具成本估算
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 夾治具設計師 / Fixture Designer

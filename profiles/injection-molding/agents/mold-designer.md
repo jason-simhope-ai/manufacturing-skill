@@ -3,7 +3,7 @@ name: mold-designer
 displayName: 模具設計師 / Mold Designer
 description: 射出模具設計 — DFM 檢討、流道與澆口、冷卻佈置、頂出策略、脫模角
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 status: alpha
 ---
 

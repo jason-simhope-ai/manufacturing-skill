@@ -3,7 +3,7 @@ name: <TODO-agent-name>
 displayName: <TODO 中文名>
 description: <TODO 一句話描述這個 agent 做什麼>
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # <TODO 中文名> / <TODO English Name>
@@ -33,7 +33,7 @@ tools: [Read, Grep, Glob, Bash]
 
 ## 你會用的資源
 
-- **Know-how**: 至少需要 `gmp` / `21-cfr-part-11` / `data-integrity-alcoa-plus`
+- **Know-how**: 先參考 `know-how/gmp-gxp-basics.md`、`know-how/validation-and-change-control.md`
 - **配合**: 永遠 dispatch 給人類 QA 簽認，不自決
 
 ## 你絕對不會做的事
@@ -48,9 +48,10 @@ tools: [Read, Grep, Glob, Bash]
 
 依 `profile.json` 的 `wantedContributions`：
 
-1. `qa-pharmacist` — 品保藥師
-2. `validation-engineer` — IQ/OQ/PQ、CSV
-3. `deviation-handler` — 偏差初步分析（人類覆審）
+1. ~~`deviation-handler`~~ — 以 `deviation-capa-coordinator` 名稱完成 alpha（[`agents/deviation-capa-coordinator.md`](../agents/deviation-capa-coordinator.md)）
+2. ~~`batch-record-review`~~ — 以 `batch-record-reviewer` agent + skill 完成 alpha（[`agents/batch-record-reviewer.md`](../agents/batch-record-reviewer.md)）
+3. `qa-release-support` — 放行文件包彙整，只彙整不放行（仍徵求中）
+4. `validation-engineer` — IQ/OQ/PQ、清潔 / 製程確效、CSV（仍徵求中）
 
 合規重點：GMP (PIC/S, EU GMP, FDA cGMP), ICH Q7/Q8/Q9/Q10, 21 CFR Part 11, Annex 11
 

@@ -7,7 +7,7 @@
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](https://claude.com/claude-code)
 [![繁體中文](https://img.shields.io/badge/lang-%E7%B9%81%E4%B8%AD-red)](README.zh-TW.md)
 
-A Claude Code plugin that gives any manufacturing company a 30-minute path to a working AI assistant — tailored to their vertical, runnable on their own GPU.
+A Claude Code plugin that gives any manufacturing company a 30-minute path to a working AI assistant — tailored to their vertical. The plugin's prompts and files live on your machine, but the default model is Anthropic's cloud (Claude Code): anything you paste or attach is sent to the model provider under its terms. An on-prem model is an option, not verified end-to-end by this project (see [Data flow](#data-flow)).
 
 > 中文讀者請看 [README.zh-TW.md](README.zh-TW.md)
 
@@ -16,6 +16,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 ## ⭐ Live demo (real Claude Opus 4.7 acting as the `quote-specialist` persona)
 
 ![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo-en.png)
+
+> *Illustration only: this is the response to a persona prompt pasted into the claude.ai web chat (see [capture](docs/demo/real-claude-response.md)), not a recording of the installed plugin running in Claude Code. The animation below replays the same response.*
 
 **The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
 
@@ -32,8 +34,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 `manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
 
-- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 6 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager, engineering change manager), and a baseline know-how library (ISO 9001, Lean, OEE, MRP).
-- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 4 know-how docs covering IATF 16949, tool life, cutting parameters, job-shop vs. mass production). Stub profiles for PCB assembly, injection molding, food processing, and pharma are scaffolded for community / customer contribution.
+- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 6 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager, engineering change manager), and a baseline know-how library (ISO 9001, IATF 16949 / PPAP, Lean, OEE, MRP, FMEA, GD&T, ECN, INCOTERMS).
+- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 3 know-how docs covering tool life, cutting parameters, job-shop vs. mass production). Five **alpha** profiles carry real content that still needs practitioner validation: **injection molding**, **food processing** (HACCP / ISO 22000, batch traceability), **PCB assembly / EMS** (SMT process + EMS quality agents, DFM and AOI-defect-Pareto skills, IPC-A-610 and SMT-defect know-how; no MES integration yet) **pharma / medical device** (GMP / GxP deviation–CAPA and batch-record review assistants; AI output is never a GMP record) and **machinery / equipment, engineer-to-order** (option-based machine quoting with explicit assumption lists, spec freeze and design review, FAT / SAT acceptance, commissioning and after-sales; quotes are engineering estimates and safety / CE sign-off stays with a human engineer). There are no stub profiles left; new verticals are welcome as contributions.
 - **Infra layer** — MCP server templates for ERP/MES connectivity, on-prem LLM setup guides (Ollama on NVIDIA GB10), and reference configurations.
 - **Adapter layer** — a Claude Code adapter (v1). Cursor / Gemini / Codex adapters are post-v1.
 
@@ -80,7 +82,7 @@ Manufacturing AI adoption usually fails on three things:
 
 | Problem                    | Traditional answer                                             | What this plugin gives you                                                           |
 | -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 6 built-in agent personas + 4 know-how docs — AI understands ISO/Lean/OEE on day one |
+| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 6 built-in agent personas + 9 core know-how docs — AI understands ISO/IATF/Lean/OEE on day one |
 | Every factory is different | Hire an SI, pay for full custom build                          | Core + profile overlay — fork, edit your profile, done                               |
 | IT blocks cloud SaaS       | Cannot pass customer audits (drawings must not leave premises) | On-prem-first design with GB10/Ollama runtime                                        |
 
@@ -94,7 +96,7 @@ Manufacturing AI adoption usually fails on three things:
 | ------------------------------ | ------------- | ------------------------ |
 | Try it out (Cloud Pro)         | $17-20 / mo   | 0                        |
 | Heavy daily use (Cloud Max)    | $100-200 / mo | 0                        |
-| Drawings can't leave (on-prem) | Electricity   | NT$200K+ (GB10 hardware) |
+| Drawings can't go to a cloud model (on-prem option, unverified) | Electricity   | NT$200K+ (GB10 hardware) |
 
 **Reference comparison**: hiring an SI to custom-build a comparable system runs **NT$300K-1M one-time** (development + integration + training). This plugin is fork-friendly open source — that's what you save.
 
@@ -116,12 +118,16 @@ bash adapters/claude-code/install.sh
 /manufacturing init     # 4-question wizard for first-time users
 ```
 
+The installer puts the plugin in `~/.claude/plugins/manufacturing-skill/` and links it into `~/.claude/skills/` so Claude Code loads it; restart Claude Code or run `/reload-plugins` afterwards (check with `claude plugin list`).
+
 Or skip the wizard:
 
 ```bash
 /quote @examples/sample-drawing/bracket.md          # CNC profile demo
 /quote "Stainless brackets, 100 pcs, ±0.05mm"      # plain text works too
 ```
+
+- **Not on Claude Code?** Export the same merged content as plain markdown for Cursor, Gemini CLI, Codex or an on-prem Ollama system prompt: `python3 adapters/generic/export.py --profiles cnc-machining --out ./export` — see [adapters/generic/README.md](adapters/generic/README.md) (experimental, v0.3 preview).
 
 ---
 
@@ -130,10 +136,17 @@ Or skip the wizard:
 Three paths:
 
 1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 6 universal agents (quote / sales / production / quality / inventory / engineering change). Useful to evaluate "does this AI understand my factory at all" before committing.
-2. **Use a stub + customize** — PCB / injection / food / pharma stubs ship with starter templates ready to fill in.
-3. **Fork the CNC profile** — CNC is the most complete reference; fork and adapt is the fastest path. See [docs/profile-development.md](docs/profile-development.md).
+2. **Use an alpha profile + customize** — injection molding, food processing, PCB assembly, pharma and machinery ETO are all alpha (content present, labelled needs-validation); starter templates under each profile's `_templates/` are ready to extend.
+3. **Build your own profile** — copy an alpha profile as the scaffold and follow [docs/profile-development.md](docs/profile-development.md) (CI-checked template, registration and checklist included).
 
 ---
+
+### Data flow
+
+- **Stays on your machine:** the plugin's prompts, skills, know-how and hooks, and your drawing/BOM files themselves.
+- **Sent to the model provider:** the default model is Anthropic's cloud (Claude Code). Whatever you paste into the chat or attach with `@file` is transmitted and handled under the provider's terms.
+- **Terms differ:** consumer plans and commercial plans (Team / Enterprise / API) have different retention and training rules. Read the terms of the plan you actually use before sending customer drawings.
+- **On-prem is optional:** see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md). It is **not verified end-to-end by this project**; have IT verify isolation themselves.
 
 ### Cloud first, on-prem later
 
@@ -145,7 +158,7 @@ When should you consider on-prem LLM (GB10 / Ollama)?
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Just want to try / evaluate value                                | ☁️ **Cloud Claude Code — no hardware needed**                               |
 | 1-2 weeks in, value confirmed                                    | ☁️ Stay on cloud, validate team adoption                                    |
-| Customer audits (IATF / medical / drawings can't leave premises) | 🏠 On-prem — see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
+| Customer audits (IATF / medical / drawings can't leave premises) | 🏠 On-prem option (unverified by this project) — see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | Already have AI hardware, want to use it                         | 🏠 Just plug in                                                             |
 
 **Don't let "AI needs expensive hardware" scare you off** — v0.1 runs the entire flow on cloud.
@@ -162,14 +175,15 @@ manufacturing-skill/
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
 │   ├── agents/               # 6 universal personas
 │   ├── skills/               # 6-stage flow + utility skills
-│   ├── know-how/             # ISO 9001, Lean, OEE, MRP
+│   ├── know-how/             # ISO 9001, IATF 16949, Lean, OEE, MRP, ...
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/
 │   ├── cnc-machining/        # ★ Complete v1 profile
-│   ├── pcb-assembly/         # Stub — community wanted
-│   ├── injection-molding/    # Stub
-│   ├── food-processing/      # Stub
-│   └── pharma/               # Stub
+│   ├── pcb-assembly/         # Alpha — SMT / EMS, needs practitioner validation
+│   ├── injection-molding/    # Alpha — needs practitioner validation
+│   ├── food-processing/      # Alpha — HACCP / ISO 22000, needs validation
+│   ├── pharma/               # Alpha — GMP / GxP, needs QA validation
+│   └── machinery-eto/        # Alpha — equipment ETO quoting / FAT-SAT, needs validation
 ├── TEAM.md                   # Digital-twin team — agent bootstrap (humans: team/README.zh-TW.md)
 ├── team/                     # Third tier: roster, twin files, policies, gate, teamctl/build/deid tools
 ├── adapters/claude-code/     # Plugin install adapter
@@ -228,7 +242,7 @@ If you're a developer / SI wanting to build a profile for a new vertical (e.g., 
 
 PRs welcome. Especially:
 
-- New profile contributions (PCB / injection / food / pharma — see stub READMEs for what's needed)
+- Profile contributions (validate the PCB / injection / food / pharma / machinery-ETO alphas; add new verticals — see each profile README for what's needed)
 - ERP connector implementations (SAP / Oracle / 鼎新 / Workday)
 - Translations of explainer cards to other languages
 - Real-world deployment case studies

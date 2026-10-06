@@ -138,16 +138,20 @@ Layer 1–6 在 v0.1.x 不變；Layer 7 是 v0.2.0-alpha 新增的實驗性層�
 
 **位置**：`core/know-how/` + `profiles/<vertical>/know-how/`
 
-**Core 4 份**：
+**Core 9 份**：
 
 - `iso-9001.md` — 品質管理體系
+- `iatf-16949.md` — 汽車品質體系 + PPAP（任何汽車供應商製程通用）
 - `lean-5s.md` — 精實 + 現場
 - `oee.md` — 設備總效率
 - `mrp-basics.md` — 物料需求規劃
+- `gd-and-t.md` — 圖面幾何公差
+- `fmea-pfmea.md` — 失效模式分析
+- `incoterms.md` — 貿易條件
+- `eco-ecn.md` — 工程變更管制
 
-**CNC profile 加 4 份**：
+**CNC profile 加 3 份**：
 
-- `iatf-16949.md` — 汽車品質體系
 - `刀具壽命管理.md`
 - `切削參數查表.md`
 - `開發工廠-vs-量產.md`

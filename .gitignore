@@ -20,6 +20,24 @@ __pycache__/
 .venv/
 venv/
 
+# ---------------------------------------------------------------------
+# Real factory data — NEVER commit. Best practice: keep these in a working
+# folder OUTSIDE this repo (e.g. ~/factory-work/); these rules are a safety net.
+# See docs/adoption-guide.md and docs/data-classification.md.
+# ---------------------------------------------------------------------
+company-facts.md
+customer-data/
+drawings/
+rfq/
+logs/
+*.dwg
+*.step
+*.stp
+*.iges
+# Synthetic demo data under examples/ stays tracked (must stay below the
+# rules above and above the secrets / examples "real_*" rules that follow).
+!examples/**
+
 # Local secrets — never commit
 .env
 .env.local

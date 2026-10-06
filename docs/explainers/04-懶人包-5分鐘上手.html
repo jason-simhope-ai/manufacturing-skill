@@ -140,15 +140,16 @@
 ════════════════════════════════════════════════
 
   1) ✅       cnc-machining
-  2) 🚧 stub  pcb-assembly
-  3) 🚧 stub  injection-molding
-  4) 🚧 stub  food-processing
-  5) 🚧 stub  pharma
+  2) 🧪 alpha food-processing
+  3) 🧪 alpha injection-molding
+  4) 🧪 alpha machinery-eto
+  5) 🧪 alpha pcb-assembly
+  6) 🧪 alpha pharma
   0) 🧪       (core-only, no profile) — try the framework first
 
   Default: cnc-machining  (press Enter to accept)
 
-Select [0-5]: <span class="warn">0</span>
+Select [0-6]: <span class="warn">0</span>
 
 → Installing core layer...
 → Skipping profile overlay (core-only mode)
@@ -187,7 +188,7 @@ Select [0-5]: <span class="warn">0</span>
       <div class="step-num">3<small>quote</small></div>
       <div class="step-content">
         <div class="step-title">第一個 /quote — 純文字描述也能報</div>
-        <div class="step-caption">不一定要圖紙。口頭描述 → AI 會問釐清問題，缺資料時不硬報，你補完它就算給結構化報價。</div>
+        <div class="step-caption">不一定要圖紙。口頭描述 → AI 會問釐清問題，缺資料時不硬報。先寫下你自己的估價，再看 AI 給的結構化成本對照；金額由你定、你簽。</div>
         <div class="mock">
           <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
           <div class="chat-body"><span class="you">You ▸</span> /quote 「不鏽鋼 304 支架 50×30×10mm，4 個 φ6 通孔，量 100，要黑陽極」
@@ -200,7 +201,7 @@ Select [0-5]: <span class="warn">0</span>
   ⚠️ <strong>需澄清</strong>：「黑陽極」具體色號？（pantone / RAL / 自由色）
   ⚠️ <strong>需澄清</strong>：交期需求？
 
-請補完上述兩項我就給結構化報價。<span class="hint">[預估含稅 NT$40,000 ± 10%，視交期可能加 5% 急件費]</span></div>
+請補完上述兩項我就給結構化報價。<span class="hint">[AI 的成本對照僅供參考；請先寫下你的估價，再比對]</span></div>
         </div>
       </div>
     </div>
@@ -210,7 +211,7 @@ Select [0-5]: <span class="warn">0</span>
       <div class="step-num">4<small>order</small></div>
       <div class="step-content">
         <div class="step-title">查訂單狀態 — 一句話跨 6 段流程</div>
-        <div class="step-caption">不用打開 ERP 點 5 層選單。問「SO-XXX 在哪」AI 自動跨報價、接單、排程、生產、檢驗、出貨整合。</div>
+        <div class="step-caption">先寫下你打算怎麼回客戶，再問「SO-XXX 在哪」。AI 幫你跨報價、接單、排程、生產、檢驗、出貨整理事實，拿來對照你的回覆；回覆由你寫、你發出。</div>
         <div class="mock">
           <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
           <div class="chat-body"><span class="you">You ▸</span> /order-status SO-2026-0421
@@ -225,9 +226,10 @@ Select [0-5]: <span class="warn">0</span>
 <span class="warn">⚠️ 風險</span>：刀具壽命將於第 80 件達上限
    → 已通知刀具部，預計 4/26 14:30 換刀，不影響交期
 
-📤 <strong>給客戶的回覆草稿：</strong>
-「客戶您好，貴司訂單 SO-2026-0421 目前已生產 60 件，
- 預計 4/28 完成全部 100 件並進入品管檢驗，4/30 出貨。」</div>
+📌 <strong>回覆時可引用的事實：</strong>
+ • 已生產 60 / 100 件　• 預計 4/28 完成並進入檢驗，4/30 出貨
+ • 交期未經生管確認前，不要寫成承諾
+🧭 <strong>你的回覆：</strong>（請你自己寫，寫完再對照上面的事實）</div>
         </div>
       </div>
     </div>
@@ -237,7 +239,7 @@ Select [0-5]: <span class="warn">0</span>
       <div class="step-num">5<small>inspect</small></div>
       <div class="step-content">
         <div class="step-title">品質檢驗 — IPQC 抽檢自動帶入 SPC</div>
-        <div class="step-caption">填量測值、AI 自動算 Cpk、對照 SPC 規則、發現失控立刻提醒，不用人工查表。</div>
+        <div class="step-caption">你親手量、填量測值，先寫下你的判定；AI 幫你算 Cpk、帶出 AQL 表與 SPC 規則來對照，判定與簽名仍是你的。</div>
         <div class="mock">
           <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot y"></span><span class="mock-dot g"></span><span class="mock-title">Claude Code</span></div>
           <div class="chat-body"><span class="you">You ▸</span> /inspect IPQC W2026042100123
@@ -251,11 +253,11 @@ W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
 
 <span class="ai">Claude ▸</span> 量測值已記錄。
   平均 X̄ = 19.991  R = 0.008
-  Cpk = 1.42（合格，> 1.33 標準）
+  Cpk = 1.42（高於 1.33 參考標準）
 
-<span class="ok">✅ 全 5 件 OK，製程穩定</span>
-<span class="hint">趨勢分析：X̄ 漸下移，距離 LCL 還有 4.2σ 安全</span>
-記錄已寫入 inspection record IPQC-20260426-007</div>
+<span class="hint">對照（參考，不是判定）：5 件皆在規範內；X̄ 漸下移，距離 LCL 還有 4.2σ</span>
+🧭 <strong>你的判定：</strong>____（請你先寫，再看上面的對照）
+記錄草稿 IPQC-20260426-007（判定與簽名待你填寫）</div>
         </div>
       </div>
     </div>
@@ -278,7 +280,7 @@ W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
 
 <span class="prompt">$</span> <span class="cmd">cd ../.. && bash adapters/claude-code/install.sh my-injection-shop</span>
 <span class="ok">✅ Installation complete.</span>
-<span class="hint"># 4 個 stub profile（PCB/射出/食品/製藥）內附 _starter-template.md，照著填更快</span></div>
+<span class="hint"># 4 個 alpha profile（PCB/射出/食品/製藥）內附 _templates/agent-starter.md，照著填更快；完整流程見 docs/profile-development.md</span></div>
         </div>
       </div>
     </div>
@@ -311,8 +313,8 @@ W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
       <div class="panel-title">❓ 常見問題</div>
       <div class="faq-q">不是 CNC 廠也能用？</div>
       <div class="faq-a">能。跑 install.sh --core-only 純試框架</div>
-      <div class="faq-q">資料會外流嗎？</div>
-      <div class="faq-a">圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不出公司：要讓 AI 讀圖紙請用地端 Ollama；雲端模式的提問會送 Claude API（保留與訓練條款依合約）；分身只處理 T0／T1，T1 會經聊天平台與雲端模型</div>
+      <div class="faq-q">資料會送出去嗎？</div>
+      <div class="faq-a">.gitignore 排除真實圖紙不進 repo；但預設模型在 Anthropic 雲端，貼上或附上的內容會送給模型供應商，依你所用方案的條款處理（個人與商用方案不同）；地端 Ollama 為選配，未經本專案驗證，隔離須自行實測；分身只處理 T0／T1，T1 會經聊天平台與雲端模型</div>
       <div class="faq-q">壞了怎麼辦？</div>
       <div class="faq-a">/manufacturing doctor 健檢，或 git pull 重裝</div>
     </div>

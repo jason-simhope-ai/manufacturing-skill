@@ -1,0 +1,74 @@
+{
+  "name": "machinery-eto",
+  "displayName": "機械設備製造（ETO 接單設計）",
+  "displayNameEn": "Machinery & Equipment — Engineer-to-Order (ETO)",
+  "version": "0.1.0-alpha",
+  "status": "alpha",
+  "extends-core": true,
+  "description": "接單設計（ETO）的機械設備製造：特殊機、自動化設備、工具機 / 成型機類設備。整機報價以選配與規格為基礎（不是逐件報價），專案以工程專案方式執行：規格 → 設計審查 → 長交期採購 → 組裝 → FAT / SAT → 安裝試車 → 售後。Alpha — 內容基於公開標準摘要與業界通識，需要設備廠的專案工程師、報價工程師與安規工程師驗證。報價永遠是工程估算；CE / 安全簽核由人類工程師負責，本 profile 任何內容都不是安全評估。",
+  "applicableTo": [
+    "special-purpose-machine",
+    "automation-equipment",
+    "automation-cell",
+    "assembly-and-test-equipment",
+    "machine-tool-class-equipment",
+    "forming-and-press-class-equipment",
+    "molding-machine-class-equipment"
+  ],
+  "tags": [
+    "machinery",
+    "equipment",
+    "eto",
+    "engineer-to-order",
+    "configure-to-order",
+    "project-engineering",
+    "spec-freeze",
+    "design-review",
+    "fat",
+    "sat",
+    "commissioning",
+    "after-sales",
+    "ce-marking",
+    "machinery-safety"
+  ],
+  "agents": ["eto-quote-engineer", "project-engineer", "commissioning-service-coordinator"],
+  "skills": ["eto-quote-breakdown", "spec-freeze-and-design-review", "fat-sat-acceptance"],
+  "knowHow": ["eto-vs-mts-quoting", "machinery-safety-ce-basics", "project-handover-and-after-sales"],
+  "hooks": ["pre-quote"],
+  "wantedContributions": [
+    "machine-safety-engineer agent（風險評估草稿、安全功能清單、PL / SIL 估算輔助 — 只起草，不簽核）",
+    "ce-technical-file-assembler skill（技術文件目錄、符合性聲明草稿欄位、標準清單對照 — 2006/42/EC 與 2023/1230 過渡期差異需驗證）",
+    "project-cost-tracking skill（預算 vs 實際：設計工時、外購件、現場人天的專案毛利追蹤）",
+    "long-lead-procurement skill（長交期件清單、下單時點與規格凍結的關係、替代料評估）",
+    "remote-service know-how（遠端診斷、資安邊界、客戶網路政策）",
+    "spare-parts-pricing skill（備品建議清單與售後備品報價）",
+    "mechatronics-design-review know-how（機構 / 電控 / 軟體三方介面審查）",
+    "台灣 機械設備器具安全標準 / 安全資訊申報 逐條對照 know-how（現行公告品項與程序）",
+    "zh-TW 可複製貼上的 LINE / claude.ai 情境提示詞包（給業務、專案與售後人員）",
+    "Validation by an active equipment-maker project engineer, quotation engineer and machine-safety engineer of all alpha content"
+  ],
+  "complianceFrameworks": [
+    "ISO 9001:2015（設計與開發 §8.3、變更管制 §8.5.6）",
+    "CE — 機械指令 Machinery Directive 2006/42/EC（需驗證）",
+    "CE — 新機械法規 Machinery Regulation (EU) 2023/1230（取代 2006/42/EC；適用日期與過渡安排需驗證）",
+    "ISO 12100（機械安全 — 設計通則、風險評估與風險降低）",
+    "IEC 60204-1（機械電氣設備安全 — 一般要求）",
+    "ISO 13849-1 / IEC 62061（控制系統安全相關部分 — PL / SIL，optional，依專案需驗證）",
+    "EMC 指令 2014/30/EU 及其他依機型適用之歐盟指令（需驗證）",
+    "台灣 職業安全衛生法 — 機械設備器具安全標準、安全資訊申報與安全標示（指定品項與程序需驗證）",
+    "高安規客製專案另有客戶規範（以合約與客戶技術規範為準）"
+  ],
+  "warnings": [
+    "Alpha 內容基於公開標準摘要與業界通識，未經在職設備廠專案工程師、報價工程師或機械安全工程師實戰驗證",
+    "所有報價產出都是工程估算（engineering estimate），不是對客戶的承諾；正式報價、價格與交期由權責主管核准",
+    "CE 標示、符合性聲明、風險評估與任何安全簽核都由人類工程師 / 製造商權責人員負責；本 profile 任何內容都不是安全評估，也不是符合性判定",
+    "法規、標準版次、過渡期與台灣申報程序一律標『需驗證』，以主管機關現行公告與標準原文為準",
+    "工時、費率、風險加成、保固期間、付款比例等數字一律是『範例』，以貴公司實績與合約為準",
+    "AI 不承諾交期、不核准規格變更、不簽署 FAT / SAT 驗收紀錄",
+    "請勿貼入客戶機密圖面、未公開的客戶規範或可識別的客戶資訊；必要時先去識別化"
+  ],
+  "createdBy": {
+    "organization": "SIMHOPE",
+    "context": "Alpha profile assembled from public machinery-safety standard summaries and general ETO project practice; example company 台灣機械設備製造商; not validated by a practitioner"
+  }
+}

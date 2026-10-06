@@ -16,13 +16,14 @@ argument-hint: ""
 ### 問題 1：你的工廠主要做什麼？
 
 ```
-A) CNC 精密加工 / 金屬切削                ✅ v1 完整支援
-B) PCB 組裝 / 電子產品                   🚧 stub
-C) 塑膠射出成型 / 模具                   🚧 stub
-D) 食品加工 / 飲料 / 烘焙                🚧 stub
-E) 製藥 / 生技                          🚧 stub（合規敏感）
-F) 多元化 / 還沒決定 / 想先試試框架       → core-only 模式
-G) 其他（板金、紡織、化工、模具...）       → 引導 fork CNC profile 客製
+A) CNC 精密加工 / 金屬切削                ✅ v1 完整支援（cnc-machining）
+B) PCB 組裝 / 電子產品                   🧪 alpha（pcb-assembly）
+C) 塑膠射出成型 / 模具                   🧪 alpha（injection-molding）
+D) 食品加工 / 飲料 / 烘焙                🧪 alpha（food-processing）
+E) 製藥 / 生技                          🧪 alpha（pharma；合規敏感）
+F) 機械設備製造（接單設計 ETO）            🧪 alpha（machinery-eto）
+G) 多元化 / 還沒決定 / 想先試試框架       → core-only 模式
+H) 其他（板金、紡織、化工、模具...）       → 先 core-only；要客製見 docs/profile-development.md
 ```
 
 ### 問題 2：你的工廠有 ERP / MES 嗎？
@@ -36,8 +37,8 @@ C) 沒有 / 還在用 Excel + 紙本             → 先用 mock data 試跑
 ### 問題 3：你的資安需求？
 
 ```
-A) 客戶會稽核（IATF / ISO / 醫材）        → 建議地端 Ollama + 完全 air-gap
-B) 一般商務、不外流就好                  → 雲端 Claude 即可，先試再說
+A) 客戶會稽核（IATF / ISO / 醫材）        → 可評估地端 Ollama（選配、未經本專案驗證，隔離須自行實測）
+B) 一般商務、可接受內容送模型供應商      → 雲端 Claude 即可，先試再說（先確認所用方案的資料條款）
 C) 完全不在乎 / 純試玩                   → 雲端 Claude，最快有東西
 ```
 

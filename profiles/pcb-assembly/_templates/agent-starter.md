@@ -3,7 +3,7 @@ name: <TODO-agent-name>
 displayName: <TODO 中文名>
 description: <TODO 一句話描述這個 agent 做什麼>
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # <TODO 中文名> / <TODO English Name>
@@ -49,20 +49,18 @@ tools: [Read, Grep, Glob, Bash]
 
 ## PCB assembly profile 建議優先補完的 agent
 
-依照 `profile.json` 的 `wantedContributions`，建議優先：
+v0.1.0 alpha 已有 `smt-process-engineer` 與 `ems-quality-analyst`（見 `agents/`）。依照 `profile.json` 的 `wantedContributions`，下一步建議：
 
-1. `smt-process-engineer` — 錫膏 / 鋼板 / 貼片 / 回流溫度曲線
-2. `pcb-test-engineer` — ICT / FCT 測試程式、夾具
-3. `box-build-coordinator` — 整機組裝排程
+1. `pcb-test-engineer` — ICT / FCT 測試程式、夾具、覆蓋率
+2. `box-build-coordinator` — 整機組裝排程
 
-把這個 template 複製 3 次、改成上面 3 隻 agent。
+把這個 template 複製成上面的 agent。新名字不要和 core 或其他 profile 撞名（CI 會跑 pairwise conflict scan）。
 
 ## 怎麼貢獻
 
 1. Fork 整個 repo
 2. 補完 `agents/`、`skills/`、`know-how/`、`hooks/`
-3. 更新 `profile.json` 的 `agents`、`skills`、`knowHow` array
-4. 改 `profile.json` 的 `status` 從 `"stub"` 拿掉（變 complete）
-5. 提 PR
+3. 更新 `profile.json` 的 `agents`、`skills`、`knowHow` array（CI 會擋沒列入的檔案）
+4. 提 PR
 
-範本見 [`profiles/cnc-machining/`](../../cnc-machining/) — 那是 v1 唯一完整 profile。
+範本見 [`profiles/cnc-machining/`](../../cnc-machining/)（complete）與本 profile 既有的 alpha 檔案。

@@ -27,6 +27,10 @@
 #     automatically if the swap fails. Only the newest 3 backups are kept.
 #   - python3 is needed only for multi-profile installs and `extends:` files
 #     (those also need PyYAML). A single plain profile installs without it.
+#   - Layout Claude Code loads: .claude-plugin/plugin.json, skills/<name>/SKILL.md
+#     (built in the staging dir, after the filename-based overlay), plus the
+#     link ~/.claude/skills/manufacturing-skill -> ../plugins/manufacturing-skill.
+#     Uninstall: rm -rf ~/.claude/plugins/manufacturing-skill and rm -f that link.
 #   - If ~/.claude is missing and stdin is not a terminal, the installer
 #     cannot ask; it exits 2 without changing anything. Create the dir first.
 # Exit codes: 0 ok · 1 error (existing install untouched) · 2 ~/.claude missing
@@ -90,6 +94,26 @@ has_extends() {
 json_escape() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
+
+# Print a markdown file's frontmatter `name:` value (empty if none).
+# CRLF-tolerant; surrounding single/double quotes are stripped.
+frontmatter_name() {
+  awk '
+    { sub(/\r$/, "") }
+    NR == 1 && !/^---$/ { exit }
+    /^---$/ { c++; if (c == 2) exit; next }
+    c == 1 && /^name:/ {
+      v = $0
+      sub(/^name:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+      if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+      print v; exit
+    }' "$1"
+}
+
+# Escape a literal string for a sed -E regex / replacement (used only by the
+# no-python fallback of the installed-path rewrite).
+ere_escape()  { printf '%s' "$1" | sed -e 's/[][\.*^$+?(){}|#]/\\&/g'; }
+repl_escape() { printf '%s' "$1" | sed -e 's/[\&#]/\\&/g'; }
 
 # Resolve a profile file via the Python resolver, write to target.
 # Args: <profile-source> <target-output>
@@ -323,6 +347,9 @@ detect_claude_dir() {
 
 CLAUDE_DIR="$(detect_claude_dir)"
 TARGET_DIR="${CLAUDE_DIR}/plugins/${PLUGIN_NAME}"
+# Loading route (see below): ~/.claude/skills/<plugin> → ../plugins/<plugin>
+SKILLS_LINK="${CLAUDE_DIR}/skills/${PLUGIN_NAME}"
+SKILLS_LINK_REL="../plugins/${PLUGIN_NAME}"
 
 echo ""
 echo "════════════════════════════════════════════════"
@@ -440,6 +467,7 @@ PLUGINS_DIR="$(dirname "${TARGET_DIR}")"
 STAGE_DIR=""
 BACKUP=""
 SWAP_STATE="none"   # none → building → old-moved → done
+LINK_CREATED=false  # true once this run created ~/.claude/skills/<plugin> link
 KEEP_BACKUPS=3
 
 on_exit() {
@@ -458,6 +486,10 @@ on_exit() {
   fi
   if [[ -n "${STAGE_DIR}" && -d "${STAGE_DIR}" ]]; then
     rm -rf "${STAGE_DIR}"
+  fi
+  # Never leave a link this run created pointing at nothing.
+  if [[ ${rc} -ne 0 && "${LINK_CREATED}" == "true" && -L "${SKILLS_LINK}" && ! -e "${SKILLS_LINK}" ]]; then
+    rm -f "${SKILLS_LINK}"
   fi
   exit "${rc}"
 }
@@ -518,7 +550,151 @@ else
   echo "→ Skipping profile overlay (core-only mode)"
 fi
 
-# Stage 3: copy plugin manifest + profile manifest(s).
+# Everything below edits only STAGE_DIR (the swap later applies it all at once).
+# python3 is optional from here on: each python step has a bash fallback.
+if [[ -z "${PYTHON_BIN:-}" ]]; then   # --core-only skips the preflight lookup
+  PYTHON_BIN="$(detect_python || true)"
+fi
+TAB="$(printf '\t')"
+
+# Stage 2b: Claude Code only loads skills laid out as skills/<name>/SKILL.md.
+# The overlay above stays filename-based (core/profile override and conflict
+# scan unchanged); here each staged skills/<x>.md moves to
+# skills/<name>/SKILL.md, <name> = frontmatter `name:` (fallback: <x>).
+# Two files mapping to one name (case-insensitively) fail before the swap.
+echo "→ Laying out skills as skills/<name>/SKILL.md..."
+SKILL_MAP=""   # one "<stem><TAB><name>" line per staged skill
+for f in "${STAGE_DIR}/skills/"*.md; do
+  [[ -f "${f}" ]] || continue
+  stem="$(basename "${f}" .md)"
+  sname="$(frontmatter_name "${f}")"
+  [[ -n "${sname}" ]] || sname="${stem}"
+  case "${sname}" in
+    */*|.*|*\\*|*"${TAB}"*)
+      preflight_fail "Skill skills/${stem}.md has frontmatter name '${sname}', which cannot be a directory name." \
+        "Use letters, digits and '-' (e.g. name: ${stem})." ;;
+  esac
+  SKILL_MAP="${SKILL_MAP}${stem}${TAB}${sname}
+"
+done
+skill_dups="$(printf '%s' "${SKILL_MAP}" | awk -F'\t' '
+  { k = tolower($2)
+    if (k in first) print "skills/" first[k] ".md and skills/" $1 ".md both have name: " $2
+    else first[k] = $1 }')"
+if [[ -n "${skill_dups}" ]]; then
+  dup_lines=()
+  while IFS= read -r line; do dup_lines+=("${line}"); done <<< "${skill_dups}"
+  preflight_fail "Two skills would install to the same skills/<name>/SKILL.md:" \
+    "${dup_lines[@]}" \
+    "Rename one (frontmatter name:) or drop one of the profiles."
+fi
+SKILL_HOLD="${STAGE_DIR}/.skills-flat"
+mkdir "${SKILL_HOLD}"
+for f in "${STAGE_DIR}/skills/"*.md; do
+  if [[ -f "${f}" ]]; then mv "${f}" "${SKILL_HOLD}/"; fi
+done
+while IFS="${TAB}" read -r stem sname; do
+  [[ -n "${stem}" ]] || continue
+  if [[ -e "${STAGE_DIR}/skills/${sname}" || -L "${STAGE_DIR}/skills/${sname}" ]]; then
+    preflight_fail "Skill name '${sname}' (from skills/${stem}.md) clashes with an existing entry skills/${sname}."
+  fi
+  mkdir "${STAGE_DIR}/skills/${sname}"
+  mv "${SKILL_HOLD}/${stem}.md" "${STAGE_DIR}/skills/${sname}/SKILL.md"
+done <<< "${SKILL_MAP}"
+rmdir "${SKILL_HOLD}"
+
+# Look up the installed skill dir name for a staged skill stem.
+skill_dir_for() {
+  printf '%s' "${SKILL_MAP}" | awk -F'\t' -v s="$1" '$1 == s { print $2; exit }'
+}
+
+# Stage 2c: command/agent/skill/hook/know-how bodies cite repo paths
+# (core/skills/01-報價.md, profiles/cnc-machining/agents/x.md) that do not
+# exist in an install. Rewrite them, in the STAGED copies only, to the
+# installed path. Exact strings only, one rule per real source file:
+#   P  <repo path>              → <installed path>   (not preceded by [A-Za-z0-9_./-])
+#   L  ](../skills/<x>.md       → ](../skills/<name>/SKILL.md
+#   L  ](../../../<repo path>   → ](../<installed path>   (profile → core links)
+# and inside SKILL.md (one level deeper than before) ](../ → ](../../.
+echo "→ Rewriting repo paths to installed paths..."
+REWRITE_RULES=""   # "<P|L><TAB><from><TAB><to>" lines
+add_rewrite_rule() { REWRITE_RULES="${REWRITE_RULES}$1${TAB}$2${TAB}$3
+"; }
+REWRITE_SRC_DIRS="core"
+if [[ "${CORE_ONLY}" == "false" ]]; then
+  for prof in "${ACTIVE_PROFILES[@]}"; do REWRITE_SRC_DIRS="${REWRITE_SRC_DIRS} profiles/${prof}"; done
+fi
+for kind in skills agents hooks know-how; do
+  for srcdir in ${REWRITE_SRC_DIRS}; do
+    for f in "${PLUGIN_ROOT}/${srcdir}/${kind}/"*.md; do
+      [[ -f "${f}" ]] || continue
+      stem="$(basename "${f}" .md)"
+      case "${stem}" in _*) continue;; esac
+      if [[ "${kind}" == "skills" ]]; then
+        sdir="$(skill_dir_for "${stem}")"
+        [[ -n "${sdir}" ]] || continue
+        dst="skills/${sdir}/SKILL.md"
+      else
+        [[ -f "${STAGE_DIR}/${kind}/${stem}.md" ]] || continue
+        dst="${kind}/${stem}.md"
+      fi
+      add_rewrite_rule P "${srcdir}/${kind}/${stem}.md" "${dst}"
+      add_rewrite_rule L "../../../${srcdir}/${kind}/${stem}.md" "../${dst}"
+    done
+  done
+done
+while IFS="${TAB}" read -r stem sname; do
+  [[ -n "${stem}" ]] || continue
+  add_rewrite_rule L "../skills/${stem}.md" "../skills/${sname}/SKILL.md"
+done <<< "${SKILL_MAP}"
+
+REWRITE_FILES=()
+for f in "${STAGE_DIR}/commands/"*.md "${STAGE_DIR}/agents/"*.md "${STAGE_DIR}/skills/"*/SKILL.md \
+         "${STAGE_DIR}/hooks/"*.md "${STAGE_DIR}/know-how/"*.md; do
+  if [[ -f "${f}" ]]; then REWRITE_FILES+=("${f}"); fi
+done
+if [[ ${#REWRITE_FILES[@]} -gt 0 && -n "${PYTHON_BIN}" ]]; then
+  printf '%s' "${REWRITE_RULES}" | "${PYTHON_BIN}" -c '
+import re, sys
+rules = [l.split("\t") for l in sys.stdin.read().splitlines() if l]
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8", errors="surrogateescape", newline="") as f:
+        old = f.read()
+    new = old
+    for kind, src, dst in rules:
+        if kind == "P":
+            new = re.sub(r"(?<![A-Za-z0-9_./-])" + re.escape(src), lambda m: dst, new)
+        else:
+            new = new.replace("](" + src, "](" + dst)
+    if path.endswith("/SKILL.md"):
+        new = new.replace("](../", "](../../")
+    if new != old:
+        with open(path, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+            f.write(new)
+' "${REWRITE_FILES[@]}"
+elif [[ ${#REWRITE_FILES[@]} -gt 0 ]]; then
+  # Same rules, same order, as sed -E expressions (LC_ALL=C: byte-wise, so
+  # the CJK file names match literally).
+  SED_ARGS=(-e 's#^##')   # no-op seed: never an empty script
+  while IFS="${TAB}" read -r kind src dst; do
+    [[ -n "${kind}" ]] || continue
+    if [[ "${kind}" == "P" ]]; then
+      SED_ARGS+=(-e "s#(^|[^A-Za-z0-9_./-])$(ere_escape "${src}")#\\1$(repl_escape "${dst}")#g")
+    else
+      SED_ARGS+=(-e "s#[]][(]$(ere_escape "${src}")#]($(repl_escape "${dst}")#g")
+    fi
+  done <<< "${REWRITE_RULES}"
+  for f in "${REWRITE_FILES[@]}"; do
+    case "${f}" in
+      */SKILL.md) LC_ALL=C sed -E "${SED_ARGS[@]}" -e 's#[]][(]\.\./#](../../#g' "${f}" > "${f}.rw" ;;
+      *)          LC_ALL=C sed -E "${SED_ARGS[@]}" "${f}" > "${f}.rw" ;;
+    esac
+    mv "${f}.rw" "${f}"
+  done
+fi
+
+# Stage 3: plugin manifests (.claude-plugin/plugin.json for Claude Code, root
+# plugin.json for our own readers) + profile manifest(s).
 # Singular `active-profile.json` retained indefinitely as a copy of the
 # first profile's manifest for backwards compatibility (spec §6.2 / M4).
 # Plural `active-profiles.json` is generated by the aggregator. It needs
@@ -526,6 +702,47 @@ fi
 # single profile without python3 it is skipped and readers fall back to
 # the singular file.
 cp "${PLUGIN_ROOT}/plugin.json" "${STAGE_DIR}/plugin.json"
+# Claude Code reads its manifest from .claude-plugin/plugin.json and rejects
+# the repo's root plugin.json as-is (`repository` must be a string; repo-only
+# keys such as `profiles` are unknown to it). Generate a manifest holding only
+# the fields Claude Code accepts. The root plugin.json is still copied above
+# for /manufacturing and active-profile readers.
+mkdir "${STAGE_DIR}/.claude-plugin"
+if [[ -n "${PYTHON_BIN}" ]]; then
+  "${PYTHON_BIN}" -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    src = json.load(f)
+out = {}
+for key in ("name", "displayName", "version", "description", "author",
+            "homepage", "repository", "license", "keywords"):
+    val = src.get(key)
+    if key == "repository" and isinstance(val, dict):
+        val = val.get("url")
+    if key == "author" and isinstance(val, dict):
+        val = {k: val[k] for k in ("name", "email", "url") if val.get(k)}
+    if val in (None, "", {}, []):
+        continue
+    out[key] = val
+with open(sys.argv[2], "w", encoding="utf-8") as f:
+    f.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+' "${PLUGIN_ROOT}/plugin.json" "${STAGE_DIR}/.claude-plugin/plugin.json"
+else
+  # Minimal manifest without python3: name, version, description (first
+  # occurrence of each key = the top-level one in our plugin.json).
+  manifest_field() {
+    { grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "${PLUGIN_ROOT}/plugin.json" || true; } \
+      | head -1 | sed -E 's/.*"([^"]*)"$/\1/'
+  }
+  m_name="$(manifest_field name)"
+  cat > "${STAGE_DIR}/.claude-plugin/plugin.json" <<JSON
+{
+  "name": "$(json_escape "${m_name:-${PLUGIN_NAME}}")",
+  "version": "$(json_escape "$(manifest_field version)")",
+  "description": "$(json_escape "$(manifest_field description)")"
+}
+JSON
+fi
 if [[ "${CORE_ONLY}" == "false" ]]; then
   cp "${PLUGIN_ROOT}/profiles/${ACTIVE_PROFILES[0]}/profile.json" \
      "${STAGE_DIR}/active-profile.json"
@@ -553,9 +770,6 @@ PLUGIN_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "${PLUGIN_
   | head -1 \
   | sed -E 's/.*"([^"]*)"$/\1/')
 INSTALLED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if [[ -z "${PYTHON_BIN:-}" ]]; then   # --core-only skips the preflight lookup
-  PYTHON_BIN="$(detect_python || true)"
-fi
 if [[ -n "${PYTHON_BIN}" ]]; then
   # Proper JSON via python (handles every special character in the path).
   # ${arr[@]+...} keeps an empty array safe under `set -u` on bash 3.2.
@@ -608,6 +822,53 @@ fi
 mv "${STAGE_DIR}" "${TARGET_DIR}"
 STAGE_DIR=""
 SWAP_STATE="done"
+
+# Loading route: Claude Code does not scan plugins/ for hand-copied plugins,
+# but it does load a "skills-dir plugin": a directory under ~/.claude/skills/
+# holding .claude-plugin/plugin.json. Link it there; the install itself stays
+# at plugins/manufacturing-skill (commands read .installed from that path).
+# Done after the swap so the link never points at a half-built tree; a link
+# failure is reported, not fatal (the install is complete either way).
+make_skills_link() {
+  mkdir -p "${CLAUDE_DIR}/skills" || return 1
+  if [[ "${OSTYPE:-}" == "msys" || "${OSTYPE:-}" == "cygwin" ]]; then
+    # Without this, MSYS/Cygwin `ln -s` silently makes a COPY of the dir.
+    MSYS=winsymlinks:nativestrict CYGWIN=winsymlinks:nativestrict \
+      ln -s "${SKILLS_LINK_REL}" "${SKILLS_LINK}" 2>/dev/null || return 1
+  else
+    ln -s "${SKILLS_LINK_REL}" "${SKILLS_LINK}" || return 1
+  fi
+  [[ -L "${SKILLS_LINK}" ]]
+}
+LINK_OK=false
+if [[ -L "${SKILLS_LINK}" ]]; then
+  old_link="$(readlink "${SKILLS_LINK}" || true)"
+  if [[ "${old_link}" == "${SKILLS_LINK_REL}" ]]; then
+    LINK_OK=true
+  else
+    rm -f "${SKILLS_LINK}"
+    if make_skills_link; then
+      LINK_OK=true
+      LINK_CREATED=true
+      echo "ℹ️ Re-pointed ${SKILLS_LINK} (was → ${old_link})"
+    fi
+  fi
+elif [[ -e "${SKILLS_LINK}" ]]; then
+  echo "⚠️ ${SKILLS_LINK} already exists and is not a symlink — left as is, link skipped."
+  echo "   Claude Code reads that directory, not this install. Move it away and re-run,"
+  echo "   or use one of the other loading routes printed below."
+else
+  if make_skills_link; then
+    LINK_OK=true
+    LINK_CREATED=true
+  fi
+fi
+if [[ "${LINK_OK}" == "true" ]]; then
+  echo "🔗 ${SKILLS_LINK} → ${SKILLS_LINK_REL}"
+elif [[ ! -e "${SKILLS_LINK}" ]]; then
+  echo "⚠️ Could not create ${SKILLS_LINK} → ${SKILLS_LINK_REL} (symlinks unavailable here?)."
+  echo "   Use one of the other loading routes printed below."
+fi
 
 # Cap retained backups: keep the newest KEEP_BACKUPS, delete older ones.
 # Names sort chronologically (YYYYmmdd-HHMMSS prefix).
@@ -670,6 +931,16 @@ if [[ "${CORE_ONLY}" == "false" ]]; then
   done
 fi
 
+echo ""
+echo "▶ 重新啟動 Claude Code 或執行 /reload-plugins (restart Claude Code or run /reload-plugins) to load it."
+echo "  Check: claude plugin list   → ${PLUGIN_NAME}@skills-dir · Status: loaded"
+echo "  Alt (this session only): claude --plugin-dir '${TARGET_DIR}'"
+echo "  Alt (marketplace): list '${TARGET_DIR}' in a local .claude-plugin/marketplace.json, then claude plugin marketplace add <dir> && claude plugin install ${PLUGIN_NAME}@<marketplace>"
+if [[ "${LINK_OK}" == "true" ]]; then
+  echo "  Uninstall: rm -rf '${TARGET_DIR}' && rm -f '${SKILLS_LINK}'"
+else
+  echo "  Uninstall: rm -rf '${TARGET_DIR}'"
+fi
 echo ""
 echo "Try in Claude Code:"
 echo "   /manufacturing                # see plugin status"

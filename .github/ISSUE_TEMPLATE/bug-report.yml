@@ -28,6 +28,7 @@ body:
         - injection-molding
         - food-processing
         - pharma
+        - machinery-eto
         - custom (describe in the body)
     validations:
       required: true
