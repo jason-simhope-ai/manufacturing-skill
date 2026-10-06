@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Added
 
+- **`examples/company-facts.template.md`** — zh-TW fill-in template (machines and hourly rates, materials, compliance frameworks, quoting margin bands and risk add-ons, lead-time norms, approvals, data-classification rules). All numbers are labelled placeholders; copy to `company-facts.md` outside the repo.
+- **`docs/data-classification.md`** — four-tier (T0 public / T1 internal / T2 confidential / T3 restricted) data classification with a cloud / on-prem / no-AI rule table and a note on consumer vs commercial API terms.
+- **`docs/adoption-guide.md`** — new section on using company-facts and where real factory data should live; fixed the wrong `infra/mock-data/machine_loads.json` path (mock data lives in `infra/mcp-servers/scheduler-mcp/mock-data/` and holds loads, not rates).
+- **`.gitignore`** — real-factory-data block (`company-facts.md`, `customer-data/`, `drawings/`, `rfq/`, `logs/`, `*.dwg`, `*.step`, `*.stp`, `*.iges`) with `!examples/**` so synthetic examples stay tracked.
+- **Mock-data labelling** in `/order-status`, `/morning-briefing` and `/manufacturing`: without an MCP connection output must be labelled 「模擬資料」; removed the `git log` status-inference fallback from `/morning-briefing`.
+### Changed
 - **Docs: state the real data flow.** Removed "drawings never leave the company / runs on your own machine" claims from the READMEs, `manufacturing.md`, the landing page and explainers 01/02. The plugin's prompts and files stay local, but the default model is Anthropic's cloud (Claude Code), so pasted or attached content is sent to the model provider under its terms; on-prem (GB10 / Ollama) is an option that this project has not verified end-to-end. Added a data-flow section to both READMEs.
 - **Docs: `infra/on-prem/gb10-setup.md`** now carries an "unverified" warning, no longer ships a JSON snippet with comments, and tells IT how to verify isolation themselves (egress deny + traffic observation). The beginner quickstart no longer advises `sudo`, covers Git Bash on Windows, and adds the missing "open Claude Code in the repo folder" step.
 - **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).

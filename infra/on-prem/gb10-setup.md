@@ -121,6 +121,7 @@ ollama run qwen2.5:14b
 - 注意 `localhost` 只有 GB10 本機自己連得到；若工程師電腦要透過內網連 GB10，端點要改成內網位址，並依下方資安清單限制 Ollama 的監聽範圍。
 - 離線（air-gap）環境無法 `ollama pull`，模型檔要在可上網的機器下載、檢查雜湊值後，以內部管道搬進來；本專案未寫出完整搬運流程。
 - Claude Code 本身的登入、遙測、自動更新等連線，是否可關閉、怎麼關，也需要另外查證與處理。
+- 已在 Claude Code 2.1.289 實測：`claude --help` 沒有對應選項、沒有 `claude config` 子指令；`--fallback-model <model>` 只是在 Claude 模型過載時改用另一個 Claude 模型，不是接 Ollama。
 
 ---
 
@@ -157,11 +158,27 @@ ollama run qwen2.5:14b
 - [ ] Ollama 只 listen on localhost (`OLLAMA_HOST=127.0.0.1:11434`) 或內網段
 - [ ] 已依上方「自行驗證隔離」完成出口封鎖與流量觀察，並留存紀錄
 - [ ] 模型權重落在加密 SSD（DGX OS 預設啟用 LUKS）
-- [ ] AI 生成的所有 record 寫入 audit log
+- [ ] AI 生成的所有 record 寫入 audit log（寫到哪、誰審閱，見下方「ERP/MES 連線」）
 - [ ] 圖紙、BOM 等敏感檔案 `.gitignore` 確實排除
 - [ ] 定期備份：權重、自訂 fine-tune（如有）
 - [ ] 漏洞管理：Ollama / 模型版本定期更新
 - [ ] 物理安全：GB10 放上鎖機櫃 / 有監視
+
+### ERP/MES 連線
+
+- [ ] **專用服務帳號**：AI 連 ERP/MES 只用專用服務帳號，不用個人帳號、不用 admin 或萬用權限；帳號有明確 owner 與到期 / 輪替規則
+- [ ] **查詢唯讀**：讀取走唯讀 view 或唯讀 replica，用唯讀帳號；上線前測一次「用該帳號嘗試寫入必須失敗」
+- [ ] **寫入分離**：寫入只能經由 ERP 官方 API，使用另一組只給連接器的帳號，不直寫資料庫、不與讀取共用帳號
+- [ ] **audit 去向**：連接器的 audit record 寫到 append-only 儲存（例如 syslog / SIEM 或唯讀掛載的日誌目錄），
+  不是只留在記憶體或預設 logger；不放在 AI 能改寫的位置；保留期限依公司與客戶稽核要求
+- [ ] **audit 審閱**：指定 owner（建議 IT 主管或品保，不是被稽核的操作者本人），定期抽查，且客戶稽核時能依 request id 追溯到人與核准
+- [ ] **audit 不含機密**：audit 與一般 log 不得含核准 token、密碼、連線字串；高機密欄位依 [資料分級](../../docs/data-classification.md) 遮罩
+- [ ] **MCP 註冊範圍**：MCP server 用 `claude mcp add` 註冊，指令用絕對路徑；`-s local` 只對單一資料夾有效，
+  團隊共用用 `-s project`（`.mcp.json` 進版控，不得放密碼，成員須核准）或 `-s user`；
+  注意 `-e KEY=value` 的值會以明文存進 `~/.claude.json`，所以其中的身分 / 角色只是便利設定，**不是安全邊界**，不得放機密
+- [ ] **server 名稱一致**：scheduler MCP 一律註冊為 `manufacturing-scheduler`（MCP 工具名稱前綴為 `mcp__manufacturing-scheduler__*`），避免 agent 工具白名單對不上
+- [ ] **核准 token 不經過模型**：高風險寫入的核准由人透過獨立通道完成，核准 token 不得出現在 prompt、工具參數或模型輸出中；
+  由 gateway / 連接器直接驗證，模型只拿得到「已核准 / 被拒絕」的結果
 
 ---
 
