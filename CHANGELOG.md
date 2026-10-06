@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`team/README.zh-TW.md` and `team/for-frontline.zh-TW.md` rewritten for non-technical readers** in the voice of explainer card 05: a 「給誰看」 line, emoji section markers, 「分身幫你做／你還是自己做」, the three safety sentences, the three categories with one example each and a three-step start on the README's first screen; below it 名詞對照, a plain FAQ, 給主管 (box, who should not adopt yet, the day example, the T0–T3 table, the 4-week pilot), and the IT/contributor detail (full start steps, T3 blocking, data feed, autonomy, gateway phrases, lint codes) in 「給 IT 與導入者看的細節」／「給貢獻者看的細節」 blocks. The front-line page is now a 5-minute page (分身是誰的、不是什麼、我可以做什麼、答錯誰負責、會不會考核我、我可以拒絕嗎、怎麼反映問題) with field names in a details block. No statement removed.
 - **`install.sh` copies `team/` by default** (without `team/.build/` and `team/local/`; `.installed` gains `"team": true`). Claude Code does not auto-load it, so v0.1.5 behavior is unchanged and the core-only agent count stays 6.
 - **`docs/architecture.md`** — corrects the core agent count from 5 to 6 (`engineering-change-manager` was missing); now describes seven layers and three tiers.
 - **`SECURITY.md`** — scope table and "Operating securely" extended for `team/` and `infra/chat-gateway/`.

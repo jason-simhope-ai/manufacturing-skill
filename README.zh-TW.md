@@ -85,7 +85,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 - ▶ **點擊式示範**（瀏覽器打開，一步一步看分身怎麼回答、誰在判斷）：[docs/demo/team-demo.html](docs/demo/team-demo.html) · 文字版 [team-demo.md](docs/demo/team-demo.md)
 - 💻 **2 分鐘離線示範**（不用帳號、不用網路；請 IT 幫你在電腦上跑這一行）：`python3 infra/chat-gateway/demo.py --plain`
 - 🎯 **要簽字的老闆**：[董事長一頁](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼喊停、第 4 週怎麼判）
-- 🧑‍🏭 **現場同仁**：[分身與我](team/for-frontline.zh-TW.md)（3 分鐘看完）
+- 🧑‍🏭 **現場同仁**：[分身與我](team/for-frontline.zh-TW.md)（5 分鐘看完）
 
 ![點擊式示範：主管先判斷，分身再拿相似案與反例來對照](docs/demo/screenshots/team-demo.png)
 

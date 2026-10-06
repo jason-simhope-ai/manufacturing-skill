@@ -212,8 +212,8 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | 檔 | 用途 |
 | -- | ---- |
 | [TEAM.md](TEAM.md) | agent 啟動檔（≤ 6,000 B）：六條規則、啟動演算法、漸進揭露地圖 |
-| [team/README.zh-TW.md](team/README.zh-TW.md) | 人讀的 10 分鐘說明 |
-| [team/for-frontline.zh-TW.md](team/for-frontline.zh-TW.md) | 給前線同仁的一頁說明 |
+| [team/README.zh-TW.md](team/README.zh-TW.md) | 人讀的說明：前 60 行看懂分身（誰做什麼、安全三句話、三分類、三步開始），其餘依讀者分段（給主管；給 IT 與導入者、給貢獻者收在展開區塊） |
+| [team/for-frontline.zh-TW.md](team/for-frontline.zh-TW.md) | 給業務助理、檢驗員等前線同仁的一頁說明（5 分鐘）：分身是誰的、我可以做什麼、答錯誰負責、會不會考核我、可以拒絕嗎、怎麼反映 |
 | [team/roster.example.yaml](team/roster.example.yaml) | 範例 roster（synthetic：7 個通用部門、7 個職位、3 個頻道） |
 | [team/twins/](team/twins/) | `_template.md` + 3 個範例分身：[production-manager](team/twins/production-manager.md) · [qa-manager](team/twins/qa-manager.md) · [engineering-manager](team/twins/engineering-manager.md) |
 | [team/policies/core-rules.md](team/policies/core-rules.md) · [restricted.md](team/policies/restricted.md) | 所有分身共用 preamble · T3 政策 |
