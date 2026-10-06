@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-— Nothing yet.
+### Fixed
+
+- **`install.sh --list` and the interactive picker no longer abort** under `set -euo pipefail` when a `profile.json` has no `"status"` key (e.g. `cnc-machining`); a missing status still means `complete`. CI now smoke-tests `--list`, `--core-only` and single-profile installs.
 
 ## [0.1.5] — 2026-05-09
 
