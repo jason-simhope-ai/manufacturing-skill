@@ -3,7 +3,7 @@ name: quote-specialist
 displayName: 報價師 / Quote Specialist
 description: 從圖紙、BOM、客戶口頭詢價內容，產出結構化、可追溯、有假設標註的報價單
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 報價師 / Quote Specialist

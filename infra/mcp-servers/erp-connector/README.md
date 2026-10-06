@@ -16,6 +16,8 @@ Instead, this directory defines the **interface contract** — the tools your ER
 
 ## Required tools (interface contract)
 
+Your connector must implement the following (`contract.py` is the source of truth; if this table drifts, `contract.py` wins):
+
 介面定義在 [`contract.py`](contract.py)（Python 3.10+、僅標準函式庫、`ErpConnector` 為 ABC）。**所有工具的第一個參數都是 `ctx: CallContext`**；舊版自由字串 `operator` 已移除（字串可被偽造）。`CallContext` 由**可信的宿主程序**依已驗證的身分建立，絕不從模型或使用者輸入的文字取得：目前是包住 connector 的程式（例如單人 stdio MCP server 啟動時的設定——這只是便利設定，不是安全邊界）；等 chat gateway 的執行路徑上線後，由 gateway 每次請求建立。
 
 ### CallContext（每次呼叫都要帶）
