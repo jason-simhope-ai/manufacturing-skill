@@ -41,7 +41,37 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 ---
 
-## Digital-twin team (v0.2.0-alpha, experimental)
+## Digital-twin team
+
+> 🧪 **Experimental** (v0.2.0-alpha). Try it in a test chat workspace with made-up data first.
+
+![Digital-twin team at a glance (Traditional Chinese card)](docs/explainers/screenshots/05-team-one-look.png)
+
+In short: **every position gets an AI copilot — a "twin" — that lives in the company chat** (Slack or Discord). A manager @-mentions it; it answers in the same thread with past cases and counter-examples. **People make the call and sign.**
+
+| 🤖 The twin does                                   | 👤 You still do                          |
+| -------------------------------------------------- | ---------------------------------------- |
+| Finds similar past cases, and the ones that went wrong later | Judge severity, pass / fail      |
+| Morning reminders: tight due dates, machines due for maintenance | Decide on rush orders, overtime, stopping a line |
+| Watches daily trends and flags drift early         | Reply to customers, send anything outside |
+| Challenges you: "this point could overturn your call" | Change data in company systems (the twin cannot) |
+| Writes drafts for you to edit (always marked DRAFT) | Sign, and own the conclusion            |
+
+**🛡️ Three safety rules**
+
+- **Never in the chat**: drawings, quotes, customer data, confidential customer projects. When unsure, don't post it.
+- **The owner signs a one-page principle first**: a copilot, not a replacement; logs are never used for performance reviews. No signature, no twin.
+- **Anyone can say 「我不同意」 ("I disagree")**: the twin only acknowledges, gives no new answer, and does not record who said it.
+
+**👀 See more**
+
+- 🖨️ One-look card (zh-TW, printable): [docs/explainers/05-分身團隊-一張圖看懂.html](docs/explainers/05-分身團隊-一張圖看懂.html)
+- ▶ Click-through demo (zh-TW, replies pre-recorded from the offline demo, not a live model): [docs/demo/team-demo.html](docs/demo/team-demo.html) · transcript [team-demo.md](docs/demo/team-demo.md)
+- 💻 2-minute offline demo (no credentials, no network): `python3 infra/chat-gateway/demo.py --plain`
+- 🎯 Decision makers: [owner one-pager](docs/owner-one-page.zh-TW.md) (zh-TW: what is signed, cost, how to stop, week-4 decision)
+
+<details>
+<summary>Details for IT and implementers</summary>
 
 > One **copilot twin** per position, living in the company's chat workspace. **A copilot, not a replacement**: people keep the judgement; the twin adds data, challenges assumptions and posts scheduled reminders.
 
@@ -64,7 +94,7 @@ It replays 8 beats (scheduled post, @-routing, "I go first", an injection attemp
 | **An AI agent** | Read [TEAM.md](TEAM.md) (≤ 6,000 B): run `teamctl check`, then `build`, read the roster, and follow the progressive-disclosure map |
 | **A human (10 minutes)** | [team/README.zh-TW.md](team/README.zh-TW.md) (Traditional Chinese; start here) → one twin file, e.g. [team/twins/qa-manager.md](team/twins/qa-manager.md) → optionally [TEAM.md](TEAM.md), which is the agent's entry file |
 
-**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (high-assurance custom projects). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is refused, not understood**: the gateway refuses to start if the roster has a T3 channel or twin (exit 3), and a keyword tripwire blocks messages that contain obvious T3 wording (e.g. defence, aerospace, ITAR) and advises the company's own T3 procedure. It cannot recognise T3 content that avoids those words, so people and process must keep T3 out. When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (CI scans tracked files; `team/local` relies on a local pre-commit hook).
+**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (restricted or NDA-bound project data, for example aerospace, medical devices, export-controlled items). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is refused, not understood**: the gateway refuses to start if the roster has a T3 channel or twin (exit 3), and a keyword tripwire blocks messages that contain obvious T3 wording (e.g. the Chinese words for aerospace or medical device, or ITAR) and advises the company's own T3 procedure. It cannot recognise T3 content that avoids those words, so people and process must keep T3 out. When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (CI scans tracked files; `team/local` relies on a local pre-commit hook).
 
 **Honest status (alpha)**
 
@@ -73,6 +103,8 @@ It replays 8 beats (scheduled post, @-routing, "I go first", an injection attemp
 - No long-term memory (only a short in-process channel window, cleared on restart).
 - No write actions: twin tools are read-only (`Read, Grep, Glob`) and autonomy is capped at `draft`.
 - Full design and deferred items: [design spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md), [ROADMAP](docs/ROADMAP.md).
+
+</details>
 
 ---
 
@@ -190,7 +222,8 @@ manufacturing-skill/
 ├── infra/                    # MCP servers, on-prem LLM setup
 │   └── chat-gateway/         # Twin chat gateway (mock / Slack / Discord adapters, offline demo)
 ├── docs/
-│   ├── explainers/           # Four printable Traditional-Chinese cards (boss / IT / operator / quick start)
+│   ├── explainers/           # Five printable Traditional-Chinese cards (boss / IT / operator / quick start / twin team)
+│   ├── demo/                 # Quote demo and the twin-team click-through demo (team-demo.html)
 │   ├── architecture.md
 │   ├── adoption-guide.md     # For consultants deploying to customers
 │   ├── profile-development.md  # For people creating new vertical profiles
@@ -203,14 +236,15 @@ manufacturing-skill/
 
 ---
 
-## Four explainer cards (Traditional Chinese, A3 print-friendly)
+## Five explainer cards (Traditional Chinese, A3 print-friendly)
 
-This plugin ships with four printable explainer cards, designed in the spirit of "印出來掛牆" (print and pin to the wall):
+This plugin ships with five printable explainer cards, designed in the spirit of "印出來掛牆" (print and pin to the wall):
 
 - **`docs/explainers/01-架構總覽.html`** — for owners. 5-minute "what is this and what does it solve."
 - **`docs/explainers/02-IT部門系統說明.html`** — for IT departments. Maps AI/agent terminology to traditional IT (Agent ≈ RPA, MCP ≈ ESB).
 - **`docs/explainers/03-使用者cheatsheet.html`** — for daily users (sales assistants, plant managers, QC). Every command, every keystroke they need.
 - **`docs/explainers/04-懶人包-5分鐘上手.html`** — ⭐ **for "just show me, don't make me read"** users. Visual-first quick start with annotated mocked screens.
+- **`docs/explainers/05-分身團隊-一張圖看懂.html`** — for owners, managers and front-line staff. The digital-twin team on one page: what a twin is, who does what, three safety rules, how to start.
 
 Open the HTML files directly in any browser — no build step, no external dependencies, prints cleanly to A3.
 
