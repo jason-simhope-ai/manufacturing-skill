@@ -16,7 +16,7 @@ Instead, this template defines the **interface contract** — the tools your ERP
 
 ## Required tools (interface contract)
 
-Your connector must implement:
+Your connector must implement the following (`contract.py` is the source of truth; if this table drifts, `contract.py` wins):
 
 ### Read tools
 
@@ -27,8 +27,6 @@ Your connector must implement:
 | `get_inventory` (part_no)                   | 即時庫存 + 在途 + 安全庫存               | inventory-manager                   |
 | `get_recent_purchase_price` (part_no, days) | 最近 N 天採購單價                        | quote-specialist                    |
 | `get_machine_rate` (machine)                | 機台費率（含人工 + 折舊 + 管理）         | quote-specialist                    |
-| `get_sales_order` (so_id)                   | SO 詳細                                  | sales-coordinator                   |
-| `list_open_pos` ()                          | 未交 PO 清單                             | inventory-manager                   |
 | `get_credit_status` (customer_id)           | 客戶當前信用使用情況                     | sales-coordinator                   |
 
 ### Write tools

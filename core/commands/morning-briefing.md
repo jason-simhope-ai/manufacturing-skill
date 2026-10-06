@@ -1,7 +1,7 @@
 ---
 name: morning-briefing
 description: 廠長每日早會懶人包 — 一個指令出未完工單、瓶頸、延誤風險、昨日 NCR、今日重點
-allowed-tools: [Read, Grep, Glob, Bash]
+allowed-tools: [Read, Grep, Glob, Bash, mcp__manufacturing-scheduler__list_work_orders, mcp__manufacturing-scheduler__get_machine_load, mcp__manufacturing-scheduler__find_bottlenecks, mcp__manufacturing-scheduler__get_capacity_summary]
 argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 ---
 
@@ -25,7 +25,9 @@ argument-hint: "[選用：日期 YYYY-MM-DD，預設今日]"
 
 ## 流程
 
-1. 讀 `infra/mcp-servers/scheduler-mcp/` — 取所有未完工單 + 機台負載
+1. 透過 MCP server `manufacturing-scheduler`（`infra/mcp-servers/scheduler-mcp`）取所有未完工單 + 機台負載（皆為唯讀）：
+   - 未完工單 → `list_work_orders`（預設回 50 筆、上限 200；`has_more` 為 true 時用 `offset` 續查）
+   - 機台負載 → `get_machine_load`；瓶頸 → `find_bottlenecks`（`load_pct >= threshold`）；整體產能 → `get_capacity_summary`
 2. 讀 `infra/mcp-servers/erp-connector/` — 取今日預計出貨清單 + 昨日新進 PO
 3. 讀 `logs/inspections/` （如有）— 統計昨日 IPQC / FQC / OQC 結果與 NCR
 4. 讀 `logs/exceptions/` — 昨日異常事件
