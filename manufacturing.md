@@ -25,7 +25,7 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay 架構，企業 fork 後改 profile 即可     |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | plugin 在本機；預設模型走 Anthropic 雲端，地端 GB10/Ollama 為選配（未經本專案驗證） |
 
@@ -74,9 +74,9 @@ Fork 整個 repo → 安裝 → 30 分鐘內，你的 Claude Code 就會：
 
 - 4 隻 agent：cnc-programmer / tool-life-engineer / fixture-designer / prototype-coordinator
 - 3 個 skill：g-code-review / cutting-parameter-calc / fixture-design-patterns
-- 4 份 know-how：IATF 16949 / 刀具壽命 / 切削參數 / 開發工廠 vs 量產
+- 3 份 know-how：刀具壽命 / 切削參數 / 開發工廠 vs 量產（IATF 16949 已升到 core）
 
-其他 vertical（PCB / 射出 / 食品 / 製藥）v1 是 stub，歡迎 [contribute](docs/profile-development.md)。
+其他 vertical（PCB / 射出 / 食品 / 製藥）v0.1 時為 stub，現已升為 alpha（內容需專業驗證），歡迎 [contribute](docs/profile-development.md)。
 
 ---
 

@@ -34,8 +34,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 `manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
 
-- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, Lean, OEE, MRP).
-- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 4 know-how docs covering IATF 16949, tool life, cutting parameters, job-shop vs. mass production). Stub profiles for PCB assembly, injection molding, food processing, and pharma are scaffolded for community / customer contribution.
+- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, IATF 16949 / PPAP, Lean, OEE, MRP, FMEA, GD&T, ECN, INCOTERMS).
+- **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 3 know-how docs covering tool life, cutting parameters, job-shop vs. mass production). Four **alpha** profiles carry real content that still needs practitioner validation: **injection molding**, **food processing** (HACCP / ISO 22000, batch traceability), **PCB assembly / EMS** (SMT process + EMS quality agents, DFM and AOI-defect-Pareto skills, IPC-A-610 and SMT-defect know-how; no MES integration yet) and **pharma / medical device** (GMP / GxP deviation–CAPA and batch-record review assistants; AI output is never a GMP record). There are no stub profiles left; new verticals are welcome as contributions.
 - **Infra layer** — MCP server templates for ERP/MES connectivity, on-prem LLM setup guides (Ollama on NVIDIA GB10), and reference configurations.
 - **Adapter layer** — a Claude Code adapter (v1). Cursor / Gemini / Codex adapters are post-v1.
 
@@ -47,7 +47,7 @@ Manufacturing AI adoption usually fails on three things:
 
 | Problem                    | Traditional answer                                             | What this plugin gives you                                                           |
 | -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 4 know-how docs — AI understands ISO/Lean/OEE on day one |
+| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 9 core know-how docs — AI understands ISO/IATF/Lean/OEE on day one |
 | Every factory is different | Hire an SI, pay for full custom build                          | Core + profile overlay — fork, edit your profile, done                               |
 | IT blocks cloud SaaS       | Cannot pass customer audits (drawings must not leave premises) | On-prem-first design with GB10/Ollama runtime                                        |
 
@@ -101,7 +101,7 @@ Or skip the wizard:
 Three paths:
 
 1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 5 universal agents (quote / sales / production / quality / inventory). Useful to evaluate "does this AI understand my factory at all" before committing.
-2. **Use a stub + customize** — PCB / injection / food / pharma stubs ship with starter templates ready to fill in.
+2. **Use an alpha profile + customize** — injection molding, food processing, PCB assembly and pharma are all alpha (content present, labelled needs-validation); starter templates under each profile's `_templates/` are ready to extend.
 3. **Fork the CNC profile** — CNC is the most complete reference; fork and adapt is the fastest path. See [docs/profile-development.md](docs/profile-development.md).
 
 ---
@@ -140,14 +140,14 @@ manufacturing-skill/
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
 │   ├── agents/               # 5 universal personas
 │   ├── skills/               # 6-stage flow + utility skills
-│   ├── know-how/             # ISO 9001, Lean, OEE, MRP
+│   ├── know-how/             # ISO 9001, IATF 16949, Lean, OEE, MRP, ...
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/
 │   ├── cnc-machining/        # ★ Complete v1 profile
-│   ├── pcb-assembly/         # Stub — community wanted
-│   ├── injection-molding/    # Stub
-│   ├── food-processing/      # Stub
-│   └── pharma/               # Stub
+│   ├── pcb-assembly/         # Alpha — SMT / EMS, needs practitioner validation
+│   ├── injection-molding/    # Alpha — needs practitioner validation
+│   ├── food-processing/      # Alpha — HACCP / ISO 22000, needs validation
+│   └── pharma/               # Alpha — GMP / GxP, needs QA validation
 ├── adapters/claude-code/     # Plugin install adapter
 ├── infra/                    # MCP servers, on-prem LLM setup
 ├── docs/
@@ -200,7 +200,7 @@ If you're a developer / SI wanting to build a profile for a new vertical (e.g., 
 
 PRs welcome. Especially:
 
-- New profile contributions (PCB / injection / food / pharma — see stub READMEs for what's needed)
+- Profile contributions (validate the PCB / injection / food / pharma alphas; add new verticals — see each profile README for what's needed)
 - ERP connector implementations (SAP / Oracle / 鼎新 / Workday)
 - Translations of explainer cards to other languages
 - Real-world deployment case studies

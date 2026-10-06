@@ -112,8 +112,11 @@ install 留在 `~/.claude/plugins/manufacturing-skill/`（commands 讀這個路�
 │   ├── fixture-design-patterns/SKILL.md  # profile
 │   └── g-code-review/SKILL.md            # profile
 ├── know-how/
-│   ├── iso-9001.md  lean-5s.md  oee.md  mrp-basics.md  …   # core
-│   ├── iatf-16949.md             # profile
+│   ├── iso-9001.md
+│   ├── lean-5s.md
+│   ├── oee.md
+│   ├── mrp-basics.md
+│   ├── iatf-16949.md
 │   ├── 刀具壽命管理.md            # profile
 │   ├── 切削參數查表.md            # profile
 │   └── 開發工廠-vs-量產.md         # profile

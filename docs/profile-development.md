@@ -275,7 +275,7 @@ CI Step 12（pairwise scan）會在 PR 時擋下任何破壞 pairwise compatibil
 
 | Vertical          | 必備 know-how                             |
 | ----------------- | ----------------------------------------- |
-| CNC machining     | IATF 16949, 切削參數, 刀具壽命, GD&T      |
+| CNC machining     | 切削參數, 刀具壽命, GD&T（IATF 在 core）  |
 | PCB assembly      | IPC-A-610, J-STD-001, MSL, ESD            |
 | Injection molding | 模流分析, 常見不良對策, polymer 資料庫    |
 | Food              | HACCP, ISO 22000, 過敏原管理, 保存期      |
@@ -327,7 +327,7 @@ A: v1 一次只能 active 一個 profile。如果你的工廠橫跨多個 vertic
 - (c) 等 v0.2 預計支援多 profile 同時 active
 
 **Q: profile 多大算合理？**
-A: 參考 CNC profile：~ 4 agents + 3 skills + 4 know-how + 1 hook，約 50KB markdown。太大表示應該拆。
+A: 參考 CNC profile：~ 4 agents + 3 skills + 3 know-how + 1 hook，約 50KB markdown。太大表示應該拆。
 
 **Q: profile 一定要寫繁中嗎？**
 A: agent prompt 與 know-how 預設繁中（台灣製造業情境）。國際 contributor 可寫英文，但建議至少 README 提供繁中翻譯方便台灣用戶。

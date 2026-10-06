@@ -51,7 +51,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 3   | 🏭 **追工單**         | 工單跑到哪了？哪台機台卡住了？哪個訂單可能延誤？隨時問                       |
 | 4   | 🔍 **顧品管**         | 不良追蹤、客訴 8D 處理、IATF（汽車業品質體系）稽核準備 — AI 引導你跑完合規流程 |
 | 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
-| 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥都有起點範本）  |
+| 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出已有 alpha 內容，食品 / 製藥有起點範本） |
 
 **5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
 
@@ -64,8 +64,8 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 採用「**core + profile overlay**」架構：
 
-- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、Lean、OEE、MRP）
-- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、4 份 know-how 涵蓋 IATF 16949、刀具壽命、切削參數、開發工廠 vs 量產）。其他 4 個產業包（PCB / 射出 / 食品 / 製藥）是 stub
+- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
+- **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出成型、食品（HACCP / ISO 22000、批次追溯）、PCB 組裝（SMT / EMS）與製藥 / 醫材（GMP / GxP 偏差 CAPA、批次紀錄預檢；AI 輸出永遠不是 GMP 紀錄）是 alpha（有內容、尚待業界實務驗證）；目前沒有 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
 
@@ -117,7 +117,7 @@ sequenceDiagram
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 4 份 know-how，AI 開箱就懂 ISO / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / IATF / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | plugin 本身在本機；預設模型走 Anthropic 雲端，地端 GB10/Ollama 為選配（[未經本專案端到端驗證](infra/on-prem/gb10-setup.md)） |
 
@@ -211,7 +211,7 @@ A: **目前不行。** 這個 repo 沒有 LINE 整合，也沒有 LINE 閘道。
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
-2. **Stub 加碼客製** — 若你是 PCB / 射出 / 食品 / 製藥，那個產業包是 stub 但有 starter template，照著填內容就能用。
+2. **Alpha 加碼客製** — 射出、食品、PCB 組裝、製藥都是 alpha（內容標示「需驗證」，請自家工程師審過再用）；各產業包的 `_templates/` 有 starter template 可照著填。
 3. **Fork CNC 產業包改成你的** — CNC 產業包是最完整的範本，fork 一份做自己的產業包是最快路徑（詳見 [docs/profile-development.md](docs/profile-development.md)）。
 
 ---
@@ -243,14 +243,14 @@ manufacturing-skill/
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
 │   ├── agents/               # 5 隻 universal persona
 │   ├── skills/               # 6 段流程 + 通用 skill
-│   ├── know-how/             # ISO 9001、Lean、OEE、MRP
+│   ├── know-how/             # ISO 9001、IATF 16949、Lean、OEE、MRP …
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
 ├── profiles/                 # 產業包
 │   ├── cnc-machining/        # ★ v1 唯一完整產業包
-│   ├── pcb-assembly/         # Stub — 歡迎 contribute
-│   ├── injection-molding/    # Stub
-│   ├── food-processing/      # Stub
-│   └── pharma/               # Stub
+│   ├── pcb-assembly/         # Alpha — SMT / EMS，待業界驗證
+│   ├── injection-molding/    # Alpha — 待射出廠驗證
+│   ├── food-processing/      # Alpha — HACCP / ISO 22000，待食品廠驗證
+│   └── pharma/               # Alpha — GMP / GxP，待 QA 驗證
 ├── adapters/claude-code/     # 一鍵安裝
 ├── infra/                    # MCP server、地端 LLM 設定
 ├── docs/
@@ -303,7 +303,7 @@ manufacturing-skill/
 
 PR 都歡迎，特別是：
 
-- 新產業包（PCB / 射出 / 食品 / 製藥 — 看 stub 裡的 README 知道要做什麼）
+- 產業包（驗證 PCB / 射出 / 食品 / 製藥 alpha 內容；新增其他產業 — 看各產業包 README 知道要做什麼）
 - ERP connector 實作（SAP / Oracle / 鼎新 / Workday）
 - explainer 卡片翻譯成其他語言
 - 真實導入 case study
