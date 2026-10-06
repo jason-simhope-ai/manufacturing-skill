@@ -188,7 +188,7 @@ T3 的完整政策見 [restricted.md](policies/restricted.md)。
 
 ### 模型在雲端
 
-T1 內容會由聊天閘道（以 `claude -p` 指令）送到 Anthropic 的雲端模型（API，用營運者自己的 API 金鑰），同時也留在 Slack／Discord 上。保留期限、資料區域與零留存條款取決於你和供應商的合約，本 repo 不替你保證。資料流向圖見 explainer 01、02 的「分身層」；可以給客戶稽核員看的三行（含它不能保證的事）在[董事長一頁](../docs/owner-one-page.zh-TW.md)第七節。
+T1 內容會由聊天閘道（以 `claude -p` 指令）送到 Anthropic 的雲端模型（API，用營運者自己的 API 金鑰），同時也留在 Slack／Discord 上。保留期限、資料區域與零留存條款取決於你和供應商的合約，本 repo 不替你保證。資料流向圖見 explainer 01、02 的「分身層」；可以給客戶稽核員看的三行（含擋不到的情況）另印一張：[給法務與客戶稽核員的一張](../docs/owner-auditor-sheet.zh-TW.md)，先經法務依客戶合約確認。
 
 ### 資料餵入：分身怎麼讀到排程／NCR 資料
 

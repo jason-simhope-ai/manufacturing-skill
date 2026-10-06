@@ -11,7 +11,7 @@
 
 **這份 README 給三種人看：**
 
-- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；想給每個職位配一個 AI 副駕，看 [分身團隊](#分身團隊)，**簽字前先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判、給客戶稽核員的三行）
+- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；想給每個職位配一個 AI 副駕，看 [分身團隊](#分身團隊)，**簽字前先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判）；給客戶稽核員的三行另印一張，[給法務](docs/owner-auditor-sheet.zh-TW.md)
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
@@ -314,6 +314,7 @@ manufacturing-skill/
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
 │   ├── owner-one-page.zh-TW.md  # 董事長一頁：簽什麼、花多少、怎麼停
+│   ├── owner-auditor-sheet.zh-TW.md  # 給法務與客戶稽核員的一張（三行與擋不到的情況）
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
 ├── tests/

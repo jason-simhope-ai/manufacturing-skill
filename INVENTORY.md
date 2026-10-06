@@ -18,6 +18,7 @@
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
 | 想一眼看懂分身團隊            | [docs/explainers/05-分身團隊-一張圖看懂.html](docs/explainers/05-分身團隊-一張圖看懂.html) → 點擊式示範 [docs/demo/team-demo.html](docs/demo/team-demo.html)          |
 | 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
+| 法務、客戶稽核員              | [docs/owner-auditor-sheet.zh-TW.md](docs/owner-auditor-sheet.zh-TW.md)（稽核員三行與擋不到的情況，先經法務確認）                            |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
 | AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
@@ -262,6 +263,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
 | [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算；分身 4 週 pilot、原則與核准範本 |
 | [owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)                                                                       | 董事長：簽三件事前的一頁（費用、最壞情況、停機、第 4 週決策表） |
+| [owner-auditor-sheet.zh-TW.md](docs/owner-auditor-sheet.zh-TW.md)                                                             | 法務：給客戶稽核員的三行與擋不到的情況（另印一張）              |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
@@ -350,8 +352,9 @@ Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-cl
                               + twin-team click-through (HTML + transcript + PNG)
                               + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 6 (architecture / adoption-guide / profile-dev / ROADMAP
-                              / quickstart-for-beginners / owner-one-page) + 6 design specs
+Docs                    : 7 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page
+                              / owner-auditor-sheet) + 6 design specs
 Scripts                 : 2 (regen_explainers.py, regen_screenshots.py)
 Tests                   : 54 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
                               cases + 58 unittest, gateway 266 unittest + demo golden
