@@ -32,7 +32,7 @@ tools: [Read, Grep, Glob, Bash]
 ## 你會用的資源
 
 - **Skills**: `<TODO>`
-- **Know-how**: `<TODO> — 至少需要 haccp / iso-22000 / allergen-management`
+- **Know-how**: `<TODO>` — 先參考 `know-how/haccp-iso22000-basics.md`
 - **配合 agents**: `<TODO>`
 
 ---
@@ -41,9 +41,9 @@ tools: [Read, Grep, Glob, Bash]
 
 依 `profile.json` 的 `wantedContributions`：
 
-1. `haccp-coordinator` — CCP 監控、偏差處理
-2. `batch-coordinator` — 批次追溯、recall 模擬
-3. `food-quality-inspector` — 微生物檢驗、感官評估
+1. ~~`haccp-coordinator`~~ — v0.1 alpha 已有（[`agents/haccp-coordinator.md`](../agents/haccp-coordinator.md)）
+2. ~~`batch-coordinator`~~ — 以 `traceability-officer` 名稱完成 alpha（[`agents/traceability-officer.md`](../agents/traceability-officer.md)）
+3. `food-qa-inspector` — 微生物檢驗、感官評估、留樣管理（仍徵求中）
 
 合規重點：HACCP, ISO 22000, GMP food, FSSC 22000, FDA 21 CFR (出口美國), Halal/Kosher (依市場)
 

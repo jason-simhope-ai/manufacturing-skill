@@ -100,6 +100,8 @@ Claude Code 主畫面有兩塊：
 
 > 💡 **找不到 terminal？** 在 Claude Code 裡按 `Ctrl + 反引號`（鍵盤左上角，數字 1 旁邊那顆 `` ` ``）切換顯示。Mac 也是一樣按法。
 
+> ⚠️ **Windows 使用者請注意：** Windows 預設的終端機是 PowerShell，裡面**沒有 `bash` 指令**，直接貼下面第 3 行會失敗。請先裝好 Git（見下方「常見錯誤排除」第一條，安裝時會一併裝 **Git Bash**），然後從「開始」選單搜尋並開啟 **Git Bash**（黑底視窗），**在 Git Bash 裡**貼下面 3 行。Mac 內建的「終端機」就有 bash，直接用即可。
+
 ### 3-1 把這 3 行貼到 terminal
 
 **一行一行貼**，每行貼完按 Enter 等它跑完，再貼下一行：
@@ -120,7 +122,9 @@ bash adapters/claude-code/install.sh
 >
 > - 第 1 行：從 GitHub 把 plugin 下載到你電腦
 > - 第 2 行：進入剛下載的資料夾
-> - 第 3 行：跑安裝程式
+> - 第 3 行：跑安裝程式（需要電腦上有 Python 3；沒有的話見下方「常見錯誤排除」）
+>
+> 安裝程式只會把檔案放進**你自己使用者資料夾**裡的 `.claude`（Windows 是 `C:\Users\你的名字\.claude`、Mac 是 `/Users/你的名字/.claude`），**完全不需要管理員權限、也不要加 `sudo`**。
 
 ### 3-2 安裝程式會問你「要裝哪個產業包」
 
@@ -132,10 +136,10 @@ bash adapters/claude-code/install.sh
 ════════════════════════════════════════════════
 
   1) ✅ cnc-machining
-  2) 🚧 stub food-processing
-  3) 🚧 stub injection-molding
-  4) 🚧 stub pcb-assembly
-  5) 🚧 stub pharma
+  2) 🧪 alpha food-processing
+  3) 🧪 alpha injection-molding
+  4) 🧪 alpha pcb-assembly
+  5) 🧪 alpha pharma
   0) 🧪 (core-only, no profile)     — try the framework first
 
   Default: cnc-machining  (press Enter to accept)
@@ -149,11 +153,20 @@ bash adapters/claude-code/install.sh
 | ------------------------ | -------------------------------------------------- |
 | CNC 加工廠               | 直接按 **Enter**（預設選 1）                       |
 | 不是 CNC、想先試框架     | 打 **0** 按 Enter                                  |
-| PCB / 射出 / 食品 / 製藥 | 也建議先打 **0** — 對應產業包目前是 stub（半成品） |
+| PCB / 射出 / 食品 / 製藥 | 也建議先打 **0** — 對應產業包目前是 alpha（有內容、尚待業界驗證） |
 
 按完 Enter，等個 5-10 秒，看到 `✅ Installation complete.` 就成功了。
 
 ![install.sh 安裝選單實際畫面（示意圖）](quickstart-screenshots/step5-install-selector-mockup.png)
+
+### 3-3 在 manufacturing-skill 資料夾裡啟動 Claude Code
+
+Step 4 的 `@examples/...` 是從「**目前開啟的資料夾**」往下找檔案，所以 Claude Code 必須開在 `manufacturing-skill` 這個資料夾裡，否則會說找不到檔案。
+
+- **用桌面 app：** 在 app 裡選「開啟資料夾 / Open folder」（或新對話時選工作資料夾），選到剛才 clone 下來的 `manufacturing-skill` 資料夾。
+- **用 terminal（Git Bash / Mac 終端機）：** 確認你還在 `manufacturing-skill` 資料夾裡（Step 3 第 2 行 `cd manufacturing-skill` 做的就是這件事），然後打 `claude` 按 Enter。
+
+> 💡 **怎麼確認開對了？** 在 terminal 打 `pwd`，路徑最後應該是 `manufacturing-skill`；桌面 app 則看視窗上方顯示的資料夾名稱。
 
 ---
 
@@ -204,6 +217,12 @@ AI 給的答案看不懂？**直接打中文問**就好，不用學任何指令�
 
 AI 會記得前面對話的脈絡，順著你的問題回答。
 
+### 之後換成你自己的圖紙
+
+- 自己的圖紙**放在 `manufacturing-skill` 資料夾外面**（例如 `文件\客戶圖紙`），不要放進這個資料夾，避免不小心被 git 提交或分享出去。用 `@` 加上完整路徑即可，例如 `/quote @C:/Users/你的名字/文件/客戶A.pdf`。
+- AI 可以讀 PDF、圖片和純文字（Excel 請另存 CSV）。**DWG、STEP 這類 CAD 原檔不能直接讀**，請先另存成 PDF 或 PNG，BOM 另外貼成文字。
+- ⚠️ **資料會送去模型供應商：** 預設的模型在 Anthropic 雲端，你用 `@` 附上或貼上的內容都會傳過去，處理方式依你所用方案的條款（個人方案與商用方案不同）。客戶有保密要求的圖紙，先確認條款或問 IT，再決定能不能餵；詳見 [README 的資料流向](../README.zh-TW.md#資料流向一張圖)。
+
 > 💡 **不確定 AI 講對還是講錯？**
 > 直接打「不對，我們公司的規則是 XXX」就好，AI 會記住並修正。AI 不會因為你糾正它而生氣。
 
@@ -221,9 +240,18 @@ AI 會記得前面對話的脈絡，順著你的問題回答。
 
 **Mac：** terminal 打 `xcode-select --install` 按 Enter，跳出對話框點「安裝」→ 等 5 分鐘裝完 → 重跑 Step 3
 
-### ❌ Step 3 跑第三行錯：`bash: command not found`
+### ❌ Step 3 跑第三行錯：`bash: command not found`（或 `'bash' 不是內部或外部命令`）
 
-代表你不是在 terminal 裡執行。確認你打字的地方有黑底白字、上面有 `$` 或 `>` 提示符號才是 terminal。如果你打字的地方是「對話框」（給 AI 的），那是 Step 4 的位置，不是 Step 3。
+- **Windows（最常見）：** 你開的是 PowerShell 或命令提示字元，它們沒有 `bash`。請改開 **Git Bash**（「開始」選單搜尋 `Git Bash`，要先裝好 Git），在裡面重跑 Step 3 的第 2、3 行。
+- 如果你打字的地方是「對話框」（給 AI 的），那是 Step 4 的位置，不是 Step 3，請移到有黑底白字、有 `$` 提示符號的 terminal。
+
+### ❌ Step 3 跑第三行錯：`Python 3 not found`
+
+安裝程式需要 Python 3。**Windows：** 到 https://www.python.org/downloads/ 下載安裝，安裝畫面第一頁務必勾選 **Add python.exe to PATH**，裝完**關掉 Git Bash 重開**。**Mac：** terminal 打 `xcode-select --install`，或同樣到 python.org 下載。裝好後在 `manufacturing-skill` 資料夾裡重跑第 3 行，看到 `✅ Installation complete.` 才算完成。
+
+### ❌ Step 4 說找不到 `examples/sample-drawing/bracket.md`
+
+代表 Claude Code 不是在 `manufacturing-skill` 資料夾裡開的。回到 Step 3-3，把 Claude Code 開在那個資料夾，再打一次。
 
 ### ❌ Step 4 打 `/quote` 沒反應、說 `command not found`
 
@@ -233,13 +261,13 @@ AI 會記得前面對話的脈絡，順著你的問題回答。
 
 ### ❌ Step 3 中間說 `Permission denied`
 
-Mac / Linux 偶爾會這樣。解法：在指令前加 `sudo`：
+**請不要用 `sudo` 重跑。** 安裝程式只寫入你自己使用者資料夾裡的 `~/.claude`，本來就不需要管理員權限；用 `sudo` 反而可能讓檔案變成「root 才能改」，之後正常執行就會一直失敗。
 
-```bash
-sudo bash adapters/claude-code/install.sh
-```
+改這樣查：
 
-會要你打電腦開機密碼（打的時候畫面不會顯示，正常的，打完按 Enter）。
+1. 確認你在 `manufacturing-skill` 資料夾裡（`pwd`），而且資料夾是你自己 clone 的，不是放在系統目錄或別人的共用資料夾。
+2. 打 `ls -ld ~/.claude`，看擁有者是不是你自己的帳號名。
+3. 如果擁有者是 `root`（可能之前有人用 `sudo` 跑過），請找 IT 同事把它改回你自己的帳號（指令：`chown -R "$(whoami)" ~/.claude`，這一行才需要 IT 用管理員身分執行），再重跑 Step 3 第 3 行。
 
 ### ❌ 跑到一半卡住、沒反應
 

@@ -3,7 +3,7 @@ name: quality-inspector
 displayName: 品質管理 / Quality Inspector
 description: IQC / IPQC / FQC / OQC 四階段檢驗、不良品處理、客訴根因分析
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 品質管理 / Quality Inspector
@@ -44,7 +44,7 @@ tools: [Read, Grep, Glob, Bash]
 ## 你會用的資源
 
 - **Skills**：`05-檢驗.md`、`spc-basics.md`
-- **Know-how**：`iso-9001.md`、profile 加碼如 `iatf-16949.md`
+- **Know-how**：`iso-9001.md`、汽車客戶加 `iatf-16949.md`
 - **Hook**：`core/hooks/pre-ship.md`（OQC 通過後觸發出貨）、`on-error.md`（NG 升級）
 - **MCP**：`erp-connector`（取規格、客訴歷史）
 

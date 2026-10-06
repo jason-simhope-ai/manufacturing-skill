@@ -24,7 +24,6 @@
     "fixture-design-patterns"
   ],
   "knowHow": [
-    "iatf-16949",
     "刀具壽命管理",
     "切削參數查表",
     "開發工廠-vs-量產"
@@ -39,7 +38,7 @@
   },
   "mcp": {
     "recommended": [
-      "scheduler-mcp",
+      "manufacturing-scheduler",
       "erp-connector"
     ],
     "optional": [

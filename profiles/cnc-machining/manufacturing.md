@@ -41,11 +41,12 @@
 | `cutting-parameter-calc`  | 算切削參數：vc / fz / ap / ae，依材料 + 刀具 + 機台剛性 |
 | `fixture-design-patterns` | 設計夾具的常見 pattern                                  |
 
-### 多 4 份 know-how
+### 多 3 份 know-how
+
+> 汽車業品質體系 `iatf-16949`（PPAP / FAI / Run @ Rate）已升到 core（[core/know-how/iatf-16949.md](../../core/know-how/iatf-16949.md)），所有 profile 都能用。
 
 | Know-how           | 內容                                       |
 | ------------------ | ------------------------------------------ |
-| `iatf-16949`       | 汽車業品質體系，含 PPAP / FAI / Run @ Rate |
 | `刀具壽命管理`     | 各類刀具的典型壽命、換刀策略               |
 | `切削參數查表`     | 常見材料 × 常見刀具的推薦參數              |
 | `開發工廠-vs-量產` | 兩種生產模式的差異、什麼時候該怎麼做       |
@@ -79,7 +80,7 @@ v0.1 暫無 override，CNC profile 只「加」不「改」。
 此 profile 是基於 SIMHOPE 真實 job shop 場景開發：
 
 - 接客戶開發件：dispatch `prototype-coordinator`
-- 客戶要求 PPAP：用 `iatf-16949` know-how
+- 客戶要求 PPAP：用 core 的 `iatf-16949` know-how
 - 急件想知道刀夠不夠：問 `tool-life-engineer`
 - 報價時的工時估算：用 `cutting-parameter-calc`
 

@@ -6,7 +6,9 @@ Two subcommands:
   scan <p1> <p2> [...]
       Detect file collisions between active profiles. A collision is
       two profiles containing the same `<kind>/<basename>.md` under
-      `agents`, `skills`, `know-how`, or `hooks`. Exit 0 if clean,
+      `agents`, `skills`, `know-how`, or `hooks`. Basenames are compared
+      case-insensitively (`Quote.md` collides with `quote.md`) because
+      macOS and Windows filesystems fold case. Exit 0 if clean,
       exit 1 with one ::error line per collision.
 
   scan-all
@@ -48,16 +50,31 @@ LIST_FIELDS_FOR_AGGREGATION = (
 @dataclasses.dataclass(frozen=True)
 class Conflict:
     kind: str          # "agents" / "skills" / "know-how" / "hooks"
-    basename: str      # e.g. "quote-specialist"
+    basename: str      # e.g. "quote-specialist" (first spelling seen)
     profiles: tuple    # tuple of profile names (sorted)
+    spellings: tuple = ()  # distinct on-disk spellings, if they differ
 
     def render(self) -> str:
         names = ", ".join(self.profiles)
-        return (f"{self.kind}/{self.basename}.md present in multiple "
-                f"profiles: {names}")
+        msg = (f"{self.kind}/{self.basename}.md present in multiple "
+               f"profiles: {names}")
+        if len(self.spellings) > 1:
+            msg += (" (names differ only by case: "
+                    + ", ".join(f"{sp}.md" for sp in self.spellings)
+                    + "; collides on case-insensitive filesystems)")
+        return msg
+
+
+def _fold(name: str) -> str:
+    return name.casefold()
 
 
 def list_profile_files(profile_dir: Path, kind_dir: str) -> set[str]:
+    """Basenames (no .md) of the profile's files of one kind.
+
+    A missing kind directory (e.g. a profile with no hooks/) is an empty
+    set, not an error.
+    """
     d = profile_dir / kind_dir
     if not d.is_dir():
         return set()
@@ -67,19 +84,36 @@ def list_profile_files(profile_dir: Path, kind_dir: str) -> set[str]:
     }
 
 
+def _by_fold(names: set[str]) -> dict[str, str]:
+    """casefolded basename -> one spelling (deterministic: smallest)."""
+    out: dict[str, str] = {}
+    for n in sorted(names):
+        out.setdefault(_fold(n), n)
+    return out
+
+
+def _make_conflict(kind_dir: str, spellings: set[str],
+                   profiles: list[str]) -> Conflict:
+    ordered = tuple(sorted(spellings))
+    return Conflict(
+        kind=kind_dir,
+        basename=ordered[0],
+        profiles=tuple(sorted(profiles)),
+        spellings=ordered,
+    )
+
+
 def scan_pair(repo_root: Path, p1: str, p2: str) -> list[Conflict]:
-    """Return conflicts between two profiles."""
+    """Return conflicts between two profiles (case-insensitive)."""
     out: list[Conflict] = []
     d1 = repo_root / "profiles" / p1
     d2 = repo_root / "profiles" / p2
     for kind_key, kind_dir in KINDS_TO_DIR.items():
-        f1 = list_profile_files(d1, kind_dir)
-        f2 = list_profile_files(d2, kind_dir)
-        for basename in sorted(f1 & f2):
-            out.append(Conflict(
-                kind=kind_dir,
-                basename=basename,
-                profiles=tuple(sorted([p1, p2])),
+        f1 = _by_fold(list_profile_files(d1, kind_dir))
+        f2 = _by_fold(list_profile_files(d2, kind_dir))
+        for fold in sorted(f1.keys() & f2.keys()):
+            out.append(_make_conflict(
+                kind_dir, {f1[fold], f2[fold]}, [p1, p2],
             ))
     return out
 
@@ -89,22 +123,25 @@ def scan_set(
     profile_names: list[str],
 ) -> list[Conflict]:
     """Return all collisions in a set of profiles. Reports per
-    basename, not per pair, so a 3-way collision shows once."""
-    seen: dict[tuple[str, str], list[str]] = {}
+    basename, not per pair, so a 3-way collision shows once. Basenames
+    are matched case-insensitively."""
+    seen: dict[tuple[str, str], list[tuple[str, str]]] = {}
     for name in profile_names:
         d = repo_root / "profiles" / name
         for kind_key, kind_dir in KINDS_TO_DIR.items():
-            for basename in list_profile_files(d, kind_dir):
-                seen.setdefault((kind_dir, basename), []).append(name)
+            for fold, spelling in _by_fold(
+                    list_profile_files(d, kind_dir)).items():
+                seen.setdefault((kind_dir, fold), []).append(
+                    (name, spelling))
     out: list[Conflict] = []
-    for (kind_dir, basename), profiles in seen.items():
-        if len(profiles) > 1:
-            out.append(Conflict(
-                kind=kind_dir,
-                basename=basename,
-                profiles=tuple(sorted(profiles)),
+    for (kind_dir, _fold_key), entries in seen.items():
+        if len(entries) > 1:
+            out.append(_make_conflict(
+                kind_dir,
+                {sp for _, sp in entries},
+                [n for n, _ in entries],
             ))
-    return sorted(out, key=lambda c: (c.kind, c.basename))
+    return sorted(out, key=lambda c: (c.kind, _fold(c.basename)))
 
 
 def cmd_scan(args) -> int:
@@ -168,7 +205,9 @@ def aggregate_lists(
     for prof in profiles:
         cursor = prof
         for key in nested_path:
-            cursor = cursor.get(key, {})
+            cursor = cursor.get(key, {}) if isinstance(cursor, dict) else {}
+        if not isinstance(cursor, dict):
+            continue
         values = cursor.get(field, [])
         if not isinstance(values, list):
             continue

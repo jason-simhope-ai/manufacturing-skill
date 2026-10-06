@@ -16,7 +16,7 @@ SO 建立完成後自動觸發，確保「客戶 PO 變成內部行動」不漏�
 
 ### 1. 通知 production-planner
 
-- 推送新 SO 到 scheduler-mcp 待排隊列
+- 提醒生管 / MES 操作員把新 SO 加入待排隊列（`manufacturing-scheduler` 唯讀，AI 只準備要建立的資料）
 - 自動跑一次 `capacity-planning` 評估能否準時
 - 如果預估 > 客戶交期 → 立即標紅，回報 sales-coordinator
 
@@ -28,8 +28,9 @@ SO 建立完成後自動觸發，確保「客戶 PO 變成內部行動」不漏�
 
 ### 3. 通知客戶
 
-- 發 PO 收件確認（自動 email / Telegram）
-- 提供初估開工日（基於 capacity-planning）
+- **產生**PO 收件確認草稿（email / Telegram 文字），**不自動寄出**
+- 草稿內附初估開工日（基於 capacity-planning）
+- 由業助檢視、必要時修改，**人工確認後才送出**（對外通知會代表公司承諾交期與數量，須有人負責）
 
 ### 4. 紀錄
 
@@ -44,6 +45,6 @@ SO 建立完成後自動觸發，確保「客戶 PO 變成內部行動」不漏�
 
 - production-planner 排不下 → 升級給生產主管
 - 採購提報失敗 → 升級給採購主管
-- 客戶通知失敗 → 業助手動補發
+- 客戶通知草稿產生失敗 → 業助手動撰寫並寄出
 
 **不能因為 hook 失敗就讓 SO 卡在中間狀態**。
