@@ -631,6 +631,8 @@ jobs:
       - name: Multi-profile — helper unit tests
         run: python3 tests/multiprofile/test_multiprofile.py
 
+      - name: erp-connector — contract tests
+        run: python3 tests/mcp/test_erp_contract.py
       - name: scheduler-mcp — stdio protocol tests
         run: python3 tests/mcp/test_scheduler_mcp.py
 

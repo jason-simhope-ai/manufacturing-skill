@@ -58,7 +58,7 @@ If you're an enterprise IT team adopting `manufacturing-skill`:
 - Run the local LLM (Ollama on GB10 or similar) on the **internal network only**. Never expose Ollama's port to the public internet.
 - The plugin reads agent prompts and skills as **untrusted** user-controllable text — if you customize a profile, review the prompt for injection vectors before deploying widely.
 - Your ERP connector implementation handles real customer data. Use a service account with **read-only access** for queries; restrict write tools (`create_sales_order`, etc.) by role.
-- Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` includes an `operator` audit field on every write tool — keep it.
+- Log every AI-driven action that touches the ERP. The contract in `infra/mcp-servers/erp-connector/contract.py` takes a typed `CallContext` (operator_id, role, channel, request_id, classification, approval_token) on every tool and an `idempotency_key` on every write tool — log the context on every call and keep the approval-token check.
 - Customer drawings, BOMs, and pricing are sensitive. Verify `.gitignore` excludes your real data directories before any team member runs `git add`.
 
 For a deeper deployment-security checklist, see [`infra/on-prem/gb10-setup.md`](infra/on-prem/gb10-setup.md).
