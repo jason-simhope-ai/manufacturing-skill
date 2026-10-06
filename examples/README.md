@@ -11,6 +11,7 @@
 | `sample-drawing/bracket.md`  | 模擬一張 CNC 件圖紙 metadata（不需要真 CAD 檔） |
 | `sample-bom/bracket-bom.csv` | 對應的 BOM 範例                                 |
 | `sample-quote-output.md`     | `/quote` 流程跑完後的預期輸出格式               |
+| `company-facts.template.md`  | 公司事實檔填寫範本（費率、毛利、交期、核准、資料分類）；複製後放 repo 外 |
 
 ---
 
@@ -23,7 +24,11 @@
 正式部署時，把真實 CAD 檔放：
 
 - 公司內部 PLM 系統 → 透過 MCP 連
-- 或 Local 資料夾 → `.gitignore` 排除
+- 或 Local 資料夾 → 放在 repo 之外（`.gitignore` 只是保險）
+
+公司自己的費率、毛利與核准規則，請複製 [`company-facts.template.md`](company-facts.template.md)
+為 `company-facts.md`，同樣放在 repo 之外，不要 commit。
+資料分級見 [docs/data-classification.md](../docs/data-classification.md)。
 
 ---
 

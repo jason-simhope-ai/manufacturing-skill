@@ -3,7 +3,7 @@ name: production-planner
 displayName: 生產管理 / Production Planner
 description: 工單派工、產能排程、機台與人力配置、瓶頸識別
 model: sonnet
-tools: [Read, Grep, Glob, Bash, mcp__manufacturing-scheduler__get_machine_load, mcp__manufacturing-scheduler__find_bottlenecks, mcp__manufacturing-scheduler__get_capacity_summary, mcp__manufacturing-scheduler__list_work_orders, mcp__manufacturing-scheduler__get_work_order_status]
+tools: [Read, Grep, Glob, mcp__manufacturing-scheduler__get_machine_load, mcp__manufacturing-scheduler__find_bottlenecks, mcp__manufacturing-scheduler__get_capacity_summary, mcp__manufacturing-scheduler__list_work_orders, mcp__manufacturing-scheduler__get_work_order_status]
 ---
 
 # 生產管理 / Production Planner
