@@ -9,10 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Docs: state the real data flow.** Removed "drawings never leave the company / runs on your own machine" claims from the READMEs, `manufacturing.md`, the landing page and explainers 01/02. The plugin's prompts and files stay local, but the default model is Anthropic's cloud (Claude Code), so pasted or attached content is sent to the model provider under its terms; on-prem (GB10 / Ollama) is an option that this project has not verified end-to-end. Added a data-flow section to both READMEs.
+- **Docs: `infra/on-prem/gb10-setup.md`** now carries an "unverified" warning, no longer ships a JSON snippet with comments, and tells IT how to verify isolation themselves (egress deny + traffic observation). The beginner quickstart no longer advises `sudo`, covers Git Bash on Windows, and adds the missing "open Claude Code in the repo folder" step.
 - **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).
-
 ### Fixed
-
 - **Claude Code now actually loads the plugin.** Until now it loaded nothing from the install (checked with claude 2.1.289: `claude plugin list` showed no plugin). `~/.claude/plugins/` is never scanned for hand-copied plugins, the root `plugin.json` is not a manifest (and `repository` as an object fails validation), flat `skills/*.md` are not skills, and markdown `hooks/*.md` are not hooks. `install.sh` now, inside the staging dir and before the atomic swap:
   - moves each `skills/<x>.md` to `skills/<name>/SKILL.md` (`<name>` = frontmatter `name:`, else the file name). Two skills mapping to one name fail before the swap and leave the existing install untouched. The overlay and conflict scan still go by file name.
   - writes `.claude-plugin/plugin.json` from `plugin.json` with only the fields Claude Code accepts (`repository` → its URL string). Without python3 it writes a minimal one: name, version and description. The root `plugin.json` is still copied for `/manufacturing` and CI.
@@ -32,9 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`install.sh -h`** prints the whole usage block (the last two examples were cut off).
 - **CRLF profile files with `extends:` are now resolved.** `has_extends` matched `^---$`, so a CRLF file (`---\r`) was never seen as having frontmatter and was copied raw, with `extends:` unresolved. It now strips `\r` first. New root `.gitattributes` (`* text=auto eol=lf`, `*.sh` / `*.py` `eol=lf`) keeps Windows checkouts from converting the installer and tools to CRLF.
 - **`.installed` is always valid JSON.** `source`, `pluginVersion` and the profile names are now JSON-escaped (via python3 `json` when available; pure-bash fallback escapes `\` and `"`). Previously a repo path containing `"` or `\` produced invalid JSON that `/manufacturing` could not read. CI now installs from a repo path and a `HOME` containing a space and `"`, and validates `.installed` with `python3 -m json.tool` (python and no-python paths).
-
 ### Changed
-
 - **Atomic install swap**: the new tree is built in a staging dir next to the target (same filesystem), then swapped in with `mv`. The old install moves to `manufacturing-skill.bak.<timestamp>.<pid>`; if the swap fails, it is moved back automatically and the installer exits non-zero. Only the newest 3 backups are kept (older `manufacturing-skill.bak.*` dirs are deleted; the output says so and prints an undo command).
 - **python3 is only required when it is actually used**: multi-profile installs (conflict scan + `active-profiles.json`) and profiles with `extends:` files (which also need PyYAML). A single plain profile installs without python3; `active-profiles.json` is then skipped and readers fall back to `active-profile.json`.
 - **Stub-profile warning**: installing a profile with `"status": "stub"` prints a warning block (profile files installed: 0, core layer only; for `food-processing` "HACCP / food-safety content is NOT included", for `pharma` "GxP content is NOT included") and the profile's `warnings` array. Alpha profiles with `warnings` (e.g. `injection-molding`) print them too. When only stubs are installed, the "Try in Claude Code" hints no longer suggest the CNC drawing example.
