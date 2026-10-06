@@ -414,7 +414,7 @@ A 決定與角色
 [ ] 每項啟用能力的 today 已由實際做事的人看過並同意（affectedRoles 不是本職位的，填 doerAckedOn）
 [ ] 「pilot 核准」「預算核准」已由董事長（最高負責人）簽署（範圍、4 週期間、到期日、第 4 週門檻、每日上限）  負責：______ 日期：____
 [ ] 核准人、稽核錨點簽收人、金鑰保管人、pilot 總負責人、機密事件受理人已指定；前三者都不是 AI 導入負責人
-[ ] 停機演練一次：主管提出 → 金鑰保管人停止 gateway、確認分身不再回答 → 記下實際分鐘數 ____（應在 30 分鐘內）  負責：______ 日期：____
+[ ] 停機演練一次：主管提出 → 金鑰保管人凍結（chat_gateway freeze，應在 1 分鐘內）並停止 gateway、確認分身不再回答 → 記下實際分鐘數 ____（全程應在 30 分鐘內）  負責：______ 日期：____
 [ ] 客戶合約（NDA、客戶規範）已查：T1 內容送雲端模型沒有違約疑慮
 
 B 平台與 bot
@@ -447,13 +447,13 @@ G 金鑰與稽核
 [ ] 每週簽收流程已排：金鑰保管人 audit-verify OK 並印 head → checkpoint 複製到另一處 → 簽收人（不持金鑰）比對 head 後簽名；保存期限：______
 
 H 啟動與驗證
-[ ] PYTHONPATH=infra/chat-gateway python3 -m chat_gateway self-check --adapter <slack|discord> --driver claude-code 通過（環境要有 MFG_TEAM_DAILY_BUDGET_USD）
-[ ] 排程貼文（chat_gateway post）由作業系統 cron 觸發（teamctl roster --crontab 可印出範例行）；金鑰由 0600 的環境檔載入，不寫在 crontab 或指令列
+[ ] PYTHONPATH=infra/chat-gateway python3 -m chat_gateway self-check --adapter <slack|discord> --driver claude-code 通過（環境要有 MFG_TEAM_DAILY_BUDGET_USD 與 MFG_TEAM_DENYLIST；輸出印出 denylist 筆數與每日上限）
+[ ] 排程貼文（chat_gateway post）由 systemd timer 觸發（不要用 cron：cron 讀不到 root 0600 的 EnvironmentFile；teamctl roster --crontab 只印排程時間範本），與 gateway 同一個服務帳號、同一個環境檔（infra/chat-gateway/DEPLOY.md 第 3 節）；金鑰不寫在單元檔或指令列
 [ ] 在測試工作區做一次：被 @ 回覆、非提問者被拒、含 T2 字樣被擋、含 T3 字樣被擋
 
 I 下架
-[ ] 停止服務、在平台撤銷 bot 與 token、更換 API 金鑰（金鑰保管人，接到任何主管要求後 30 分鐘內；董事長不需金鑰）；稽核紀錄與檢查點依保存期限保存
-    （PR #38 的停機手冊合併後，第一步改為 python3 -m chat_gateway freeze：在 MFG_TEAM_STATE_DIR 寫入旗標檔 frozen，分身改回「暫停服務中」）
+[ ] 先凍結：python3 -m chat_gateway freeze（1 分鐘內，在 MFG_TEAM_STATE_DIR 寫入旗標檔 frozen，分身只回「分身暫停服務中」；指令原文依部署單元，見 infra/chat-gateway/RUNBOOK.md 第 0 節）
+[ ] 停止服務、在平台撤銷 bot 與 token、更換 API 金鑰（金鑰保管人，接到任何主管要求後 30 分鐘內；董事長不需金鑰）；稽核紀錄與檢查點依保存期限保存（RUNBOOK 第 1–4 節）
 ```
 
 

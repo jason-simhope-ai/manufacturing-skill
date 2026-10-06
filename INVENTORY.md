@@ -290,17 +290,23 @@ CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、�
 | [build.py](team/tools/build.py) | 編譯 `team/.build/`（`roster.json`、分身 prompt、`ref/`；輸出可重現） |
 | [deid.py](team/tools/deid.py) | 來源端去識別（CSV：NFKC／空白折疊後客戶名 → `CUST-xx`、整詞比對、刪欄；殘留掃描含 email、電話、姓名＋職稱、聯絡人欄，命中即 exit 1，除非 `--allow-residual`） |
 | [teamlib/](team/tools/teamlib/) · [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`）：`schema.py`（常數、`CODES`、欄位規格、樣式橋接）· `io.py`（YAML／JSON／日期）· `compile.py`（組裝與 build）· `validate.py`（驗證器）；`_teamlib.py` 是相容 shim |
-| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本 |
+| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本（Python regex，與 gateway 同語法） |
+| [denylist.starter.txt](team/tools/denylist.starter.txt) | 建議起始 denylist：通用中英同義詞、保密約定、金額寫法；`T3:` 開頭的行命中視為 T3 |
 
 **Chat gateway（[infra/chat-gateway/](infra/chat-gateway/)；Python 3.11，核心只用 stdlib）**
 
 | 路徑 | 用途 |
 | ---- | ---- |
 | [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) · `requirements-optional.txt` | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證；`--plain` 前線版）· 選用相依（Slack／Discord SDK） |
-| `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify` |
+| [DEPLOY.md](infra/chat-gateway/DEPLOY.md) · [RUNBOOK.md](infra/chat-gateway/RUNBOOK.md) | Pilot 部署檢核表（主機、帳號、systemd、出口、祕密、廠商檢查表、首日驗收）· 停機與外洩處置（凍結、撤銷、輪替、封存） |
+| `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify`、`freeze`／`unfreeze`（`state-reset` 在 `team/tools/teamctl.py`） |
 | `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
 | `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
 | `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` · `spend.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 · claude-code driver 的每日預算上限（持久化） |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint＋主機外錨點（`--heads-out`／`--anchor`）· secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 |
+| `chat_gateway/datascan.py` | `MFG_TEAM_DATA_T1` 資料夾內容掃描（DLP＋denylist，只重讀變動檔，5,000 檔上限） |
+| `chat_gateway/spend.py` | 每分身每日費用累計（`$MFG_TEAM_STATE_DIR/daily-spend.json`，0600、UTC 日期、檔案鎖，重啟不歸零） |
+| `audit-weekly.sh` | 每週稽核 systemd timer 用的腳本（`audit-verify --anchor` → `--heads-out` → 推到主機外） |
 | `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
 | `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py`、`twin_result.schema.json` |
 | `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
@@ -312,6 +318,7 @@ CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、�
 | ---- | ---- | ----------------- |
 | [tests/team/](tests/team/) | `fixtures.yaml` 135 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 58 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code、agent 檔的 `$ROOT` 路徑） | `python3 tests/team/run.py`（Step 19）· `python3 tests/team/test_team.py` |
 | [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 44 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 60 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、每日費用上限與 `daily-spend.json`、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 50 個 unittest（Slack／Discord 事件對應、T1 上限、Slack scope 檢查與 README 一致性，假 transport）；`test_claude_code_driver.py` 90 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`、資料夾掃描、家目錄隱藏目錄）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`test_pilot.py` 40 個 unittest（starter denylist 與 7 句實測、kill switch（含凍結先於預算檢查、凍結中丟棄的回覆仍計費）、稽核錨點、symlink state dir、錯誤訊息）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
 
@@ -326,6 +333,7 @@ CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、�
 | [data-classification.md](docs/data-classification.md) | 導入負責人 / IT：T0–T3 資料分級與 AI 工具使用規則 |
 | [permissions-template.md](docs/permissions-template.md) | IT：Claude Code `permissions` 最小權限範本（allow / ask / deny） |
 | [consulting/](docs/consulting/README.md) | 顧問交付包（6 份範本）：90 分鐘探索工作坊、IT 資料流問卷、SOW、pilot 一頁紙、交付物清單 |
+| [audit-operations.md](docs/audit-operations.md) | IT／稽核：分身 gateway 稽核週作業、簽收單、金鑰輪替與遺失、ISO 27001 對應 |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
@@ -413,6 +421,9 @@ Team tier               : TEAM.md + team/ 23 files (README, for-frontline, gate,
 Infra                   : 2 MCP servers (scheduler-mcp 5 files; erp-connector 4 incl.
                               mock_connector + mock data) + 1 on-prem guide
                               + chat-gateway (32 files)
+Team tier               : TEAM.md + team/ 24 files (README, for-frontline, gate, policies × 2,
+                              roster.example, 3 example twins + _template, tools 12, local 2)
+Infra                   : 2 MCP servers + 1 on-prem guide + chat-gateway (36 files)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + 4 mockup HTML + CAPTURE-GUIDE.md
@@ -431,6 +442,14 @@ Examples                : 5 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template
 Tracked files           : 343
+Docs                    : 7 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page / audit-operations)
+                              + 6 design specs
+Scripts                 : 1 (regen_explainers.py)
+Tests                   : 55 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
+                              cases + 58 unittest, gateway 342 unittest + demo golden
+Examples                : 4 files
+Tracked files           : 266
 ```
 
 ---

@@ -6,6 +6,8 @@
 # The denylist (real names, customer names, project codes, one regex per line)
 # lives in team/local/names.denylist, which is gitignored. Public CI cannot see
 # that list, so this hook is the real defence against real names (spec 11.4).
+# Lines are Python regexes, the same syntax the gateway and deid.py read (so
+# `\d`, `(?i)` and look-behinds work); a leading `T3:` tier marker is ignored here.
 set -u
 root="$(git rev-parse --show-toplevel)"
 list="${root}/team/local/names.denylist"
@@ -13,17 +15,28 @@ if [ ! -f "${list}" ]; then
   echo "pre-commit-names: ${list} not found; skipping name scan" >&2
   exit 0
 fi
-pats="$(mktemp)"
-trap 'rm -f "${pats}"' EXIT
-grep -v -E '^[[:space:]]*(#|$)' "${list}" > "${pats}" || true
-if [ ! -s "${pats}" ]; then
-  exit 0
-fi
-hits="$(git diff --cached -U0 --no-color | grep -E '^\+[^+]' | grep -n -E -f "${pats}" || true)"
-if [ -n "${hits}" ]; then
-  echo "pre-commit-names: staged changes match team/local/names.denylist:" >&2
-  echo "${hits}" | cut -c1-80 >&2
-  echo "Remove the names (use CUST-EX-001 / PN-EX-0001 style placeholders)." >&2
-  exit 1
-fi
-exit 0
+git diff --cached -U0 --no-color | python3 -c '
+import re, sys, unicodedata
+pats = []
+for n, line in enumerate(open(sys.argv[1], encoding="utf-8").read().splitlines(), 1):
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+    if s.startswith("T3:"):
+        s = s[3:].strip()
+    try:
+        pats.append(re.compile(unicodedata.normalize("NFKC", s)))
+    except re.error:
+        sys.exit(f"pre-commit-names: names.denylist line {n} is not a valid regex; fix it first")
+hits = 0
+for n, line in enumerate(sys.stdin.read().splitlines(), 1):
+    if not line.startswith("+") or line.startswith("+++"):
+        continue
+    if any(p.search(unicodedata.normalize("NFKC", line[1:])) for p in pats):
+        hits += 1
+        print(f"  diff line {n}: {line[:80]}", file=sys.stderr)
+if hits:
+    print("pre-commit-names: staged changes match team/local/names.denylist (above).", file=sys.stderr)
+    print("Remove the names (use CUST-EX-001 / PN-EX-0001 style placeholders).", file=sys.stderr)
+    sys.exit(1)
+' "${list}"

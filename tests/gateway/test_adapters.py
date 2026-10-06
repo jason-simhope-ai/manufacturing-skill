@@ -56,14 +56,18 @@ TWO_SLACK = {"schema": 1, "channels": {"qa-floor": {"platform": "slack", "ref": 
 
 
 class FakeTransport:
-    def __init__(self, bot_id: str, inbound=(), allowed_guilds=None, fail_sends=()):
+    def __init__(self, bot_id: str, inbound=(), allowed_guilds=None, fail_sends=(), scopes=smod.BOT_SCOPES):
         self.bot_id, self.inbound, self.sent, self.closed = bot_id, list(inbound), [], False
+        self.scopes = None if scopes is None else list(scopes)       # Slack `x-oauth-scopes` of auth.test
         self.fail_sends, self.sends = set(fail_sends), 0
         if allowed_guilds is not None:
             self.allowed_guilds = set(allowed_guilds)
 
     def identity(self) -> str:
         return self.bot_id
+
+    def granted_scopes(self):
+        return self.scopes
 
     def listen(self, sink) -> None:
         for raw in self.inbound:
@@ -116,6 +120,80 @@ def d_click(custom_id=f"mfg:approve:{APV}:{NONCE}", **over) -> dict:
          "member": {"user": {"id": D_USER, "bot": False}}, "data": {"custom_id": custom_id, "component_type": 2}}
     d.update(over)
     return {"t": "INTERACTION_CREATE", "d": d}
+
+
+# ── S06: granted scopes checked at startup, constants match the README ──
+def readme_row(label: str) -> list[str]:
+    """Cells of the `| <label> | slack | discord |` row of the adapters table in the gateway README."""
+    text = (GW_DIR / "README.md").read_text(encoding="utf-8")
+    line = next(ln for ln in text.splitlines() if ln.startswith(f"| {label} |"))
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+class TestSlackScopes(unittest.TestCase):
+    def test_constants_match_the_readme_rows(self):
+        import re  # noqa: PLC0415
+        ticks = re.compile(r"`([^`]+)`")
+        grant = set(ticks.findall(readme_row("Grant exactly")[1]))
+        self.assertEqual(grant, set(smod.BOT_SCOPES) | set(smod.APP_TOKEN_SCOPES) | set(smod.EVENT_SUBSCRIPTIONS))
+        never = set(ticks.findall(readme_row("Never grant")[1]))
+        self.assertEqual(never, set(smod.FORBIDDEN_SCOPES))
+        for s in ("users:read", "reactions:write"):
+            self.assertIn(s, smod.FORBIDDEN_SCOPES)
+
+    def adapter(self, scopes):
+        return smod.SlackAdapter(bindings=SLACK_BINDINGS, transport=FakeTransport(SLACK_BOT, scopes=scopes),
+                                 env=SLACK_ENV)
+
+    def test_exact_scopes_start(self):
+        self.assertEqual(self.adapter(["chat:write", "app_mentions:read"]).name, "slack")
+
+    def test_extra_or_missing_scopes_or_no_header_refuse_exit_78(self):
+        for scopes, needle in ((["app_mentions:read", "chat:write", "users:read"], "users:read (never grant)"),
+                               (["app_mentions:read", "chat:write", "reactions:write", "channels:history"],
+                                "channels:history (never grant), reactions:write (never grant)"),
+                               (["app_mentions:read", "chat:write", "pins:read"], "pins:read"),
+                               (["app_mentions:read"], "lacks required scopes: chat:write"),
+                               (None, "no x-oauth-scopes header")):
+            with self.subTest(scopes=scopes):
+                with self.assertRaises(ConfigRefused) as cm:
+                    self.adapter(scopes)
+                self.assertEqual(cm.exception.exit, 78)
+                self.assertIn(needle, str(cm.exception))
+
+    def test_transport_without_scope_probe_is_refused(self):
+        class Bare(FakeTransport):
+            granted_scopes = None
+        with self.assertRaises(ConfigRefused):
+            smod.SlackAdapter(bindings=SLACK_BINDINGS, transport=Bare(SLACK_BOT), env=SLACK_ENV)
+
+    def test_header_parsing(self):
+        self.assertEqual(smod.scopes_from_headers({"X-OAuth-Scopes": "chat:write, app_mentions:read"}),
+                         ["chat:write", "app_mentions:read"])
+        self.assertEqual(smod.scopes_from_headers({"x-oauth-scopes": ["chat:write", "app_mentions:read"]}),
+                         ["chat:write", "app_mentions:read"])
+        self.assertIsNone(smod.scopes_from_headers({"content-type": "application/json"}))
+        self.assertIsNone(smod.scopes_from_headers(None))
+        self.assertEqual(smod.scopes_from_headers({"x-oauth-scopes": ""}), [])
+
+    def test_real_transport_reads_scopes_from_the_auth_test_headers(self):
+        class Resp(dict):
+            headers = {"X-OAuth-Scopes": "app_mentions:read,chat:write,users:read"}
+
+        class Web:
+            calls = 0
+
+            def auth_test(self):
+                Web.calls += 1
+                return Resp(user_id="UBOT")
+
+        t = object.__new__(smod._SlackSdkTransport)                 # no SDK needed for this path
+        t.web, t._auth = Web(), None
+        self.assertEqual(t.identity(), "UBOT")
+        self.assertEqual(t.granted_scopes(), ["app_mentions:read", "chat:write", "users:read"])
+        self.assertEqual(Web.calls, 1)                                # one auth.test serves both
+        with self.assertRaises(ConfigRefused):
+            smod.check_granted_scopes(t.granted_scopes())
 
 
 # ── import hygiene ───────────────────────────────────────────────────
