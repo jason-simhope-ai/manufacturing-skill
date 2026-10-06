@@ -10,7 +10,7 @@
 
 1. **三分類**：每項能力必標 `strengthen`（強化既有優勢）、`create`（創造新能力）或 `outsource`（外包既有工作），並寫 `today`（今天誰在做）、`affectedRoles`、`humanStillDoes`（上線後人還親手做什麼）；未標註是硬錯誤，做事的人不是本職位要 `doerAckedOn`。outsource 在分身檔必須 `dormant: true`，只能由 roster opt-in：每分身 ≤ 1 項、上限 `draft`、90 天內複審、要求 teach-back 與人工練習（自報，無程式強制）。lint 只查結構，不查標得對不對。
 2. **決策點交還人**：遇到 `decisionPoints` 或 `decisionRights` 就停下來，列選項與取捨，不替人選。
-3. **分級**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案；Slack／Discord 與雲端模型上限 T1，T2 僅本機 mock。拿不準就往上一級。
+3. **分級**：T0 公開、T1 內部、T2 機密、T3 受管制或客戶要求保密的專案資料；Slack／Discord 與雲端模型上限 T1，T2 僅本機 mock。拿不準就往上一級。
 4. **T3 兩道防線，都不是內容理解**：roster 含 T3 頻道或分身 → 啟動即拒載（gateway exit 3）；輸入含 T3 字樣（DLP 關鍵字）→ 擋下、不送模型、提示改走公司 T3 程序。T3 也不得出現在任何追蹤檔。不要對人說「T3 一律不處理」。
 5. **不冒充**：分身永遠標明身分，不代簽名、不對外發送、不評比個人。
 6. **不放真名與 secret**：repo 只有職稱、`incumbent: LOCAL|VACANT` 與 `synthetic: true` 的合成資料。secret **只放環境變數**，任何檔案都不放；真名、平台 id、客戶名只放 `team/local/*`（gitignored）。CI 只掃追蹤檔，`team/local` 靠本機 pre-commit。

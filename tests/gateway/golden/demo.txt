@@ -85,7 +85,7 @@ gateway up: audit #1 config_loaded
   → #qa-floor thread:m-0501
     【品保部主管分身】內容含 T2 標記，不能在 T1 頻道處理；請改到正確分級的頻道（內容未送進模型）（#28）
     audit: #25 msg_in → #26 route_decision → #27 dlp_blocked(dlp:T2) → #28 msg_out
-[08:21] #qa-floor mock-qa-lead: @品保 高安規專案（受限）那批的公差也一起看
+[08:21] #qa-floor mock-qa-lead: @品保 客戶保密案（受限）那批的公差也一起看
   → #qa-floor thread:m-0502
     【品保部主管分身】此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理（#32）
     audit: #29 msg_in → #30 route_decision → #31 dlp_blocked(dlp:T3) → #32 msg_out

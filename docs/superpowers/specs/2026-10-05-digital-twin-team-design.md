@@ -16,7 +16,7 @@
 | v2      | 2026-10-05 | 依 round-2 裁決重寫：(A1) 全面去識別 — 範例公司改為通用設計假設，pilot 只用通用部門；(A2) capability 加 `today`/`humanStillDoes`，旗艦能力拆成 strengthen + 休眠 outsource；(A3) team/ 預設安裝；(A4) claude-code driver 固定受限旗標集；(A5) wave-1 品保分身降為 T1 + 來源端去識別；(A6) `/team ask` 只是預覽；(A7) 每輪必須 @mention、前綴身分；(A8) 刪 JSON Schema，改手寫驗證 + 錯誤碼；(A9) 分身互相交棒延後。B1–B17 定值（分級 T0–T3、autonomy 名稱制、bytes 預算、TTL 30 分、限流、無長期記憶、`MFG_TEAM_` 前綴、gate 欄位、outsource 每分身 ≤ 1、T3 拒載 exit 3）。新增 §14 Deferred、§15 Known gaps；§18 改為 7 個可平行實作的 WP。 |
 | v2.1    | 2026-10-05 | 實作修訂：§9.1 `ApprovalClick` 加 `channel_ref`（核准綁定發卡頻道，EXT-03）；`team/tools/_teamlib.py` 拆成 `team/tools/teamlib/`（schema／validate／compile／io），`_teamlib.py` 保留為相容 shim，WP2 介面不變。 |
 | v2.2    | 2026-10-05 | 前線情境模擬（R7）修訂：§5.3 capability 加 `affectedRoles`、`doerAckedOn`，`E038` 改用 `REVIEW_ONLY_WORDS` 並涵蓋 `create`、逐職位行判斷，新增 `E061`–`E063`、`W009`；§5.1 position twin 加 `vacancyApprovedBy`／`vacancyApprovedOn`（`E064`），channel 加 `learners`、`predictFirstDefault`、`twinFreeDays`；§5.4 roster.json 的 `policy.timezone` 與上述 channel 欄位；§5.5 專業參考只供對照、不出判定；§9.4 回覆標頭改中文、固定「這是參考，不是指示」行、「結論」改「分身的看法」；gateway 新增 `human_override`／`practice_checkin`／`twin_free_day` 匿名計數與學習模式。 |
-| v2.4    | 2026-10-05 | 董事長情境模擬（R8）修訂：§13.2 pilot 定為 **4 週** = Wave 0 模擬預演 1 週 + Wave 1 測試工作區 3 週（原 2 + 6 週），第 4 週五依「第 4 週決策表」（越界次數、主管是否仍每週 review、人改 🧭 結論的次數、同仁匿名問卷；門檻由董事長填）決定繼續／延長／停止，G1 的每週小時數與 baseline 只當參考、不是成效指標；§13.3 董事長室簽三件事（原則、pilot 核准、預算核准）；§9.6、§18 WP3：`MFG_TEAM_DAILY_BUDGET_USD` 在 `--driver claude-code` 時必填（未設或非正有限數 → exit 64），當日累計以 0600 JSON（UTC 日期 → 分身 → USD，檔案鎖）存於 `$MFG_TEAM_STATE_DIR/daily-spend.json`，重啟不歸零，未回報費用或失敗的呼叫以每次上限計；§12 Q6 伺服器名改為 `manufacturing-scheduler`。 |
+| v2.4    | 2026-10-05 | 董事長情境模擬（R8）修訂：§13.2 pilot 定為 **4 週** = Wave 0 模擬預演 1 週 + Wave 1 測試工作區 3 週（原 2 + 6 週），第 4 週五依「第 4 週決策表」（越界次數、主管是否仍每週 review、人改 🧭 結論的次數、同仁匿名問卷；門檻由董事長填）決定繼續／延長／停止，G1 的每週小時數與 baseline 只當參考、不是成效指標；§13.3 董事長簽三件事（原則、pilot 核准、預算核准）；§9.6、§18 WP3：`MFG_TEAM_DAILY_BUDGET_USD` 在 `--driver claude-code` 時必填（未設或非正有限數 → exit 64），當日累計以 0600 JSON（UTC 日期 → 分身 → USD，檔案鎖）存於 `$MFG_TEAM_STATE_DIR/daily-spend.json`，重啟不歸零，未回報費用或失敗的呼叫以每次上限計；§12 Q6 伺服器名改為 `manufacturing-scheduler`。 |
 
 ## 0. TL;DR
 
@@ -27,8 +27,8 @@
 - 先過「需要分身嗎？」閘門（`needsTwinGate`）；流程修正能解決就不開分身。
 - Alpha 只做到 `observe / suggest / draft`：**沒有任何寫入工具**，分身工具恆為 `Read, Grep, Glob`。
 - Chat-ops：`infra/chat-gateway/`（Python 3.11，核心只用 stdlib）、mock / Slack / Discord adapter、`HarnessDriver`（mock + claude-code）。每輪必須 @mention，回覆前綴 `【<職稱>分身】`，不讀頻道歷史、不接 DM、忽略所有 bot 作者。
-- 安全：T0–T3；SaaS 聊天與雲端模型上限 T1；T3（高安規客製專案）在 alpha **設定層拒載（exit 3），字樣層以 DLP 關鍵字擋下並提示（不是內容理解）**；repo 無真名、無平台 id、無 secret（CI 強制）。
-- Pilot：wave 1 = 生產部主管分身 + 品保部主管分身（T1）；技術部主管分身視 gate 而定；董事長室不開分身。
+- 安全：T0–T3；SaaS 聊天與雲端模型上限 T1；T3（受管制或客戶要求保密的專案資料）在 alpha **設定層拒載（exit 3），字樣層以 DLP 關鍵字擋下並提示（不是內容理解）**；repo 無真名、無平台 id、無 secret（CI 強制）。
+- Pilot：wave 1 = 生產部主管分身 + 品保部主管分身（T1）；技術部主管分身視 gate 而定；最高負責人本人的職位不開分身。
 
 ### 決策一覽（細節見 §12）
 
@@ -46,9 +46,9 @@
 
 ## 1. 問題、願景與範例假設
 
-v0.1.x 讓「一個人打 `/quote`」有用；工廠卻是團隊在運作（早會、NCR 會簽、ECN 跨部門）。願景：每個職位有一個常駐聊天工作區的分身，可被 @、在 thread 回覆、會貼排程簡報；**人或 agent 讀了 repo 就能把 roster 站起來**。三條不可妥協的約束：(1) AI 不取代核心技能；(2) 流程修正優先於加 AI；(3) 高安規專案的分級、隔離、稽核與 repo 零機密。
+v0.1.x 讓「一個人打 `/quote`」有用；工廠卻是團隊在運作（早會、NCR 會簽、ECN 跨部門）。願景：每個職位有一個常駐聊天工作區的分身，可被 @、在 thread 回覆、會貼排程簡報；**人或 agent 讀了 repo 就能把 roster 站起來**。三條不可妥協的約束：(1) AI 不取代核心技能；(2) 流程修正優先於加 AI；(3) 受管制或客戶要求保密的專案資料的分級、隔離、稽核與 repo 零機密。
 
-**範例假設（全文只用這組，不描述任何真實公司）**：範例公司 = 台灣機械設備製造商。部門只用通用名稱：技術部 / 品保部 / 生產部 / 加工部 / 業務部 / 管理部 / 董事長室。T3 設計假設 = 「高安規客製專案」（例：國防、航太、醫療器材客戶）。所有範例資料加 `synthetic: true`，客戶寫成 `CUST-EX-001`，料號寫成 `PN-EX-0001`。
+**範例假設（全文只用這組，不描述任何真實公司）**：範例公司（虛構）= 台灣中小型製造業工廠。部門只用通用名稱：技術部 / 品保部 / 生產部 / 加工部 / 業務部 / 管理部（範例，實際使用時請改成自己的部門）。T3 設計假設 = 「受管制或客戶要求保密的專案資料」（例：航太、醫療器材、簽了保密協議的客戶專案、有出口管制的品項）。所有範例資料加 `synthetic: true`，客戶寫成 `CUST-EX-001`，料號寫成 `PN-EX-0001`。
 
 ## 2. 設計原則
 
@@ -130,7 +130,7 @@ YAML 一律用 `yaml.SafeLoader` 載入，`date`/`datetime` 轉成 ISO 字串；
 | ---- | ---- | ---- | ---- |
 | `schema` | int | ✔ | 固定 `1` |
 | `synthetic` | bool | example ✔ | example 檔必須為 `true` |
-| `org.id` / `org.displayName` / `org.timezone` | id / str / str | ✔ | 例：`example-machinery-co`、`範例機械設備製造商`、`Asia/Taipei` |
+| `org.id` / `org.displayName` / `org.timezone` | id / str / str | ✔ | 例：`example-machinery-co`、`範例製造公司（虛構）`、`Asia/Taipei` |
 | `profiles` | id[] | ✔ | 必須 ⊆ `plugin.json` `profiles.available`；決定可解析的 id 集合 |
 | `policy.saasTierCeiling` | tier | ✔ | 預設 `T1`（Slack/Discord 上可出現的最高分級） |
 | `policy.cloudTierCeiling` | tier | ✔ | 預設 `T1`（雲端模型可處理的最高分級） |
@@ -488,7 +488,7 @@ frontmatter：`name: team`、`description`、`allowed-tools: [Read, Grep, Glob, 
 | T0 public | 型錄、公開規範 | 任一 | 雲端或地端 | ✔ |
 | T1 internal | SOP、排程摘要、已去識別的 NCR | Slack / Discord / mock | 雲端或地端 | ✔ |
 | T2 confidential | 圖紙、BOM、報價、客戶名、個資 | 僅 mock（本機） | 預設地端；放寬到雲端是政策文字，需零留存合約 + 書面核准 + manifest 明列三項 | 只在 mock 可設定；Slack-T2 延後 |
-| T3 restricted | 高安規客製專案的任何資料，包含專案「是否存在」 | 不適用 | 不適用 | **拒載，exit 3** |
+| T3 restricted | 受管制或客戶要求保密的專案資料，包含專案「是否存在」 | 不適用 | 不適用 | **拒載，exit 3** |
 
 超過 T3 的等級不在任何 AI 系統的範圍內，本 repo 也拒絕建模。拿不準就往上一級；頻道 tier 即內容 tier，只能往上升，不能往下降。DLP tripwire（只是告警，不是防線）：「機密 / CONFIDENTIAL」（T2）、「RESTRICTED / 受限 / 國防 / 航太 / 軍工 / 軍規 / 醫材 / 醫療器材 / ITAR / EAR / CUI / 外銷許可 / 管制」（T3；`管制` 排除管制圖、文件管制等品管用語）、統一編號（含檢查碼）、身分證字號 `[A-Z][12]\d{8}`、`NT\$\s?[\d,]{4,}`、`US$`／`USD` 金額與「萬元／千元」（T2），以及本機 denylist 中的圖號與專案代號樣式。命中等級高於頻道 → `dlp_blocked`，提示改到正確頻道，內容不送進模型；命中 T3 樣式 → 回「此內容可能屬 T3，不在本系統處理範圍，請依貴公司 T3 程序處理」。
 
@@ -533,7 +533,7 @@ G0 alpha = mock 模式 + 本 spec 全部測試綠 + 只有 T0/T1。G1 pilot = �
 
 **Q7 — 手寫驗證器 + 錯誤碼，三處強制。** *否決*：JSON Schema（CI 沒有 `jsonschema` 套件，而且每個 `*.json` 都會被 Step 1 解析，故意寫錯的 fixture 會讓 Step 1 失敗）；比例上限（只有 3–4 項能力時，灌一項 strengthen 就能繞過）；完全禁止 outsource（不誠實，只會逼人把外包標成強化）。
 
-**Q8 — 見 §13。** *否決*：先做業務報價分身——現有的 quote-specialist 偏向零件報價，對設備接單設計不一定適用，gate 很可能判 `process-fix`；董事長分身——權威效應會讓大家把它的話當成命令。
+**Q8 — 見 §13。** *否決*：先做業務報價分身——現有的 quote-specialist 偏向零件報價，對零件報價以外的接單情境（例如依訂單設計的整機）不一定適用，gate 很可能判 `process-fix`；董事長分身——權威效應會讓大家把它的話當成命令。
 
 **Q9 — 見 §10。** 人與 agent 各走一條路徑、各有預算；預算以 bytes 為準，不依賴任何 tokenizer。
 
@@ -550,19 +550,19 @@ Pilot 合計 **4 週**（v2.4；董事長核准的就是這 4 週，到期即停
 - **Wave 0：模擬預演（第 1 週）**：只用 mock adapter + 合成資料重播；`/team ask` 預覽。目的：讓主管看到口吻、🧭 決策點與頁尾。同週 IT 部署測試工作區並演練停機一次；週五決定是否進測試工作區。
 - **Wave 1：測試工作區（第 2–4 週）**：**生產部主管分身**（`briefing-risk-check` strengthen：主管先貼 3 個今日重點，分身用排程資料挑戰並補漏；`briefing-data-pack` 為休眠的 outsource，若喚醒，生管列為 `today` 的共同擁有者）＋ **品保部主管分身**（§5.2）。tier T1，上限 draft。NCR 匯出先在來源端用 `team/tools/deid.py` 去識別。第 4 週五依「第 4 週決策表」決定繼續／延長／停止：越界次數（預期 0）、兩位主管是否仍每週 review、人改 🧭 結論的次數（0 代表照單全收）、同仁 3 題匿名問卷（是否覺得被取代）；門檻由董事長在 pilot 核准時填（`docs/adoption-guide.md`、`docs/owner-one-page.zh-TW.md`）。**不用**「省下多少時間」當指標，因為那其實是外包指標；閘門 G1 的每週小時數與 baseline 只當參考。
 - **Wave 1b**：技術部主管分身（ECN 影響面交叉檢查，create）——不在 4 週 pilot 內，要另簽；只有 G2 與 G5 通過（ECN 表單與 BOM where-used 已數位化）才開；沒通過就先做流程修正，這本身也是成果。
-- **之後**：加工部、業務部多半會判 `use-command` 或 `process-fix`；T3 等 G3；董事長室不開分身，改收月彙總。
+- **之後**：其他部門（例：加工、業務）若閘門判 `use-command` 或 `process-fix`，就照結果走；T3 等 G3；最高負責人本人的職位不開分身，改收月彙總。
 
 ### 13.3 導入負責人對各部門的下一步（通用職稱）
 
 | 對象 | 下一步 | 產出 |
 | ---- | ------ | ---- |
-| 董事長室 | 20 分鐘說明「副駕不是替身」與三分類；簽三件事：「AI 賦能原則」（分身指標與技能保留紀錄不作為人力或績效依據，至少到 v1.0；第 9 條違反時）、pilot 核准（2 個分身、4 週 = 1 週模擬預演 + 3 週測試工作區、T1、上限 draft、第 4 週決策表門檻）、預算核准（每分身每日上限）；指定稽核錨點簽收人、pilot 總負責人、機密事件受理人 | 一頁原則、pilot 與預算核准表 |
+| 董事長（最高負責人） | 20 分鐘說明「副駕不是替身」與三分類；簽三件事：「AI 賦能原則」（分身指標與技能保留紀錄不作為人力或績效依據，至少到 v1.0；第 9 條違反時）、pilot 核准（2 個分身、4 週 = 1 週模擬預演 + 3 週測試工作區、T1、上限 draft、第 4 週決策表門檻）、預算核准（每分身每日上限）；指定稽核錨點簽收人、pilot 總負責人、機密事件受理人 | 一頁原則、pilot 與預算核准表 |
 | 生產部主管 | 旁聽 3 次早會、記錄現行簡報形式；跑 gate；訪談生管（填 `today`）；確認決策點（插單、加班、外包加工）；約定每週 15 分鐘 review | gate 紀錄、baseline |
 | 品保部主管 | 挑 10 件歷史 NCR，用 deid 去識別後做 mock 重播；訪談品保工程師；列出 decisionRights；決定哪些能力開放「我先說」 | 合成重播劇本、gate 紀錄 |
 | 技術部主管 | 盤點 ECN 表單與 BOM where-used；跑 gate；沒通過就提出流程修正案 | ECN 流程圖、gate 紀錄 |
 | 加工部主管、業務部主管 | 先試用既有指令（`/inspect`、`/quote`）；收集最常重複被問的 20 個問題；跑 gate | 試用回饋 |
 | 管理部主管（IT／人資） | 決定 wave 1 用哪個平台（沿用公司既有的；沒有就先用 mock）；用服務帳號建 bot 與環境變數；安裝 pre-commit 名單 hook；審閱 FAQ「會不會取代我？」的用語 | 部署檢核表 |
-| 高安規專案窗口（若有此類專案） | 把文件類型對應到 T2/T3；確認 T3 不進 SaaS 與雲端；alpha 不導入，只做規劃 | 分級對照表（本機保存） |
+| 受管制專案窗口（若有此類專案） | 把文件類型對應到 T2/T3；確認 T3 不進 SaaS 與雲端；alpha 不導入，只做規劃 | 分級對照表（本機保存） |
 
 ## 14. Deferred from alpha（全部不在 v0.2.0-alpha）
 
@@ -578,7 +578,7 @@ Pilot 合計 **4 週**（v2.4；董事長核准的就是這 4 週，到期即停
 | `openai-compatible`／`anthropic-messages` driver | 介面已預留 |
 | 加工部主管分身、profile 提供的分身、LINE／Teams／Mattermost adapter、hook 事件橋接到聊天 | 尚無需求驗證 |
 | JSON Schema 檔；SBOM、`pip-audit`、`--require-hashes`、CODEOWNERS；kill switch `/team freeze`（SEC-15） | 上 pilot（G1）前再做 |
-| 設備接單設計（ETO）profile | v0.3 需求 |
+| 依訂單設計的接單（ETO）profile | v0.3 需求 |
 
 ## 15. Known gaps in existing repo（D15/D16；只記錄，除標註外不在本版修正）
 
