@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Twin team for non-technical readers** — `docs/explainers/05-分身團隊-一張圖看懂.html` (one printable card: what a twin is, who does what, the three categories with everyday examples, three safety rules, how to start) and `docs/demo/team-demo.html` + `team-demo.md` (zh-TW click-through of `demo.py --plain` beats 1–3 plus a 「我不同意」 beat, replies pre-recorded, a caption per step saying who judges); screenshots via the new `scripts/regen_screenshots.py`.
+- **README twin section rewritten** (zh-TW / EN) in the original plain style: card screenshot, a 「分身幫你做／你還是自己做」 table, three safety rules and links; technical and policy detail moved into a 「給 IT 與導入者看的細節」 block. T3 wording made generic (「受管制或客戶要求保密的專案資料」) in both READMEs and explainers 01, 02, 04.
 - **`TEAM.md`** — agent bootstrap (≤ 6,000 B): one-line definition, six inviolable rules, startup algorithm, progressive-disclosure map. Humans start at `team/README.zh-TW.md` (10 minutes).
 - **`team/`** — the third tier. `roster.example.yaml` (synthetic, generic departments and job titles), `twins/` (`_template.md` plus three example twins: production, QA and engineering department heads), `policies/` (`core-rules.md` shared preamble, `restricted.md` T3 policy), `gate/need-a-twin.md` (the "do we need a twin?" gate), `local/README.md` (gitignored local overlays).
 - **Three categories** on every capability — `strengthen` / `create` / `outsource` — with mandatory `today` and `humanStillDoes`. `outsource` must be dormant in a twin file and can only be woken by a roster opt-in: at most one per twin, capped at `draft`, review within 90 days, mandatory teach-back and manual practice. Missing labels are hard errors.

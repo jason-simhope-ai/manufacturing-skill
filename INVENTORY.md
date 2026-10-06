@@ -16,6 +16,7 @@
 | 第一次看到、完全不懂          | [docs/quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                              |
 | 想 5 分鐘看懂這玩意           | [docs/explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                                          |
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
+| 想一眼看懂分身團隊            | [docs/explainers/05-分身團隊-一張圖看懂.html](docs/explainers/05-分身團隊-一張圖看懂.html) → 點擊式示範 [docs/demo/team-demo.html](docs/demo/team-demo.html)          |
 | 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
@@ -268,10 +269,12 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | [explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html)                                                   | IT：infra / security / ops 視角                                 |
 | [explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                               | 業助 / 廠長 / 品管：每日指令快查                                |
 | [explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                               | 不想看字：6 步驟視覺操作流                                      |
-| [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 4 張的 PNG 版本（給 LinkedIn / 簡報用）                    |
+| [explainers/05-分身團隊-一張圖看懂.html](docs/explainers/05-分身團隊-一張圖看懂.html)                                         | 老闆 / 主管 / 現場同仁：分身是什麼、誰做什麼、安全三句話、怎麼開始 |
+| [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 5 張的 PNG 版本（給 LinkedIn / 簡報用）                    |
 | [quickstart-screenshots/](docs/quickstart-screenshots/)                                                                       | 6 步驟安裝實機截圖 + mockup（含 CAPTURE-GUIDE.md 紀錄產出方式） |
 | [demo/quote-demo.gif](docs/demo/quote-demo.gif) · [demo/quote-demo-en.gif](docs/demo/quote-demo-en.gif)                       | `/quote` 19 秒實錄 GIF（雙語版）                                |
 | [demo/quote-demo.html](docs/demo/quote-demo.html) · [quote-real.html](docs/demo/quote-real.html)（含 `-en` 版）· [real-claude-response.md](docs/demo/real-claude-response.md) · [screenshots/](docs/demo/screenshots/) | GIF 的 HTML 原稿、真實 Claude 回覆紀錄與截圖 |
+| [demo/team-demo.html](docs/demo/team-demo.html) · [team-demo.md](docs/demo/team-demo.md) · [screenshots/team-demo.png](docs/demo/screenshots/team-demo.png) | 分身團隊點擊式示範（4 段：排程貼文、@ 提問、「我先說」、「我不同意」；回覆預錄自離線 demo，不是即時模型）與文字版 |
 | [demo/slides/](docs/demo/slides/)                                                                                             | 6-capability 介紹簡報（HTML + retina PNG）                      |
 | [superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md) | 設計史：v0.1 spec 完整版                                        |
 | [superpowers/specs/](docs/superpowers/specs/)                                                                                 | 其餘 5 份設計 spec：v0.1.1、v0.1.2、profile 繼承、多 profile、數位分身團隊 |
@@ -294,6 +297,7 @@ SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
 | 檔 | 用途 |
 | -- | ---- |
 | [regen_explainers.py](scripts/regen_explainers.py) | 重生 `docs/explainers/*.html` 的 `AUTO-START`／`AUTO-END` 區塊（計數、版本、分身數）；`--check` 供 CI Step 11 |
+| [regen_screenshots.py](scripts/regen_screenshots.py) | 從 HTML 重拍已提交的 PNG（explainer 01–05、簡報、新手 mockup、分身點擊示範）；Node Playwright + 預裝 Chromium；`--check` 列出比 HTML 舊的 PNG |
 
 ---
 
@@ -339,21 +343,22 @@ Adapters                : claude-code (install.sh + 2 Python helpers + plugin-ma
 Team tier               : TEAM.md + team/ 23 files (README, for-frontline, gate, policies × 2,
                               roster.example, 3 example twins + _template, tools 11, local 2)
 Infra                   : 2 MCP servers + 1 on-prem guide + chat-gateway (31 files)
-Explainers (HTML)       : 4 + 4 PNG snapshots
+Explainers (HTML)       : 5 + 5 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
                               + 1 hero) + 4 mockup HTML + CAPTURE-GUIDE.md
 Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-claude-response.md
+                              + twin-team click-through (HTML + transcript + PNG)
                               + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
 Docs                    : 6 (architecture / adoption-guide / profile-dev / ROADMAP
                               / quickstart-for-beginners / owner-one-page) + 6 design specs
-Scripts                 : 1 (regen_explainers.py)
+Scripts                 : 2 (regen_explainers.py, regen_screenshots.py)
 Tests                   : 54 files — extends 13 cases, multiprofile 8, team 135 + 18 fixture
                               cases + 58 unittest, gateway 266 unittest + demo golden
 Examples                : 4 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template
-Tracked files           : 257
+Tracked files           : 265
 ```
 
 ---
