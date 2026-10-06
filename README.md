@@ -81,6 +81,8 @@ bash adapters/claude-code/install.sh
 /manufacturing init     # 4-question wizard for first-time users
 ```
 
+The installer puts the plugin in `~/.claude/plugins/manufacturing-skill/` and links it into `~/.claude/skills/` so Claude Code loads it; restart Claude Code or run `/reload-plugins` afterwards (check with `claude plugin list`).
+
 Or skip the wizard:
 
 ```bash
