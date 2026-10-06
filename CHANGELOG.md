@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).
+
 ### Fixed
 
 - **Claude Code now actually loads the plugin.** Until now it loaded nothing from the install (checked with claude 2.1.289: `claude plugin list` showed no plugin). `~/.claude/plugins/` is never scanned for hand-copied plugins, the root `plugin.json` is not a manifest (and `repository` as an object fails validation), flat `skills/*.md` are not skills, and markdown `hooks/*.md` are not hooks. `install.sh` now, inside the staging dir and before the atomic swap:
@@ -16,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - links `~/.claude/skills/manufacturing-skill → ../plugins/manufacturing-skill` after the swap. Claude Code loads it as `manufacturing-skill@skills-dir`. If a real directory already exists there, the installer leaves it alone and warns. The output tells you to restart Claude Code or run `/reload-plugins`, and prints the `claude --plugin-dir` and local-marketplace alternatives. To uninstall, remove the plugin dir and the link.
   - `hooks/*.md` remain process documents for agents to read. They are not Claude Code hooks (`Hooks (0)`), and the docs now say so.
   - New CI step `install.sh — Claude Code layout (manifest, SKILL.md dirs, symlink)` checks all of this for core-only, single-profile, multi-profile, re-install and no-python installs. It also checks a duplicate skill name and a real directory at the link path, and runs `claude plugin validate` when the CLI is on PATH. `adapters/claude-code/plugin-mapping.md` has been rewritten to match.
+- **CI profile-extends lint (step 10a) no longer passes vacuously** — it now also lints the `tests/extends/case-*/profile.md` fixtures (error cases must be rejected, others accepted) alongside real `profiles/` files, and fails if zero files were linted.
+- **CI core heading-anchor guard (step 10b) now actually runs on PRs** — checkout uses `fetch-depth: 0`, a failing diff is an error instead of a silent skip, the step reports whether core files were touched, and its logic moved into an argv/env-driven Python block (no filename or heading interpolated into `python3 -c`, no hidden errors, dead check removed).
+- **CI core heading-anchor guard (step 10b) handles non-ASCII core paths** — the changed-file list is now read with `git diff -z` (NUL-separated, unquoted) instead of line-split `--name-only` output; previously a path such as `core/skills/01-報價.md` arrived in git's quoted/escaped form, `git show` could not resolve it, and its removed headings were never checked.
 - **`install.sh --list` and the interactive picker no longer abort** under `set -euo pipefail` when a `profile.json` has no `"status"` key (e.g. `cnc-machining`); a missing status still means `complete`. CI now smoke-tests `--list`, `--core-only` and single-profile installs.
 - **`install.sh` no longer leaves a half-built install behind.** Every check (profile names, profile dirs, python3 / PyYAML when needed, conflict scan) now runs before the existing install is touched. Previously `install.sh ..`, a missing python3, missing PyYAML or a bad `extends:` target failed *after* the old install had been moved to `.bak`, leaving `plugins/manufacturing-skill/` without `.installed`.
 - **Profile names are validated** (`[A-Za-z0-9_-]`, no leading `-`): `..`, `../x`, `a/b`, names with spaces and `*` are rejected up front; `*` is no longer glob-expanded against the current directory.
