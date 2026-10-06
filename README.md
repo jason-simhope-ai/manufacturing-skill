@@ -7,7 +7,7 @@
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](https://claude.com/claude-code)
 [![繁體中文](https://img.shields.io/badge/lang-%E7%B9%81%E4%B8%AD-red)](README.zh-TW.md)
 
-A Claude Code plugin that gives any manufacturing company a 30-minute path to a working AI assistant — tailored to their vertical. The plugin's prompts and files live on your machine, but the default model is Anthropic's cloud (Claude Code): anything you paste or attach is sent to the model provider under its terms. An on-prem model is an option, not verified end-to-end by this project (see [Data flow](#data-flow)).
+A Claude Code plugin that gives any manufacturing company a 30-to-60-minute path to a working AI assistant — tailored to their vertical. The plugin's prompts and files live on your machine, but the default model is Anthropic's cloud (Claude Code): anything you paste or attach is sent to the model provider under its terms. An on-prem model is an option, not verified end-to-end by this project (see [Data flow](#data-flow)).
 
 > 中文讀者請看 [README.zh-TW.md](README.zh-TW.md)
 
@@ -57,11 +57,13 @@ In short: **every position gets an AI copilot — a "twin" — that lives in the
 | Challenges you: "this point could overturn your call" | Change data in company systems (the twin cannot) |
 | Writes drafts for you to edit (always marked DRAFT) | Sign, and own the conclusion            |
 
+Every task is labelled first: 💪 strengthen an existing strength / ✨ create a new capability / 📦 outsource existing work (off by default).
+
 **🛡️ Three safety rules**
 
 - **Never in the chat**: drawings, quotes, customer data, confidential customer projects. When unsure, don't post it.
 - **The owner signs a one-page principle first**: a copilot, not a replacement; logs are never used for performance reviews. No signature, no twin.
-- **Anyone can say 「我不同意」 ("I disagree")**: the twin only acknowledges, gives no new answer, and does not record who said it.
+- **Anyone can say 「我不同意」 ("I disagree")**: the twin only acknowledges, gives no new answer, and does not record who said it (the chat platform itself still shows who posted).
 
 **👀 See more**
 
