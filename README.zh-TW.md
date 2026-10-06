@@ -26,6 +26,8 @@
 
 ![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo.png)
 
+> *情境示意：此為把 quote-specialist 提示詞手動貼到 claude.ai 網頁版得到的回應（見[原始紀錄](docs/demo/real-claude-response.md)），不是安裝後的 plugin 在 Claude Code 內執行的錄影；下方動畫為同一份回應的重播。*
+
 **真實場景**：客戶 RFQ 寫「SUS304 不鏽鋼支架要 RAL9005 黑陽極」 — 工程上根本做不到（陽極處理是給鋁/鈦的）。
 plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代方案、parking 在客戶書面確認上才鎖價。
 
@@ -199,6 +201,10 @@ A: 不一定。Claude Code **桌面 app** 內建 terminal、有圖形介面，�
 
 **Q: VS Code 裡也能用嗎？**
 A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡照樣呼叫所有 `/` 指令。
+
+**Q: 可以直接在 LINE 上用嗎？**
+A: **目前不行。** 這個 repo 沒有 LINE 整合，也沒有 LINE 閘道。現況的做法是：在 Claude Code 裡產出報價草稿、回覆訊息草稿，**由人檢視後自己複製貼到 LINE**（含對客戶的訊息，請勿讓 AI 自動發送）。
+[ROADMAP](docs/ROADMAP.md) 目前規劃的是 Telegram 通知；LINE 閘道尚未排入，需要先有多人共用與對外訊息核准的設計才會做。另外，貼進 LINE 群組的內容就離開了你的控管範圍，機密圖紙與客戶資料請不要貼。
 
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——

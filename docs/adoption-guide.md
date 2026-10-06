@@ -11,6 +11,8 @@
 - 外部 AI 導入 SI / 顧問
 - 製造業老闆 / 接班人想自己導入
 
+> 上線前請先看 [工廠工作站權限範本](permissions-template.md)（建議的 `permissions.deny` / `allow` 設定，最小權限）。
+
 ---
 
 ## 標準導入順序（建議 6 週）
