@@ -121,7 +121,7 @@ bash adapters/claude-code/install.sh injection-molding
 bash adapters/claude-code/install.sh cnc-machining,injection-molding
 ```
 
-兩個（或更多）profile 一起 install。**install.sh 在 backup 前先做 conflict scan**：兩個 profile 若各自包含同名 `<kind>/<basename>.md`，install 拒絕並列出衝突檔，現有 install 不受影響（atomicity）。
+兩個（或更多）profile 一起 install。**install.sh 在動到現有 install 之前先跑完所有檢查**（profile 名稱、profile 目錄、需要時的 python3 / PyYAML、跨 profile conflict scan）：兩個 profile 若各自包含同名 `<kind>/<basename>.md`，install 拒絕並列出衝突檔。新版本先在同一個 `plugins/` 目錄下的暫存目錄組好，再用 `mv` 換上；舊版移到 `manufacturing-skill.bak.<時間>.<pid>`（只保留最新 3 份），換上途中失敗會自動搬回舊版。任何一步失敗都以非 0 結束，現有 install 不受影響（atomicity）。
 
 設定後 `~/.claude/plugins/manufacturing-skill/` 多兩個檔：
 
