@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> 把工廠的 SOP 變成會幫你看事情的 AI 同事：30 分鐘裝好，跑在自己的電腦上。圖紙、報價、客戶資料與保密專案留在公司（要讓 AI 讀圖紙，請用地端模型，[怎麼做](#cloud-first-on-prem-later)）；聊天室裡的「分身」只碰一般資料。
+> 把工廠的 SOP 變成會幫你看事情的 AI 同事：30 分鐘裝好，在自己的電腦上用。預設用雲端模型，你貼給它的內容會送到雲端；圖紙、報價、客戶資料要留在公司，就不要貼給它，要讓 AI 讀圖紙請用地端模型（[怎麼做](#cloud-first-on-prem-later)）。聊天室裡的「分身」只碰一般資料。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
