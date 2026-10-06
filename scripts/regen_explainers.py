@@ -6,6 +6,7 @@ are wrapped in `<!-- AUTO-START: <id> -->` / `<!-- AUTO-END: <id> -->`
 markers in the HTML. This script regenerates them from authoritative
 sources:
 - `plugin.json` for version + profile lists
+- `team/roster.example.yaml` for the team tier's twin counts (needs PyYAML, as the team tools do)
 - the actual filesystem under `core/` and `profiles/` for counts
 
 Run locally:
@@ -38,6 +39,15 @@ def count_md(d: Path) -> int:
         1 for f in d.iterdir()
         if f.suffix == ".md" and not f.name.startswith("_")
     )
+
+
+def count_team_twins() -> dict:
+    """Twins declared in team/roster.example.yaml: positions carrying a `twin:` block."""
+    import yaml  # noqa: PLC0415 - only needed here; CI installs it before this step
+
+    roster = yaml.safe_load((REPO / "team" / "roster.example.yaml").read_text(encoding="utf-8")) or {}
+    twins = [p["twin"] for p in roster.get("positions") or [] if isinstance(p.get("twin"), dict)]
+    return {"twins": len(twins), "enabled": sum(1 for t in twins if t.get("enabled") is True)}
 
 
 def gather_metrics() -> dict:
@@ -75,6 +85,7 @@ def gather_metrics() -> dict:
 
     return {
         "version": version,
+        "team": count_team_twins(),
         "agents": {
             "core": core_agents, "cnc": cnc_agents, "inj": inj_agents,
             "total": core_agents + cnc_agents + inj_agents,
@@ -130,6 +141,8 @@ def render_explainer01_stats(m: dict) -> str:
         f'{m["profiles"]["complete"]} 完整 + '
         f'{m["profiles"]["alpha"]}α + '
         f'{m["profiles"]["stub"]} stub）</div></div>',
+        f'<div class="stat"><div class="stat-num">{m["team"]["twins"]}</div>'
+        f'<div class="stat-label">Team tier 分身（{m["team"]["enabled"]} 啟用）</div></div>',
     ]
     indent = "      "
     return "\n".join(indent + ln for ln in lines)

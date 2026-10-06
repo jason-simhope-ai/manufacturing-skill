@@ -20,6 +20,8 @@ core/hooks/*.md               ────►     hooks/*.md                   �
 profiles/<active>/hooks/*.md  ────►     hooks/*.md                   ┘
 plugin.json                   ────►     .claude-plugin/plugin.json   ← 產生的 Claude Code manifest（白名單欄位）
 plugin.json                   ────►     plugin.json                  ← 原樣複製（/manufacturing、CI 讀它）
+team/                         ────►     team/                        ← 數位分身團隊（預設安裝；不含 .build/、local/）
+TEAM.md                       ────►     TEAM.md
 profiles/<active>/profile.json ────►    active-profile.json
                                         ~/.claude/skills/manufacturing-skill → ../plugins/manufacturing-skill（symlink）
 ```
@@ -29,6 +31,8 @@ profiles/<active>/profile.json ────►    active-profile.json
 1. **Skills 改成資料夾**：`skills/<x>.md` → `skills/<name>/SKILL.md`。兩個檔對到同一個 `<name>`（不分大小寫）→ 在換上之前失敗，現有 install 不動。
 2. **路徑改寫**：command / agent / skill / hook / know-how 內文引用的 repo 路徑（`core/skills/01-報價.md`、`core/agents/quote-specialist.md`、`profiles/cnc-machining/know-how/iatf-16949.md` …）在 install 裡不存在，改成安裝後的路徑（`skills/01-quote/SKILL.md`、`agents/quote-specialist.md`、`know-how/iatf-16949.md`）。只改**完全相符**、對得到實際來源檔的字串；`profiles/<p>/...` 只在 `<p>` 是 active profile 時改。markdown 連結 `](../skills/<x>.md)` 一起改，SKILL.md 因為深一層，`](../` 變 `](../../`。只動暫存樹，repo 不動。有 python3 用 python，沒有就用同一套規則的 `sed -E`（CI 比對兩者輸出一致）。
 3. **Manifest**：從根目錄 `plugin.json` 產生 `.claude-plugin/plugin.json`，只留 Claude Code 接受的欄位（`name`、`displayName`、`version`、`description`、`author`{name, email, url}、`homepage`、`repository`、`license`、`keywords`）；`repository` 物件轉成它的 `url` 字串。沒有 python3 時只寫 `name`、`version`、`description`（`claude plugin validate` 會多一個「沒有 author」警告，仍通過）。
+
+`infra/`（含 `infra/chat-gateway/`）**不安裝**。team 工具（`teamctl.py`、`build.py`）載入 `infra/chat-gateway/chat_gateway/patterns.py`，所以 `/team` 的 status／check／ask／demo 都在 repo clone（`.installed` 的 `source`）執行；安裝副本只夠 `/team gate`。見 [core/commands/team.md](../../core/commands/team.md) 的 `$ROOT` 段。
 
 ---
 
@@ -82,9 +86,11 @@ install 留在 `~/.claude/plugins/manufacturing-skill/`（commands 讀這個路�
 ├── plugin.json              # repo 根目錄 plugin.json 原樣複製
 ├── active-profile.json      # 第一個 profile 的 manifest
 ├── active-profiles.json     # aggregated（有 python3 時）
-├── .installed               # 安裝紀錄（時間、版本、profiles、source）
-├── commands/                # 10 個：quote、order-status、bom-check、inspect、8d、
-│   └── *.md                 #   manufacturing、init、install-profile、add-profile、morning-briefing
+├── .installed               # 安裝紀錄（時間、版本、profiles、source、team: true）
+├── team/                    # 數位分身團隊（資料、policies、tools；/team 指令使用）
+├── TEAM.md                  # agent 啟動檔
+├── commands/                # 11 個：quote、order-status、bom-check、inspect、8d、
+│   └── *.md                 #   manufacturing、init、install-profile、add-profile、morning-briefing、team
 ├── agents/
 │   ├── quote-specialist.md       # profile (cnc) 版，取代 core
 │   ├── sales-coordinator.md      # core

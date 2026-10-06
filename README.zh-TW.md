@@ -11,7 +11,7 @@
 
 **這份 README 給三種人看：**
 
-- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)
+- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；**要簽字導入分身前，先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判、給客戶稽核員的三行）
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
@@ -42,7 +42,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ## 這能做什麼
 
-簡單說：**裝起來後你會多 5 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
+簡單說：**裝起來後你會多 6 個內建懂製造業的 AI 同事**，幫你工廠做這 6 件事 ——
 
 | #   | 場景                  | AI 同事幫你做                                                                |
 | --- | --------------------- | ---------------------------------------------------------------------------- |
@@ -53,9 +53,44 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 5   | 📦 **管庫存**         | BOM 對帳、缺料預警、出貨檢查清單                                             |
 | 6   | 🛠️ **客製給自己工廠** | 不是 CNC 廠？fork 一份改成你的行業（PCB / 射出 / 食品 / 製藥 / 機械設備 ETO 已有 alpha 內容） |
 
-**5 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管 — 各司其職、會互相接力（看下面 Mermaid 圖）。
+**6 個 AI 同事是誰：** 報價師、業助、生管、品管、倉管、工程變更 — 各司其職、會互相接力（看下面 Mermaid 圖）。
 
-**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 5 隻 AI 同事，**你不用每次重講一遍**。
+**為什麼跟一般 ChatGPT 不一樣？** 一般 ChatGPT 不知道「IATF 16949 是什麼」「不鏽鋼不能陽極」這種行業 know-how，要每次自己貼背景才會答對。這個 plugin 把這些知識預載進 6 隻 AI 同事，**你不用每次重講一遍**。
+
+---
+
+## 虛實整合團隊（v0.2.0-alpha，實驗性）
+
+> 每個職位一個**副駕分身**，住在公司的聊天工作區。**副駕不是替身**：判斷永遠由人做，分身只負責補資料、挑戰假設、定時提醒。
+
+- **分身是什麼**：一個職位一個分身（例：品保部主管分身），由既有的 agents、skills、know-how 以 id **組合**而成，不複製、不覆寫。只在被 @ 時回答，回覆一律標明「【某某分身】」，遇到決策點就停下來把選項交還給人（`🧭 需要你判斷`）。
+- **三分類**：分身的每項能力必標強化既有優勢（`strengthen`：人仍親手判斷）、創造新能力（`create`：以前沒人做）或外包既有工作（`outsource`：今天有人在做、上線後那個人不再做），並寫明 `today`（今天誰在做）與 `humanStillDoes`（上線後人還親手做什麼）。外包既有工作預設休眠，只能由公司在 roster 明確 opt-in：每分身最多 1 項、上限 `draft`、90 天內複審，並強制 teach-back 與人工練習。分類有爭議一律判外包既有工作。
+- **先過閘門**：流程修正或既有 `/command` 能解決的，就不開分身（`team/gate/need-a-twin.md`）。
+
+**2 分鐘離線試玩**（零憑證、零網路、純 Python 標準庫）：
+
+```bash
+python3 infra/chat-gateway/demo.py
+```
+
+會重播 8 個情境（排程貼文、@ 路由、「我先說」、注入攻擊被擋、跨分級內容被攔、限流、忽略 bot 與未 @ 的訊息……），最後驗證稽核鏈。
+
+**怎麼開始**
+
+| 你是 | 路徑 |
+| ---- | ---- |
+| **AI agent** | 讀 [TEAM.md](TEAM.md)（≤ 6,000 B）：照啟動演算法 `teamctl check` → `build` → 讀 roster，再依漸進揭露地圖往下讀 |
+| **人（10 分鐘）** | 從 [team/README.zh-TW.md](team/README.zh-TW.md) 開始 → 任選一個分身檔，例如 [team/twins/qa-manager.md](team/twins/qa-manager.md) →（選讀）[TEAM.md](TEAM.md)，那是給 agent 的啟動檔 |
+
+**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 不處理，但做法是「拒載」不是「理解」**：roster 出現 T3 頻道或分身，gateway 啟動即拒絕（exit 3）；訊息含明顯的 T3 字樣（國防、航太、ITAR 等）會被擋下並提示改走公司 T3 程序，字樣之外的 T3 內容系統認不出來，要靠人與流程。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 掃追蹤檔；`team/local` 靠本機 pre-commit）。
+
+**誠實的現況（alpha）**
+
+- mock adapter、mock driver、team 工具與稽核／核准／過濾邏輯有完整的離線測試，CI 可重現。
+- Slack / Discord adapter 與 Claude Code driver 已隨附，但**未在 CI 對真實平台或真實 `claude` 測試，需要憑證**，只以假 transport 驗證事件對應與指令參數。
+- 沒有長期記憶（只有行程內的短頻道窗，重啟即清空）。
+- 沒有任何寫入動作：分身工具恆為唯讀（`Read, Grep, Glob`），上限 `draft`。
+- 完整設計與延後項目見 [設計 spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md)、[ROADMAP](docs/ROADMAP.md)。
 
 ---
 
@@ -64,7 +99,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 採用「**core + profile overlay**」架構：
 
-- **Core 層** — 普世製造業基本功：6 段流程 + 5 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
+- **Core 層** — 普世製造業基本功：6 段流程 + 6 隻 agent + 通用 know-how（ISO 9001、IATF 16949 / PPAP、Lean、OEE、MRP、FMEA、GD&T、ECN、INCOTERMS）
 - **Profile 層（產業包）** — 各行業別加碼。v1 完整支援 CNC 精密加工（4 隻專精 agent、3 個 skill、3 份 know-how 涵蓋刀具壽命、切削參數、開發工廠 vs 量產）。射出成型、食品（HACCP / ISO 22000、批次追溯）、PCB 組裝（SMT / EMS）、製藥 / 醫材（GMP / GxP 偏差 CAPA、批次紀錄預檢；AI 輸出永遠不是 GMP 紀錄）與機械設備製造 ETO（選配式整機報價與假設清單、規格凍結與設計審查、FAT / SAT 驗收、安裝試車與售後；報價是工程估算，安全 / CE 簽核由人類工程師負責）是 alpha（有內容、尚待業界實務驗證）；目前沒有 stub
 - **Infra 層** — MCP server template 接 ERP/MES、地端 LLM 安裝指南（Ollama on NVIDIA GB10）
 - **Adapter 層** — Claude Code adapter（v1）。Cursor / Gemini / Codex adapter 排在 v1 之後
@@ -75,7 +110,7 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ## Agent 之間怎麼協作
 
-看完 demo 最常被問的問題：「5 隻 AI 同事是怎麼接力的？」一張圖說明。
+看完 demo 最常被問的問題：「6 隻 AI 同事是怎麼接力的？」一張圖說明。
 
 ### 流程：以 `/quote` 為例
 
@@ -97,7 +132,7 @@ sequenceDiagram
     Quote->>User: 完整報價單（含交期 + 檢驗成本）
 ```
 
-### 5 隻通用 agent · 各司其職
+### 6 隻通用 agent · 各司其職
 
 | Agent       | 角色             | 何時被呼叫              | 主要接力對象       |
 | ----------- | ---------------- | ----------------------- | ------------------ |
@@ -106,6 +141,7 @@ sequenceDiagram
 | 📅 生管     | 排程、產能評估   | 排單、交期確認          | 報價師、倉管       |
 | 🔍 品管     | 檢驗計畫、不良追蹤 | `/inspect`、`/8d`       | 業助、倉管         |
 | 📦 倉管     | 庫存、BOM 對帳   | `/bom-check`、缺料      | 生管、品管         |
+| 🛠️ 工程變更 | ECN / ECO 影響分析、變更追溯 | 圖紙或 BOM 改版     | 生管、品管、倉管   |
 
 > CNC 產業包再加 4 隻（CAM 工程師、刀具管理、量測技師、首件確認），詳見 [profiles/cnc-machining/](profiles/cnc-machining/)。
 
@@ -117,7 +153,7 @@ sequenceDiagram
 
 | 痛點              | 傳統作法                                | 本 plugin 提供                                               |
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
-| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / IATF / Lean / OEE |
+| AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 6 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / IATF / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
 | IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | plugin 本身在本機；預設模型走 Anthropic 雲端，地端 GB10/Ollama 為選配（[未經本專案端到端驗證](infra/on-prem/gb10-setup.md)） |
 
@@ -147,7 +183,7 @@ sequenceDiagram
 
 ## 💰 成本預期
 
-**最便宜路徑：先用雲端試一個月，總成本約 NT$650**
+**最便宜路徑：先用雲端試一個月，總成本約 NT$650**（一個人在自己電腦試 Claude Code plugin 的個人訂閱；**不是分身 pilot 的費用**——分身走 API 金鑰計費，另有聊天平台與人力，見 [董事長一頁](docs/owner-one-page.zh-TW.md)）
 
 | 階段                       | 月成本                | 一次性                 |
 | -------------------------- | --------------------- | ---------------------- |
@@ -210,7 +246,7 @@ A: **目前不行。** 這個 repo 沒有 LINE 整合，也沒有 LINE 閘道。
 
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
-1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
+1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 6 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
 2. **Alpha 加碼客製** — 射出、食品、PCB 組裝、製藥、機械設備 ETO 都是 alpha（內容標示「需驗證」，請自家工程師審過再用）；各產業包的 `_templates/` 有 starter template 可照著填。
 3. **做你自己的產業包** — 複製一個 alpha 產業包當骨架，照 [docs/profile-development.md](docs/profile-development.md) 逐步做（含過得了 CI 的範本、登記步驟與必改清單）。
 
@@ -241,7 +277,7 @@ manufacturing-skill/
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # 普世製造業基本功
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
-│   ├── agents/               # 5 隻 universal persona
+│   ├── agents/               # 6 隻 universal persona
 │   ├── skills/               # 6 段流程 + 通用 skill
 │   ├── know-how/             # ISO 9001、IATF 16949、Lean、OEE、MRP …
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
@@ -252,14 +288,21 @@ manufacturing-skill/
 │   ├── food-processing/      # Alpha — HACCP / ISO 22000，待食品廠驗證
 │   ├── pharma/               # Alpha — GMP / GxP，待 QA 驗證
 │   └── machinery-eto/        # Alpha — 設備 ETO 報價 / FAT-SAT，待設備廠驗證
+├── TEAM.md                   # 數位分身團隊 — agent 啟動檔（人讀 team/README.zh-TW.md）
+├── team/                     # 第三階 team tier：roster、分身檔、政策、閘門、teamctl/build/deid 工具
 ├── adapters/claude-code/     # 一鍵安裝
 ├── infra/                    # MCP server、地端 LLM 設定
+│   └── chat-gateway/         # 分身聊天 gateway（mock / Slack / Discord adapter、離線 demo）
 ├── docs/
 │   ├── explainers/           # 三張可印 A3 的繁中說明卡
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
+│   ├── owner-one-page.zh-TW.md  # 董事長一頁：簽什麼、花多少、怎麼停
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
+├── tests/
+│   ├── team/                 # team 檔案 lint 與工具測試
+│   └── gateway/              # gateway 單元／安全測試與 demo golden
 └── examples/                 # 合成 demo data — 絕對不要放真實客戶資料
 ```
 
@@ -280,7 +323,7 @@ manufacturing-skill/
 
 ## 我要在自己的工廠導入
 
-→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。
+→ 讀 [docs/adoption-guide.md](docs/adoption-guide.md)。要導入分身、需要董事長簽字的，先給董事長 [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)。
 
 裡面有 Jason 用過的導入順序、踩雷清單、客製化指引。
 

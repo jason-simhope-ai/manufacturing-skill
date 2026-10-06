@@ -66,3 +66,23 @@ infra/mcp-servers/**/logs/
 dist/
 build/
 *.log
+
+# Digital twin team tier (spec 2026-10-05-digital-twin-team-design.md §4).
+# The parent must be `team/local/*` (not `team/local/`) so the negations work.
+team/local/*
+!team/local/README.md
+!team/local/.gitkeep
+team/.build/
+*.local.yaml
+*.local.md
+logs/
+**/audit/
+**/memory/
+
+# Exports and de-identified exports belong OUTSIDE the clone (/tmp or $MFG_TEAM_DATA_T1; see
+# team/local/README.md). Belt and braces in case one lands here anyway. examples/** stays tracked.
+*.deid.csv
+team/local/**/*.csv
+# Stricter, optional: ignore every CSV in the clone but keep the synthetic examples tracked.
+# *.csv
+# !examples/**/*.csv

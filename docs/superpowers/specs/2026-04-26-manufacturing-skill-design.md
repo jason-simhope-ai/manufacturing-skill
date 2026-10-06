@@ -356,7 +356,7 @@ source: ISO 9001:2015
 - [x] CNC profile 完整：4 agent、3 skill、4 know-how、profile.json
 - [x] 4 stub profile（PCB / injection / food / pharma）
 - [x] adapters/claude-code/install.sh
-- [x] infra：scheduler-mcp 範例、ERP connector template、gb10-setup.md
+- [x] infra：manufacturing-scheduler MCP 範例、ERP connector template、gb10-setup.md
 - [x] docs：architecture / adoption-guide / profile-development / ROADMAP
 - [x] **3 份 explainer 圖卡**（HTML, 繁中, A3 print）
 - [x] examples 合成 demo data

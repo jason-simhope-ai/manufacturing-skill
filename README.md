@@ -34,10 +34,45 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 
 `manufacturing-skill` is a **Claude Code plugin** built around a **core + profile overlay** architecture for manufacturing AI adoption.
 
-- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 5 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager), and a baseline know-how library (ISO 9001, IATF 16949 / PPAP, Lean, OEE, MRP, FMEA, GD&T, ECN, INCOTERMS).
+- **Core layer** — universal manufacturing primitives that apply to _any_ factory: 6-stage flow (quote → order → schedule → produce → inspect → ship), 6 agent personas (quote specialist, sales coordinator, production planner, quality inspector, inventory manager, engineering change manager), and a baseline know-how library (ISO 9001, IATF 16949 / PPAP, Lean, OEE, MRP, FMEA, GD&T, ECN, INCOTERMS).
 - **Profile layer** — vertical-specific overlays. v1 ships a complete **CNC machining** profile (4 specialist agents, 3 skills, 3 know-how docs covering tool life, cutting parameters, job-shop vs. mass production). Five **alpha** profiles carry real content that still needs practitioner validation: **injection molding**, **food processing** (HACCP / ISO 22000, batch traceability), **PCB assembly / EMS** (SMT process + EMS quality agents, DFM and AOI-defect-Pareto skills, IPC-A-610 and SMT-defect know-how; no MES integration yet) **pharma / medical device** (GMP / GxP deviation–CAPA and batch-record review assistants; AI output is never a GMP record) and **machinery / equipment, engineer-to-order** (option-based machine quoting with explicit assumption lists, spec freeze and design review, FAT / SAT acceptance, commissioning and after-sales; quotes are engineering estimates and safety / CE sign-off stays with a human engineer). There are no stub profiles left; new verticals are welcome as contributions.
 - **Infra layer** — MCP server templates for ERP/MES connectivity, on-prem LLM setup guides (Ollama on NVIDIA GB10), and reference configurations.
 - **Adapter layer** — a Claude Code adapter (v1). Cursor / Gemini / Codex adapters are post-v1.
+
+---
+
+## Digital-twin team (v0.2.0-alpha, experimental)
+
+> One **copilot twin** per position, living in the company's chat workspace. **A copilot, not a replacement**: people keep the judgement; the twin adds data, challenges assumptions and posts scheduled reminders.
+
+- **What a twin is.** One twin per position (e.g. the QA department head's twin), composed by id from the existing agents, skills and know-how, never copied or overridden. It answers only when @-mentioned, labels every reply `【… twin】`, and stops at decision points to hand the options back to the human (`🧭`).
+- **Three categories.** Every capability is labelled `strengthen` (a human still does the judging), `create` (nobody did this before) or `outsource` (someone does this today and will stop once the twin exists), plus `today` (who does it now) and `humanStillDoes` (what the human still does by hand). `outsource` is dormant by default and can only be woken by an explicit opt-in in the roster: at most one per twin, capped at `draft`, reviewed within 90 days, with mandatory teach-back and manual practice. When in doubt, a capability counts as `outsource`.
+- **Gate first.** If a process fix or an existing `/command` solves it, do not build a twin (`team/gate/need-a-twin.md`).
+
+**2-minute offline demo** (no credentials, no network, stdlib-only Python):
+
+```bash
+python3 infra/chat-gateway/demo.py
+```
+
+It replays 8 beats (scheduled post, @-routing, "I go first", an injection attempt, a tier-mismatch block, rate limits, ignored bots and un-mentioned messages, ...) and ends by verifying the audit chain.
+
+**Where to start**
+
+| You are | Path |
+| ------- | ---- |
+| **An AI agent** | Read [TEAM.md](TEAM.md) (≤ 6,000 B): run `teamctl check`, then `build`, read the roster, and follow the progressive-disclosure map |
+| **A human (10 minutes)** | [team/README.zh-TW.md](team/README.zh-TW.md) (Traditional Chinese; start here) → one twin file, e.g. [team/twins/qa-manager.md](team/twins/qa-manager.md) → optionally [TEAM.md](TEAM.md), which is the agent's entry file |
+
+**Data-tier rule.** T0 public, T1 internal, T2 confidential, T3 restricted (high-assurance custom projects). Slack / Discord and cloud models are **capped at T1**; T2 stays on the local mock adapter; **T3 is refused, not understood**: the gateway refuses to start if the roster has a T3 channel or twin (exit 3), and a keyword tripwire blocks messages that contain obvious T3 wording (e.g. defence, aerospace, ITAR) and advises the company's own T3 procedure. It cannot recognise T3 content that avoids those words, so people and process must keep T3 out. When unsure, go one tier up. The repo holds only job titles and synthetic data: no real names, platform ids or secrets (CI scans tracked files; `team/local` relies on a local pre-commit hook).
+
+**Honest status (alpha)**
+
+- The mock adapter, the mock driver, the team tools and the audit / approval / filtering logic are fully tested offline and reproducible in CI.
+- The Slack and Discord adapters and the Claude Code driver ship in the repo but are **not exercised in CI against the real platforms or a real `claude` binary and need credentials**; they are tested only against fake transports (event mapping, argv).
+- No long-term memory (only a short in-process channel window, cleared on restart).
+- No write actions: twin tools are read-only (`Read, Grep, Glob`) and autonomy is capped at `draft`.
+- Full design and deferred items: [design spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md), [ROADMAP](docs/ROADMAP.md).
 
 ---
 
@@ -47,7 +82,7 @@ Manufacturing AI adoption usually fails on three things:
 
 | Problem                    | Traditional answer                                             | What this plugin gives you                                                           |
 | -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 5 built-in agent personas + 9 core know-how docs — AI understands ISO/IATF/Lean/OEE on day one |
+| AI doesn't speak factory   | Train your own LLM, write all the prompts yourself             | 6 built-in agent personas + 9 core know-how docs — AI understands ISO/IATF/Lean/OEE on day one |
 | Every factory is different | Hire an SI, pay for full custom build                          | Core + profile overlay — fork, edit your profile, done                               |
 | IT blocks cloud SaaS       | Cannot pass customer audits (drawings must not leave premises) | On-prem-first design with GB10/Ollama runtime                                        |
 
@@ -100,7 +135,7 @@ Or skip the wizard:
 
 Three paths:
 
-1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 5 universal agents (quote / sales / production / quality / inventory). Useful to evaluate "does this AI understand my factory at all" before committing.
+1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 6 universal agents (quote / sales / production / quality / inventory / engineering change). Useful to evaluate "does this AI understand my factory at all" before committing.
 2. **Use an alpha profile + customize** — injection molding, food processing, PCB assembly, pharma and machinery ETO are all alpha (content present, labelled needs-validation); starter templates under each profile's `_templates/` are ready to extend.
 3. **Build your own profile** — copy an alpha profile as the scaffold and follow [docs/profile-development.md](docs/profile-development.md) (CI-checked template, registration and checklist included).
 
@@ -138,7 +173,7 @@ manufacturing-skill/
 ├── plugin.json               # Claude Code plugin manifest
 ├── core/                     # Universal manufacturing primitives
 │   ├── commands/             # /quote /order-status /bom-check /inspect …
-│   ├── agents/               # 5 universal personas
+│   ├── agents/               # 6 universal personas
 │   ├── skills/               # 6-stage flow + utility skills
 │   ├── know-how/             # ISO 9001, IATF 16949, Lean, OEE, MRP, ...
 │   └── hooks/                # pre-quote / post-order / pre-ship / on-error
@@ -149,14 +184,20 @@ manufacturing-skill/
 │   ├── food-processing/      # Alpha — HACCP / ISO 22000, needs validation
 │   ├── pharma/               # Alpha — GMP / GxP, needs QA validation
 │   └── machinery-eto/        # Alpha — equipment ETO quoting / FAT-SAT, needs validation
+├── TEAM.md                   # Digital-twin team — agent bootstrap (humans: team/README.zh-TW.md)
+├── team/                     # Third tier: roster, twin files, policies, gate, teamctl/build/deid tools
 ├── adapters/claude-code/     # Plugin install adapter
 ├── infra/                    # MCP servers, on-prem LLM setup
+│   └── chat-gateway/         # Twin chat gateway (mock / Slack / Discord adapters, offline demo)
 ├── docs/
 │   ├── explainers/           # Four printable Traditional-Chinese cards (boss / IT / operator / quick start)
 │   ├── architecture.md
 │   ├── adoption-guide.md     # For consultants deploying to customers
 │   ├── profile-development.md  # For people creating new vertical profiles
 │   └── ROADMAP.md
+├── tests/
+│   ├── team/                 # Team-file lint and tooling tests
+│   └── gateway/              # Gateway unit / security tests and the demo golden transcript
 └── examples/                 # Synthetic demo data — never put real customer data here
 ```
 

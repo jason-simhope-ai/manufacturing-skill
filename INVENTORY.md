@@ -2,8 +2,10 @@
 
 > One-page entry-point map. 從這裡找到 repo 任何東西。
 >
-> 規模：v0.1.5 · MIT （multi-profile active experimental ship）
-> 最後更新：2026-05-09
+> 規模：v0.1.5 + Unreleased（v0.2.0-alpha 數位分身團隊，實驗性）· MIT
+> 最後更新：2026-10-06
+>
+> 只列本分支 tree 內實際存在的檔案（以 `git ls-files` 為準）；其他分支或未合併 PR 新增的檔案，合併後再補進來。
 
 ---
 
@@ -14,10 +16,13 @@
 | 第一次看到、完全不懂          | [docs/quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                              |
 | 想 5 分鐘看懂這玩意           | [docs/explainers/04-懶人包-5分鐘上手.html](docs/explainers/04-懶人包-5分鐘上手.html)                                                          |
 | 機械業老闆 / 二代             | [docs/explainers/01-架構總覽.html](docs/explainers/01-架構總覽.html)                                                                          |
+| 要簽字導入分身的董事長        | [docs/owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼停、第 4 週怎麼判）                                       |
 | 企業 IT 部門                  | [docs/explainers/02-IT部門系統說明.html](docs/explainers/02-IT部門系統說明.html) → [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 業助 / 廠長 / 品管            | [docs/explainers/03-使用者cheatsheet.html](docs/explainers/03-使用者cheatsheet.html)                                                          |
-| AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md)                                                                                              |
+| AI 導入顧問                   | [docs/adoption-guide.md](docs/adoption-guide.md) → [docs/consulting/](docs/consulting/README.md)（工作坊、問卷、SOW、pilot 一頁紙、交付清單）     |
+| 要導入分身團隊（agent / 人）  | [TEAM.md](TEAM.md)（agent）· [team/README.zh-TW.md](team/README.zh-TW.md)（人，10 分鐘）                                                      |
 | 想 fork 開新 vertical         | [docs/profile-development.md](docs/profile-development.md)                                                                                    |
+| Coding agent / 貢獻者         | [CLAUDE.md](CLAUDE.md)（repo 地圖、語言慣例、CI 規則）                                                                                        |
 | 開發者讀架構                  | [docs/architecture.md](docs/architecture.md)                                                                                                  |
 | 看設計脈絡 / decision history | [docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md)            |
 | 看未來路線                    | [docs/ROADMAP.md](docs/ROADMAP.md)                                                                                                            |
@@ -37,28 +42,38 @@
 | 修報價邏輯          | [core/skills/01-報價.md](core/skills/01-報價.md) + [core/agents/quote-specialist.md](core/agents/quote-specialist.md)   |
 | 修排程邏輯          | [core/skills/03-排程.md](core/skills/03-排程.md) + [core/skills/capacity-planning.md](core/skills/capacity-planning.md) |
 | 修檢驗邏輯          | [core/skills/05-檢驗.md](core/skills/05-檢驗.md) + [core/skills/spc-basics.md](core/skills/spc-basics.md)               |
-| 接 ERP              | 看 [infra/mcp-servers/erp-connector/contract.py](infra/mcp-servers/erp-connector/contract.py) 介面                      |
+| 接 ERP              | 看 [infra/mcp-servers/erp-connector/contract.py](infra/mcp-servers/erp-connector/contract.py) 介面（參考實作：[mock_connector.py](infra/mcp-servers/erp-connector/mock_connector.py)） |
 | 接生產排程          | 用 [infra/mcp-servers/scheduler-mcp/server.py](infra/mcp-servers/scheduler-mcp/server.py) 當參考                        |
+| 填公司事實與資料分級 | [examples/company-facts.template.md](examples/company-facts.template.md) + [docs/data-classification.md](docs/data-classification.md) |
+| 設定工作站權限      | [docs/permissions-template.md](docs/permissions-template.md)                                                            |
+| 給其他 AI 工具用    | [adapters/generic/export.py](adapters/generic/export.py)（純 markdown 匯出，experimental）                             |
 | 看 demo 輸出長怎樣  | [examples/sample-quote-output.md](examples/sample-quote-output.md)                                                      |
 
 ---
 
 ## 完整檔案地圖
 
-### 頂層 (5)
+### 頂層 (13)
 
 ```
 manufacturing.md          ← 靈魂入口文件，先讀
 README.md                 ← 英文介紹
 README.zh-TW.md           ← 繁中介紹
 plugin.json               ← Claude Code plugin manifest
+TEAM.md                   ← 數位分身團隊 agent 啟動檔（v0.2.0-alpha，見 Team tier）
 LICENSE                   ← MIT
 INVENTORY.md              ← 這份
+CHANGELOG.md              ← 版本紀錄（Keep a Changelog；[Unreleased] 在最上面）
+CONTRIBUTING.md           ← 貢獻指南
+SECURITY.md               ← 回報漏洞 + 資安範圍（含 team tier）
+.gitignore                ← 含 team/local/*、team/.build/
+CLAUDE.md                 ← 給 coding agent 的貢獻指南（repo 地圖、慣例、CI 規則）
+.gitattributes            ← 強制 LF（install.sh / *.py 在 CRLF checkout 下會壞）
 ```
 
 ### `core/` — 普世製造業（任何工廠都用得到）
 
-#### `core/commands/` — 7 個 slash commands
+#### `core/commands/` — 11 個 slash commands
 
 | 指令                                                     | 用途                                                             |
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -72,6 +87,7 @@ INVENTORY.md              ← 這份
 | [`/manufacturing init`](core/commands/init.md)           | 第一次用的 4 問題引導                                            |
 | [`/morning-briefing`](core/commands/morning-briefing.md) | 廠長每日 8 AM 早會懶人包                                         |
 | [`/8d`](core/commands/8d.md)                             | 啟動 8D 客訴 / 重大不良處理                                      |
+| [`/team`](core/commands/team.md)                         | 數位分身團隊（v0.2.0-alpha）：status / ask / add / check / gate / demo |
 
 #### `core/agents/` — 6 隻 universal persona
 
@@ -210,13 +226,28 @@ INVENTORY.md              ← 這份
 | [\_multiprofile.py](adapters/claude-code/_multiprofile.py)       | v0.1.5+ multi-profile helper：`scan` 衝突偵測 + `scan-all` CI 批掃 + `aggregate` 產 `active-profiles.json`                                                       |
 | [plugin-mapping.md](adapters/claude-code/plugin-mapping.md)      | source → `~/.claude/plugins/` 映射說明（v0.1.5 加多 profile 章節）                                                                                               |
 
+### `adapters/generic/` — 純 markdown 匯出（experimental, v0.3 preview）
+
+| 檔 | 用途 |
+| -- | ---- |
+| [export.py](adapters/generic/export.py) | 把 core + profile（`extends:` 已解析、多 profile 衝突檢查同 install.sh）匯出成純 markdown：`files` 資料夾 + `MANIFEST.json` 或單一 `bundle` 檔 |
+| [README.md](adapters/generic/README.md) | 用法：Cursor、Gemini CLI / Codex、地端 Ollama / Open WebUI、列印成 SOP |
+
 ### `tests/extends/` — Inheritance resolver 測試 fixtures
 
-13 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
+24 個 golden-file case，每個釘住 resolver 的某個行為或失敗模式。用 `py tests/extends/run.py` 跑完整套，CI Step 10c 也會跑。
 
 ### `tests/multiprofile/` — Multi-profile helper 單元測試
 
-`test_multiprofile.py` — 8 個測試 in-process 驗證 `scan_set` / `scan_pair` / `aggregate_profiles` 的行為（含合成衝突 / 三 profile 部分衝突 / list 欄位 union dedupe）。CI Step 13 會跑。
+`test_multiprofile.py` — 16 個測試 in-process 驗證 `scan_set` / `scan_pair` / `aggregate_profiles` 的行為（含合成衝突 / 三 profile 部分衝突 / list 欄位 union dedupe）。CI Step 13 會跑。
+
+### `tests/generic/` — Generic adapter 測試
+
+`test_export.py` — 12 個 stdlib unittest（匯出內容與 install.sh 一致、`extends:` 解析、衝突拒絕、bundle / files 兩種格式）。CI「Generic adapter — export tests」會跑。
+
+### `tests/mcp/` — MCP server 測試
+
+`test_erp_contract.py` — 78 個 unittest（`CallContext`、角色遮罩、寫入核准 token、`max_rows`／`fields`，含可重用的 `ConformanceSuite` 跑 `MockErpConnector`）；`test_scheduler_mcp.py` — 30 個 unittest（`manufacturing-scheduler` stdio JSON-RPC：`initialize`、`tools/list`、`tools/call`、輸入驗證、惡意輸入）。CI「erp-connector — contract tests」「scheduler-mcp — stdio protocol tests」會跑。
 
 ---
 
@@ -227,8 +258,60 @@ INVENTORY.md              ← 這份
 | [mcp-servers/scheduler-mcp/](infra/mcp-servers/scheduler-mcp/)                                                                                                                                         | 範例 MCP server，含 mock data 可立即跑     |
 | `mcp-servers/scheduler-mcp/`[server.py](infra/mcp-servers/scheduler-mcp/server.py) · [README.md](infra/mcp-servers/scheduler-mcp/README.md) · [mock-data/](infra/mcp-servers/scheduler-mcp/mock-data/) |                                            |
 | [mcp-servers/erp-connector/](infra/mcp-servers/erp-connector/)                                                                                                                                         | ERP 整合介面契約（template，實作交給用戶） |
-| `mcp-servers/erp-connector/`[contract.py](infra/mcp-servers/erp-connector/contract.py) · [README.md](infra/mcp-servers/erp-connector/README.md)                                                        |                                            |
+| `mcp-servers/erp-connector/`[contract.py](infra/mcp-servers/erp-connector/contract.py) · [README.md](infra/mcp-servers/erp-connector/README.md) · [mock_connector.py](infra/mcp-servers/erp-connector/mock_connector.py) · [mock-data/erp_mock.json](infra/mcp-servers/erp-connector/mock-data/erp_mock.json) |                                            |
 | [on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md)                                                                                                                                                   | NVIDIA GB10 + Ollama 地端 LLM 安裝指南     |
+| [chat-gateway/](infra/chat-gateway/)                                                                                                                                                                   | 數位分身聊天 gateway（見下方 Team tier）；`install.sh` 不安裝 `infra/` |
+
+---
+
+### Team tier — 數位分身團隊（v0.2.0-alpha，實驗性）
+
+第 7 層 TEAM 與第三階 `team/`。設計見 [spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md)。
+
+**入口與資料（`TEAM.md`、`team/`）**
+
+| 檔 | 用途 |
+| -- | ---- |
+| [TEAM.md](TEAM.md) | agent 啟動檔（≤ 6,000 B）：六條規則、啟動演算法、漸進揭露地圖 |
+| [team/README.zh-TW.md](team/README.zh-TW.md) | 人讀的 10 分鐘說明 |
+| [team/for-frontline.zh-TW.md](team/for-frontline.zh-TW.md) | 給前線同仁的一頁說明 |
+| [team/roster.example.yaml](team/roster.example.yaml) | 範例 roster（synthetic：7 個通用部門、7 個職位、3 個頻道） |
+| [team/twins/](team/twins/) | `_template.md` + 3 個範例分身：[production-manager](team/twins/production-manager.md) · [qa-manager](team/twins/qa-manager.md) · [engineering-manager](team/twins/engineering-manager.md) |
+| [team/policies/core-rules.md](team/policies/core-rules.md) · [restricted.md](team/policies/restricted.md) | 所有分身共用 preamble · T3 政策 |
+| [team/gate/need-a-twin.md](team/gate/need-a-twin.md) | 「需要分身嗎？」閘門問卷與季複審清單 |
+| [team/local/README.md](team/local/README.md) · `team/local/.gitkeep` | 本機專屬設定說明（`team/local/*` 與 `team/.build/` 皆 gitignored） |
+| [core/commands/team.md](core/commands/team.md) | `/team status \| ask \| add \| check \| gate \| demo`（預覽用，不經 gateway；先找 `$ROOT` 再用 `$ROOT/…` 路徑） |
+
+**工具（`team/tools/`）**
+
+| 檔 | 用途 |
+| -- | ---- |
+| [teamctl.py](team/tools/teamctl.py) | `check`（驗證）、`roster`（檢視）、`audit-verify`（驗稽核雜湊鏈） |
+| [build.py](team/tools/build.py) | 編譯 `team/.build/`（`roster.json`、分身 prompt、`ref/`；輸出可重現） |
+| [deid.py](team/tools/deid.py) | 來源端去識別（CSV：NFKC／空白折疊後客戶名 → `CUST-xx`、整詞比對、刪欄；殘留掃描含 email、電話、姓名＋職稱、聯絡人欄，命中即 exit 1，除非 `--allow-residual`） |
+| [teamlib/](team/tools/teamlib/) · [_teamlib.py](team/tools/_teamlib.py) | 手寫驗證器與錯誤碼表（`E0xx` / `W0xx`）：`schema.py`（常數、`CODES`、欄位規格、樣式橋接）· `io.py`（YAML／JSON／日期）· `compile.py`（組裝與 build）· `validate.py`（驗證器）；`_teamlib.py` 是相容 shim |
+| [lint-allow.txt](team/tools/lint-allow.txt) · [pre-commit-names.sample](team/tools/pre-commit-names.sample) | 名稱 lint 豁免清單 · 本機 pre-commit 名單 hook 範本 |
+
+**Chat gateway（[infra/chat-gateway/](infra/chat-gateway/)；Python 3.11，核心只用 stdlib）**
+
+| 路徑 | 用途 |
+| ---- | ---- |
+| [README.md](infra/chat-gateway/README.md) · [demo.py](infra/chat-gateway/demo.py) · `requirements-optional.txt` | 說明 · 2 分鐘離線 demo（8 個情境 + 稽核驗證；`--plain` 前線版）· 選用相依（Slack／Discord SDK） |
+| `chat_gateway/__main__.py` | CLI：`run`、`post`、`self-check`、`audit-verify` |
+| `chat_gateway/core.py` | 載入與驗證 roster（T3 → exit 3；`act*`、雜湊不符等 → exit 78）、路由、有效 autonomy、限流、`Gateway` |
+| `chat_gateway/sanitize.py` · `formatter.py` · `prompt.py` | 正規化（NFKC＋去除格式字元）／`<<UNTRUSTED>>` 信封／tripwire／DLP（含本機 denylist）／輸出過濾 · 回覆版型 · 12,000 B prompt 預算與 token 估算 |
+| `chat_gateway/approvals.py` · `audit.py` · `patterns.py` · `config.py` · `spend.py` | 核准簿（結構化點擊、argsHash、TTL 30 分、一次性；alpha 無可執行動作）· HMAC 金鑰雜湊鏈稽核＋簽章 checkpoint · secret／名稱／PII／DLP 樣式唯一來源（`teamlib/schema.py` 直接載入）· 環境變數設定 · claude-code driver 的每日預算上限（持久化） |
+| `chat_gateway/adapters/` | `base.py`（凍結介面）、`mock.py`（CI 完整測試） |
+| `chat_gateway_ext/` | 跨進程／網路邊界的整合，不受核心「禁用 subprocess/網路」限制，只以名稱延遲載入：`slack.py`、`discord.py`（共用 `_saas.py`；**未在 CI 對真實平台測試，需要憑證**）、`claude_code.py`、`twin_result.schema.json` |
+| `chat_gateway/drivers/` | `base.py`（凍結介面）、`mock.py`（完整測試）、`chat_gateway_ext/claude_code.py`（獨立套件，不受核心「禁用 subprocess/網路」限制；固定受限旗標集，只以假 `claude` 測試；需要服務帳號憑證） |
+| `fixtures/` | 範例 roster 快照（`roster/`）、`demo.jsonl` 劇本、`mock_driver.json` |
+
+**測試**
+
+| 套件 | 內容 | 怎麼跑（CI Step） |
+| ---- | ---- | ----------------- |
+| [tests/team/](tests/team/) | `fixtures.yaml` 135 個 lint case + 18 個 deid case（`run.py` 逐一在暫存迷你 repo 執行 `teamctl` / `deid`）；`test_team.py` 58 個 unittest（驗證器、build 決定性、effective autonomy、CLI exit code、agent 檔的 `$ROOT` 路徑） | `python3 tests/team/run.py`（Step 19）· `python3 tests/team/test_team.py` |
+| [tests/gateway/](tests/gateway/) | `test_gateway.py` 142 個 unittest（路由、autonomy、核准、限流、taint 與衰退、DLP、稽核竄改偵測、prompt 預算、核心與 `chat_gateway_ext` 靜態安全檢查、CLI、demo golden）；`test_adapters.py` 44 個 unittest（Slack／Discord 事件對應、T1 上限，假 transport）；`test_claude_code_driver.py` 60 個 unittest（假 `claude` 驗 argv、環境、cwd、promptSha、`self_check`）；`test_frontline.py` 20 個 unittest（前線回合：參考非指示、不同意／親手做、無分身日、learner mode、`demo --plain`）；`fixtures/`；`golden/demo.txt` | `python3 -m unittest discover -s tests/gateway -p 'test_*.py'` · `python3 infra/chat-gateway/demo.py --check tests/gateway/golden/demo.txt`（Steps 20–21） |
 
 ---
 
@@ -237,8 +320,12 @@ INVENTORY.md              ← 這份
 | 檔                                                                                                                            | 對象 / 用途                                                     |
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [quickstart-for-beginners.zh-TW.md](docs/quickstart-for-beginners.zh-TW.md)                                                   | 完全沒裝過 CLI 工具的工廠人員：6 步驟導引                       |
-| [architecture.md](docs/architecture.md)                                                                                       | 開發者：六層架構詳解                                            |
-| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算                              |
+| [architecture.md](docs/architecture.md)                                                                                       | 開發者：七層架構詳解（含 Layer 7 TEAM）                         |
+| [adoption-guide.md](docs/adoption-guide.md)                                                                                   | 顧問：6 週導入 playbook + ROI 計算；分身 4 週 pilot、原則與核准範本 |
+| [owner-one-page.zh-TW.md](docs/owner-one-page.zh-TW.md)                                                                       | 董事長：簽三件事前的一頁（費用、最壞情況、停機、第 4 週決策表） |
+| [data-classification.md](docs/data-classification.md) | 導入負責人 / IT：T0–T3 資料分級與 AI 工具使用規則 |
+| [permissions-template.md](docs/permissions-template.md) | IT：Claude Code `permissions` 最小權限範本（allow / ask / deny） |
+| [consulting/](docs/consulting/README.md) | 顧問交付包（6 份範本）：90 分鐘探索工作坊、IT 資料流問卷、SOW、pilot 一頁紙、交付物清單 |
 | [profile-development.md](docs/profile-development.md)                                                                         | 開發者：怎麼長新 vertical profile                               |
 | [ROADMAP.md](docs/ROADMAP.md)                                                                                                 | 全：v0.1 → v2.0 路線                                            |
 | [index.html](docs/index.html)                                                                                                 | GitHub Pages 著陸頁（單頁行銷）                                 |
@@ -249,8 +336,10 @@ INVENTORY.md              ← 這份
 | [explainers/screenshots/](docs/explainers/screenshots/)                                                                       | 上面 4 張的 PNG 版本（給 LinkedIn / 簡報用）                    |
 | [quickstart-screenshots/](docs/quickstart-screenshots/)                                                                       | 6 步驟安裝實機截圖 + mockup（含 CAPTURE-GUIDE.md 紀錄產出方式） |
 | [demo/quote-demo.gif](docs/demo/quote-demo.gif) · [demo/quote-demo-en.gif](docs/demo/quote-demo-en.gif)                       | `/quote` 19 秒實錄 GIF（雙語版）                                |
+| [demo/quote-demo.html](docs/demo/quote-demo.html) · [quote-real.html](docs/demo/quote-real.html)（含 `-en` 版）· [real-claude-response.md](docs/demo/real-claude-response.md) · [screenshots/](docs/demo/screenshots/) | GIF 的 HTML 原稿、真實 Claude 回覆紀錄與截圖 |
 | [demo/slides/](docs/demo/slides/)                                                                                             | 6-capability 介紹簡報（HTML + retina PNG）                      |
 | [superpowers/specs/2026-04-26-manufacturing-skill-design.md](docs/superpowers/specs/2026-04-26-manufacturing-skill-design.md) | 設計史：v0.1 spec 完整版                                        |
+| [superpowers/specs/](docs/superpowers/specs/)                                                                                 | 其餘 5 份設計 spec：v0.1.1、v0.1.2、profile 繼承、多 profile、數位分身團隊 |
 
 ---
 
@@ -262,6 +351,16 @@ INVENTORY.md              ← 這份
 | [sample-drawing/bracket.md](examples/sample-drawing/bracket.md)   | 模擬 CNC 件圖紙 metadata       |
 | [sample-bom/bracket-bom.csv](examples/sample-bom/bracket-bom.csv) | 對應的 BOM                     |
 | [sample-quote-output.md](examples/sample-quote-output.md)         | `/quote` 預期輸出範例          |
+| [company-facts.template.md](examples/company-facts.template.md)   | 公司事實檔填寫範本（費率、毛利、交期、核准權限；填好的檔不進 repo） |
+
+---
+
+### `scripts/` — 維護腳本
+
+| 檔 | 用途 |
+| -- | ---- |
+| [regen_explainers.py](scripts/regen_explainers.py) | 重生 `docs/explainers/*.html` 的 `AUTO-START`／`AUTO-END` 區塊（計數、版本、分身數）；`--check` 供 CI Step 11 |
+| [regen_screenshots.py](scripts/regen_screenshots.py) | 從 HTML 重拍已 commit 的 PNG（explainers、6-capability slide、quickstart mockups；Node Playwright）；`--check` 列出比 HTML 舊的 PNG |
 
 ---
 
@@ -285,17 +384,18 @@ INVENTORY.md              ← 這份
 | `~/.claude/CLAUDE.md`                    | Global 個人 conventions（包括 commit signature）                                                                        |
 | `.claude/` (本 repo)                     | Claude Code 本機 session state，整個 gitignored                                                                         |
 | GitHub Releases                          | v0.1.3 起開始 tag（見 CHANGELOG.md）                                                                                    |
-| GitHub Actions CI                        | [.github/workflows/ci.yml](.github/workflows/ci.yml)（v0.1.1 起；JSON / plugin schema / frontmatter / install.sh 驗證） |
+| GitHub Actions CI                        | [.github/workflows/ci.yml](.github/workflows/ci.yml)（v0.1.1 起；JSON / plugin schema / frontmatter / install.sh 驗證；Step 18–22 為 team tier 與 chat gateway） |
 
 ---
 
-## Repo metrics（v0.1.3）
+## Repo metrics（本分支，`git ls-files`）
 
 ```
-頂層檔                  : 9 (README × 2, LICENSE, plugin.json, manufacturing.md,
-                              INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY)
+頂層檔                  : 13 (README × 2, LICENSE, plugin.json, manufacturing.md, TEAM.md,
+                              CLAUDE.md, INVENTORY, CONTRIBUTING, CHANGELOG, SECURITY,
+                              .gitignore, .gitattributes)
 core/  agents           : 6
-core/  commands         : 9
+core/  commands         : 11 (含 /team)
 core/  skills           : 11
 core/  know-how         : 9
 core/  hooks            : 4
@@ -306,18 +406,31 @@ PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
 Pharma profile (alpha)  : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
 Machinery ETO (alpha)   : 3 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Stub profiles           : 0
+Adapters                : claude-code (install.sh + 2 Python helpers + plugin-mapping.md)
+                              + generic (export.py + README; experimental, v0.3 preview)
+Team tier               : TEAM.md + team/ 23 files (README, for-frontline, gate, policies × 2,
+                              roster.example, 3 example twins + _template, tools 11, local 2)
+Infra                   : 2 MCP servers (scheduler-mcp 5 files; erp-connector 4 incl.
+                              mock_connector + mock data) + 1 on-prem guide
+                              + chat-gateway (32 files)
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
-                              + 1 hero) + CAPTURE-GUIDE.md
-Demo                    : /quote 19s GIFs (繁中/EN) + 2 styled HTML + 6-capability slide
+                              + 1 hero) + 4 mockup HTML + CAPTURE-GUIDE.md
+Demo                    : /quote 19s GIFs (繁中/EN) + 4 HTML + 2 PNG + real-claude-response.md
+                              + 6-capability slide (HTML + PNG)
 Landing page            : docs/index.html (GitHub Pages from /docs)
-Docs                    : 5 (architecture / adoption-guide / profile-dev / ROADMAP
-                              / quickstart-for-beginners)
-Infra                   : 2 MCP servers + 1 on-prem guide
-Examples                : 4 files
+Docs                    : 8 (architecture / adoption-guide / profile-dev / ROADMAP
+                              / quickstart-for-beginners / owner-one-page
+                              / data-classification / permissions-template)
+                              + consulting kit 6 + 6 design specs
+Scripts                 : 2 (regen_explainers.py, regen_screenshots.py)
+Tests                   : 91 files — extends 24 cases, multiprofile 16, team 135 + 18 fixture
+                              cases + 58 unittest, gateway 266 unittest + demo golden,
+                              generic 12, mcp 78 (erp contract) + 30 (scheduler stdio)
+Examples                : 5 files
 .github/                : CI workflow + 4 issue templates (incl. config.yml router)
                               + PR template
-Tracked files           : 139
+Tracked files           : 343
 ```
 
 ---

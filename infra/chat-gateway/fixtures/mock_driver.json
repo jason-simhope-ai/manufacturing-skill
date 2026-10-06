@@ -1,0 +1,194 @@
+{
+ "synthetic": true,
+ "responses": [
+  {
+   "twin": "production-manager",
+   "keywords": [
+    "[排程] briefing-risk-check"
+   ],
+   "result": {
+    "reply": "早安。請先在這個 thread 貼出你今天的 3 個重點，我再用排程資料挑戰並補漏。資料快照：WO-EX-0412 交期餘裕 0.5 天；CNC-03 今日排定保養 4 小時。",
+    "citations": [
+     "排程快照 SCH-EX-1005"
+    ],
+    "assumed": [
+     "排程快照為今早 07:30 匯出"
+    ],
+    "unverified": [
+     "外包件到貨時間"
+    ],
+    "confidence": "中",
+    "decisionPoints": [
+     "插單與否",
+     "是否加班"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   }
+  },
+  {
+   "twin": "production-manager",
+   "keywords": [
+    "今日重點"
+   ],
+   "result": {
+    "reply": "你的 3 點都在資料上看得到；挑戰一點：② CNC-03 保養 4 小時會壓到 WO-EX-0412 的第 3 道工序，① 和 ② 同時成立時交期餘裕會變成負 0.5 天。漏掉的一點：WO-EX-0415 的外購件今天到貨未確認。",
+    "citations": [
+     "排程快照 SCH-EX-1005",
+     "機台保養表 PM-EX-03"
+    ],
+    "assumed": [
+     "CNC-03 保養不能延到夜班"
+    ],
+    "unverified": [
+     "WO-EX-0415 外購件到貨"
+    ],
+    "confidence": "中",
+    "decisionPoints": [
+     "保養是否延後",
+     "WO-EX-0412 是否加班趕工"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   }
+  },
+  {
+   "twin": "production-manager",
+   "keywords": [
+    "WO-EX-0415 的料"
+   ],
+   "result": {
+    "reply": "在已數位化的 12 筆採購資料中，WO-EX-0415 的外購件預定今天 14:00 到貨，但沒有出貨確認；資料涵蓋率：採購 12/12、倉庫收貨尚未匯入。",
+    "citations": [
+     "採購單 PO-EX-0881"
+    ],
+    "assumed": [],
+    "unverified": [
+     "供應商出貨確認"
+    ],
+    "confidence": "低",
+    "decisionPoints": [
+     "是否先排替代工單"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   }
+  },
+  {
+   "twin": "production-manager",
+   "keywords": [
+    "WO-EX-0415 進度"
+   ],
+   "result": {
+    "reply": "WO-EX-0415 在 CNC-02 第 2 道工序，依排程預估今天 16:00 完成。",
+    "citations": [
+     "排程快照 SCH-EX-1005"
+    ],
+    "confidence": "中",
+    "decisionPoints": [
+     "是否插單提前"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   }
+  },
+  {
+   "twin": "qa-manager",
+   "keywords": [
+    "NCR-EX-012"
+   ],
+   "predictFirst": {
+    "reply": "「我先說」模式：請先寫下你對 NCR-EX-012 的嚴重度判斷（高／中／低）與一句理由；你回覆後我再揭露相似案與反例，並對照差異。",
+    "confidence": "中",
+    "decisionPoints": [
+     "嚴重度最終判定"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   },
+   "result": {
+    "reply": "你判「中」。對照：NCR-EX-007、NCR-EX-009 症狀相近，兩件都判「中」並重工結案；反例：NCR-EX-009 重工後 3 週內同模具再發，後來升級 8D。可能推翻你判斷的是「同一模具批次」這一點。",
+    "citations": [
+     "NCR-EX-007",
+     "NCR-EX-009"
+    ],
+    "assumed": [
+     "同一模具批次"
+    ],
+    "unverified": [
+     "熱處理批號"
+    ],
+    "confidence": "中",
+    "decisionPoints": [
+     "嚴重度最終判定",
+     "是否升級 8D"
+    ],
+    "proposedActions": [],
+    "suggestTwin": "production-manager"
+   }
+  },
+  {
+   "twin": "qa-manager",
+   "keywords": [
+    "spc-watch"
+   ],
+   "result": {
+    "reply": "CNC-03 外徑最近 7 點連續上升，仍在管制界限內；這是趨勢提醒，不是異常判定。",
+    "citations": [
+     "SPC 匯出 SPC-EX-03"
+    ],
+    "assumed": [
+     "量具今日已校驗"
+    ],
+    "unverified": [],
+    "confidence": "中",
+    "decisionPoints": [
+     "是否加嚴抽樣或停線"
+    ],
+    "proposedActions": [],
+    "suggestTwin": null
+   }
+  },
+  {
+   "twin": "*",
+   "keywords": [
+    "#fail"
+   ],
+   "result": {
+    "error": "simulated driver failure"
+   }
+  },
+  {
+   "twin": "*",
+   "keywords": [
+    "#leak-t2"
+   ],
+   "result": {
+    "reply": "報價是 NT$ 1,250,000。",
+    "confidence": "中",
+    "decisionPoints": [
+     "x"
+    ]
+   }
+  },
+  {
+   "twin": "*",
+   "keywords": [
+    "#no-dp"
+   ],
+   "result": {
+    "reply": "沒有列決策點的回覆。",
+    "confidence": "中"
+   }
+  }
+ ],
+ "default": {
+  "reply": "（mock）這個問題沒有對應的固定回覆；請換個說法或改問分身的能力範圍內的事。",
+  "confidence": "低",
+  "decisionPoints": [
+   "是否需要找人工確認"
+  ],
+  "proposedActions": [],
+  "suggestTwin": null
+ }
+}

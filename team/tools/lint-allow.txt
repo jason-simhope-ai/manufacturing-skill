@@ -1,0 +1,6 @@
+# teamctl check: exemptions for the name / personal-data heuristics
+# (E012, E014). One regex per line, matched against the flagged text.
+# Every line MUST end with " # <reason>" — a line without a reason is an error.
+# Keep this file empty unless a false positive cannot be reworded away.
+CONFIDENTIAL # DLP tripwire wording quoted from the spec, not a platform id
+UNTRUSTED # prompt-injection envelope marker, not a platform id

@@ -1,0 +1,6 @@
+# Optional SDKs for the real chat adapters. The gateway core is stdlib-only and
+# needs none of these; the mock adapter and every test run without them.
+# Install only what you use:  pip install -r infra/chat-gateway/requirements-optional.txt
+# The real adapters are NOT exercised in CI and need credentials (see README.md).
+slack_sdk>=3.27,<4      # --adapter slack   (Socket Mode)
+discord.py>=2.3,<3      # --adapter discord (Gateway WebSocket)

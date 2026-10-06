@@ -511,6 +511,11 @@ cp -r "${PLUGIN_ROOT}/core/skills"   "${STAGE_DIR}/skills"
 cp -r "${PLUGIN_ROOT}/core/hooks"    "${STAGE_DIR}/hooks"
 cp -r "${PLUGIN_ROOT}/core/know-how" "${STAGE_DIR}/know-how"
 
+# Stage 1b: team tier, into the staged tree (swapped in below). The
+# local build output and gitignored overlays are never installed.
+if [[ -d "${PLUGIN_ROOT}/team" ]]; then cp -r "${PLUGIN_ROOT}/team" "${STAGE_DIR}/team"; rm -rf "${STAGE_DIR}/team/.build" "${STAGE_DIR}/team/local"; fi
+if [[ -f "${PLUGIN_ROOT}/TEAM.md" ]]; then cp "${PLUGIN_ROOT}/TEAM.md" "${STAGE_DIR}/TEAM.md"; fi
+
 # Stage 2: overlay each active profile in order. The conflict scan
 # above guarantees no file collisions between profiles, so order
 # within Stage 2 doesn't affect the final state.
@@ -772,7 +777,7 @@ if [[ -n "${PYTHON_BIN}" ]]; then
 import json, sys
 at, ver, first, src = sys.argv[1:5]
 doc = {"installedAt": at, "pluginVersion": ver, "activeProfile": first,
-       "activeProfiles": sys.argv[5:], "source": src}
+       "activeProfiles": sys.argv[5:], "source": src, "team": True}
 sys.stdout.write(json.dumps(doc, indent=2) + "\n")
 ' "${INSTALLED_AT}" "${PLUGIN_VERSION}" "${ACTIVE_PROFILE_FIRST}" "${PLUGIN_ROOT}" \
     ${ACTIVE_PROFILES_LIST[@]+"${ACTIVE_PROFILES_LIST[@]}"} > "${STAGE_DIR}/.installed"
@@ -791,7 +796,8 @@ else
   "pluginVersion": "$(json_escape "${PLUGIN_VERSION}")",
   "activeProfile": "$(json_escape "${ACTIVE_PROFILE_FIRST}")",
   "activeProfiles": [${ACTIVE_PROFILES_JSON}],
-  "source": "$(json_escape "${PLUGIN_ROOT}")"
+  "source": "$(json_escape "${PLUGIN_ROOT}")",
+  "team": true
 }
 JSON
 fi

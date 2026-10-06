@@ -247,7 +247,7 @@
       <div class="layer-core">
         <div class="col-label">CORE · 跨層底座</div>
         <div class="row-items">
-          <div class="item"><div class="item-name">scheduler-mcp</div><div class="item-desc">生產排程接口</div></div>
+          <div class="item"><div class="item-name">manufacturing-scheduler</div><div class="item-desc">生產排程接口</div></div>
           <div class="item"><div class="item-name">erp-connector</div><div class="item-desc">SAP/鼎新/Oracle</div></div>
           <div class="item"><div class="item-name">GB10 + Ollama</div><div class="item-desc">地端 LLM</div></div>
           <div class="item"><div class="item-name">檔案規範</div><div class="item-desc">圖紙/BOM/NC</div></div>
@@ -334,6 +334,7 @@
       <div class="stat"><div class="stat-num">23</div><div class="stat-label">Know-how（9 + 3 + 11α）</div></div>
       <div class="stat"><div class="stat-num">8</div><div class="stat-label">Hooks（4 + 1 + 3α）</div></div>
       <div class="stat"><div class="stat-num">6</div><div class="stat-label">Profile（1 完整 + 5α + 0 stub）</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Team tier 分身（2 啟用）</div></div>
       <!-- AUTO-END: explainer01-stats -->
     </div>
 
@@ -359,6 +360,7 @@
       <div class="panel-row"><strong>預設</strong> Claude Code + Anthropic 雲端模型</div>
       <div class="panel-row"><strong>選配</strong> 地端 GB10 + Ollama（未經本專案驗證）</div>
       <div class="panel-row"><strong>DATA</strong> 預設會送給模型供應商</div>
+      <div class="panel-row"><strong>分身層</strong> 只處理 T0／T1；T1 會經聊天平台（Slack／Discord）與雲端模型；T2／T3 不進分身頻道</div>
       <div class="panel-row"><strong>COST</strong> 雲端訂閱；地端約 NT$3,000/月</div>
     </div>
 
@@ -402,7 +404,7 @@
     <div class="glossary-item"><strong>Plugin</strong><span>給這位新人的「製造業職前訓練包」</span></div>
     <div class="glossary-item"><strong>Core</strong><span>所有製造業共通的基本功（不管做什麼都會用到）</span></div>
     <div class="glossary-item"><strong>Profile</strong><span>你這個產業的專業知識（CNC / PCB / 食品...）</span></div>
-    <div class="glossary-item"><strong>Agent</strong><span>能扮演特定角色（報價師、業助）的 AI 分身</span></div>
+    <div class="glossary-item"><strong>Agent</strong><span>能扮演特定角色（報價師、業助）的 AI 角色</span></div>
     <div class="glossary-item"><strong>Skill</strong><span>「該怎麼做某件事」的 SOP，AI 跟著做</span></div>
     <div class="glossary-item"><strong>MCP</strong><span>讓 AI 能讀懂你的 ERP / MES 的「翻譯機」</span></div>
     <div class="glossary-item"><strong>Hook</strong><span>在特定時機自動觸發的檢查/通知（像門禁卡）</span></div>
@@ -410,6 +412,7 @@
     <div class="glossary-item"><strong>Ollama</strong><span>把 AI 模型搬回家自己跑的軟體（不需要連雲端）</span></div>
     <div class="glossary-item"><strong>LLM</strong><span>大語言模型 — ChatGPT/Claude/Gemini 背後的 AI 大腦</span></div>
     <div class="glossary-item"><strong>Fork</strong><span>把整個 repo 複製一份到你自己帳號，自由修改</span></div>
+    <div class="glossary-item"><strong>分身</strong><span>只指「某個職位的副駕」（例：品保部主管分身），住在聊天頻道；不是替身，判斷留給人</span></div>
   </div>
 </div>
 

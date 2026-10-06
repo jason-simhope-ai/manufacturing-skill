@@ -48,6 +48,7 @@
   .l4 { --color: #6f4a8a; }
   .l5 { --color: #4a8a8a; }
   .l6 { --color: #a55050; }
+  .l7 { --color: #8a5a7a; }
 
   .sidebar { display: flex; flex-direction: column; gap: 10px; }
   .panel {
@@ -167,9 +168,19 @@
       <div class="layer-num">6.<small>SECURITY</small></div>
       <div class="layer-content">
         <div class="item"><div class="item-name">Repo private 選項</div><div class="item-desc">客製 profile 可放私 repo</div></div>
-        <div class="item"><div class="item-name">資料外送控管</div><div class="item-desc">預設會送模型供應商；如需隔離須自行封鎖並實測，air-gap 未經驗證</div></div>
+        <div class="item"><div class="item-name">資料外送控管</div><div class="item-desc">預設會送模型供應商；如需隔離須自行封鎖並實測，air-gap 未經驗證；分身層不能 air-gap</div></div>
         <div class="item"><div class="item-name">Service account</div><div class="item-desc">ERP/MCP 用專屬帳號 + read-only</div></div>
         <div class="item"><div class="item-name">IATF 16949 ready</div><div class="item-desc">audit log 對得上稽核</div></div>
+      </div>
+    </div>
+
+    <div class="layer l7">
+      <div class="layer-num">7.<small>TWIN</small></div>
+      <div class="layer-content">
+        <div class="item"><div class="item-name">分身層資料流向</div><div class="item-desc">只處理 T0／T1；T1 會經聊天平台與雲端模型</div></div>
+        <div class="item"><div class="item-name">聊天平台</div><div class="item-desc">Slack／Discord（SaaS），上限 T1</div></div>
+        <div class="item"><div class="item-name">gateway 常駐主機</div><div class="item-desc">只連外、不開入站；每分身每日費用上限必填</div></div>
+        <div class="item"><div class="item-name">T2／T3 不進來</div><div class="item-desc">圖紙、報價、客戶資料、高安規專案；設定拒載＋字樣告警，其餘靠人</div></div>
       </div>
     </div>
 
@@ -181,7 +192,7 @@
       <div class="panel-title">OPS 指標</div>
       <div class="stat"><div class="stat-num">~30s</div><div class="stat-label">install 時間</div></div>
       <div class="stat"><div class="stat-num">~60s</div><div class="stat-label">/quote 回應（Ollama 32b）</div></div>
-      <div class="stat"><div class="stat-num">~3K</div><div class="stat-label">月維運成本（NT$）</div></div>
+      <div class="stat"><div class="stat-num">~3K</div><div class="stat-label">地端 GB10 月維運（NT$，原估計；不含分身 pilot）</div></div>
       <div class="stat"><div class="stat-num">0</div><div class="stat-label">DB / VM 維護</div></div>
       <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Git 版控可追溯</div></div>
     </div>
@@ -227,7 +238,7 @@
   </div>
   <div class="reason-card">
     <div class="reason-card-title">資料流向可控管</div>
-    <div class="reason-card-body">圖紙 .gitignore 不進 repo、ERP 走 service account 內網；LLM 預設在雲端，改跑地端 GB10 為選配且未經本專案驗證，隔離須由 IT 自行實測</div>
+    <div class="reason-card-body">圖紙 .gitignore 不進 repo、ERP 走 service account 內網；LLM 預設在雲端，改跑地端 GB10 為選配且未經本專案驗證，隔離須由 IT 自行實測；分身只處理 T0／T1，T1 會經聊天平台與雲端模型</div>
   </div>
   <div class="reason-card">
     <div class="reason-card-title">客戶稽核友善</div>
