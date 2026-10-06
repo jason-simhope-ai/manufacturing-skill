@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> 把工廠的 SOP 變成會幫你看事情的 AI 同事：30 分鐘裝好，在自己的電腦上用。預設用雲端模型，你貼給它的內容會送到雲端；圖紙、報價、客戶資料要留在公司，就不要貼給它，要讓 AI 讀圖紙請用地端模型（[怎麼做](#cloud-first-on-prem-later)）。聊天室裡的「分身」只碰一般資料。
+> 把工廠的 SOP 變成會幫你看事情的 AI 同事：約 30–60 分鐘裝好，在自己的電腦上用。預設用雲端模型，你貼給它的內容會送到雲端；圖紙、報價、客戶資料要留在公司，就不要貼給它，要讓 AI 讀圖紙請用地端模型（[怎麼做](#cloud-first-on-prem-later)）。聊天室裡的「分身」只碰一般資料。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -75,11 +75,13 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 | 挑戰你的想法：「這一點可能推翻你的判斷」        | 在公司系統裡改資料（分身改不了）   |
 | 寫草稿給你改（每份都標「草稿」）                | 簽字，並為結論負責                 |
 
+每件工作都先標清楚是哪一種：💪 強化既有優勢／✨ 創造新能力／📦 外包既有工作（預設關閉）。
+
 **🛡️ 安全三句話**
 
 - **這些不進聊天室**：圖紙、報價、客戶資料、客戶要求保密的特殊專案。拿不準，就當作不能貼。
 - **老闆先簽一頁原則**：分身是副駕不是替身，紀錄不拿來打考績。沒簽就不開。
-- **任何人都可以說「我不同意」**：分身只回「收到」，不再給新答案，也不記是誰說的。
+- **任何人都可以說「我不同意」**：分身只回「收到」，不再給新答案，也不記是誰說的（聊天軟體上還是看得到是誰發的）。
 
 **👀 想多看一點**
 
