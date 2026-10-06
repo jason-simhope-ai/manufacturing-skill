@@ -1,9 +1,10 @@
-# 範例 roster（synthetic：通用部門與職稱，不描述任何真實公司）。
+# 範例 roster（synthetic、虛構）：部門、職稱與 id 都只是範例，不描述任何真實公司。
+# 請整份改成貴公司自己的部門與職稱（id、title、channels 都要換），不要直接沿用。
 # 真實 roster 請放 team/local/roster.local.yaml（gitignored）；規則見 team/README.zh-TW.md。
 schema: 1
 synthetic: true
-org: { id: example-machinery-co, displayName: 範例機械設備製造商, timezone: Asia/Taipei }
-profiles: [cnc-machining]
+org: { id: example-machinery-co, displayName: 範例製造公司（虛構）, timezone: Asia/Taipei }
+profiles: [cnc-machining]   # 範例：換成貴公司安裝的 profile（見 profiles/）；分身檔引用的 agent 要在 core 或這些 profile 裡找得到（teamctl check 會查，E023）
 policy: { saasTierCeiling: T1, cloudTierCeiling: T1, autonomyCeiling: draft, channelWindow: 10 }
 departments:
   - { id: engineering, title: 技術部, head: engineering-manager, escalation: [engineering-manager, chair-head] }

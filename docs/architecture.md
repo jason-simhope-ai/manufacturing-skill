@@ -216,7 +216,7 @@ effective = min(capability.autonomy, 分身檔上限, roster 內該分身上限,
 另外：outsource ≤ draft；職位 VACANT → observe；本回合疑似被注入（tainted）→ ≤ suggest；alpha 再封頂在 draft
 ```
 
-**資料分級**：T0–T3；Slack / Discord 與雲端模型上限 T1，T2 只在本機 mock，T3（高安規客製專案）在 alpha 由兩道防線擋：roster 含 T3 頻道或分身即拒載（exit 3），訊息含 T3 字樣則擋下並提示（字樣比對，不是內容理解）。repo 內只有職稱與合成資料，沒有真名、平台 id、secret。
+**資料分級**：T0–T3；Slack / Discord 與雲端模型上限 T1，T2 只在本機 mock，T3（受管制或客戶要求保密的專案資料）在 alpha 由兩道防線擋：roster 含 T3 頻道或分身即拒載（exit 3），訊息含 T3 字樣則擋下並提示（字樣比對，不是內容理解）。repo 內只有職稱與合成資料，沒有真名、平台 id、secret。
 
 **延後（不在 v0.2.0-alpha）**：T3 執行期與隔離主機、動作執行與核准落地（目前沒有可寫入的工具）、長期記憶、Slack 上的 T2、gateway 內建 cron、分身互相交棒、DM、其他 LLM driver、LINE / Teams adapter。完整清單見[設計 spec §14](superpowers/specs/2026-10-05-digital-twin-team-design.md)與 [ROADMAP](ROADMAP.md)。
 

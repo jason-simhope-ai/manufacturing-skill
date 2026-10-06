@@ -2,9 +2,9 @@
 
 > **這份是給 IT（部署者、金鑰保管人）的技術文件，董事長不必讀。**
 > 董事長只需要三件事，都在 [董事長一頁](../../docs/owner-one-page.zh-TW.md)：
-> ① **花多少**：每個分身每天的費用上限 `MFG_TEAM_DAILY_BUDGET_USD` 由董事長核准；用真模型時沒設就不啟動，重啟也不歸零。
-> ② **怎麼停**：任何主管一句話，金鑰保管人在 30 分鐘內停止服務並撤銷聊天 bot 與 API 金鑰；董事長不需持有金鑰。
-> ③ **資料到哪**：圖紙、報價、客戶資料（T2）與高安規專案資料（T3）不進來；分身只處理 T0／T1，T1 會經聊天平台與雲端模型。
+> ① **花多少**：每個分身每天的費用上限 `MFG_TEAM_DAILY_BUDGET_USD`（電腦環境變數裡的一個金額）由董事長核准；用真模型時沒設就不啟動，重啟也不歸零。
+> ② **怎麼停**：任何主管一句話，金鑰保管人在 30 分鐘內停止服務並撤銷聊天機器人（bot）憑證與 API 金鑰（呼叫 AI 模型的通行金鑰）；董事長不需持有金鑰。
+> ③ **資料到哪**：圖紙、報價、客戶資料（T2）與受管制或客戶要求保密的專案資料（T3）不進來；分身只處理公開與內部資料（T0／T1），內部資料（T1）會經聊天平台與雲端模型。
 
 A thin, stdlib-only Python 3.11 gateway that connects a chat platform to twin
 "copilots". It owns routing, policy, rate limits, approvals, taint tracking and
