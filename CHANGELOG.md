@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI hardening** — `.github/workflows/ci.yml` now sets `permissions: contents: read`, pins `actions/checkout` to a full commit SHA (v4.4.0), pins `pyyaml` to `>=6,<7`, and only cancels in-progress runs for pull requests (never for `main`).
+
 ### Fixed
 
+- **CI profile-extends lint (step 10a) no longer passes vacuously** — it now also lints the `tests/extends/case-*/profile.md` fixtures (error cases must be rejected, others accepted) alongside real `profiles/` files, and fails if zero files were linted.
+- **CI core heading-anchor guard (step 10b) now actually runs on PRs** — checkout uses `fetch-depth: 0`, a failing diff is an error instead of a silent skip, the step reports whether core files were touched, and its logic moved into an argv/env-driven Python block (no filename or heading interpolated into `python3 -c`, no hidden errors, dead check removed).
+- **CI core heading-anchor guard (step 10b) handles non-ASCII core paths** — the changed-file list is now read with `git diff -z` (NUL-separated, unquoted) instead of line-split `--name-only` output; previously a path such as `core/skills/01-報價.md` arrived in git's quoted/escaped form, `git show` could not resolve it, and its removed headings were never checked.
 - **`install.sh --list` and the interactive picker no longer abort** under `set -euo pipefail` when a `profile.json` has no `"status"` key (e.g. `cnc-machining`); a missing status still means `complete`. CI now smoke-tests `--list`, `--core-only` and single-profile installs.
 - **`install.sh` no longer leaves a half-built install behind.** Every check (profile names, profile dirs, python3 / PyYAML when needed, conflict scan) now runs before the existing install is touched. Previously `install.sh ..`, a missing python3, missing PyYAML or a bad `extends:` target failed *after* the old install had been moved to `.bak`, leaving `plugins/manufacturing-skill/` without `.installed`.
 - **Profile names are validated** (`[A-Za-z0-9_-]`, no leading `-`): `..`, `../x`, `a/b`, names with spaces and `*` are rejected up front; `*` is no longer glob-expanded against the current directory.
