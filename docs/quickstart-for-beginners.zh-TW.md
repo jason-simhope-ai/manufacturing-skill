@@ -167,7 +167,7 @@ Select [0-5, comma-separated for multi]:
 
 ![install.sh 安裝選單實際畫面（示意圖）](quickstart-screenshots/step5-install-selector-mockup.png)
 
-> 📸 這張是示意圖，畫的是舊版選單。實際的字以上面的文字框為準（例如射出成型那行現在顯示 `🧪 alpha`）。
+> 📸 示意圖，跟你畫面上看到的選單一樣（產業包清單會隨版本增加）。
 
 ### 3-3 讓 Claude Code 載入 AI 同事，並開在對的資料夾
 
