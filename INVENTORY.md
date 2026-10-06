@@ -185,6 +185,18 @@ INVENTORY.md              ← 這份
 
 > **Alpha 警告**：內容基於 PIC/S GMP、ICH Q7/Q9/Q10、資料完整性指引公開摘要，未經 GMP QA / 確效人員驗證；數字標「範例 / 需驗證」。AI 輸出永遠不是 GMP 紀錄 — 不結案偏差、不核准 CAPA、不放行批次；不取代 QA / QP、法規事務或經確效的系統。
 
+#### `profiles/machinery-eto/` — 🧪 v0.1.0 alpha profile
+
+| 類別         | 內容                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manifest     | [profile.json](profiles/machinery-eto/profile.json) · [README.md](profiles/machinery-eto/README.md)                                                                                                                                        |
+| Agents (3)   | [eto-quote-engineer](profiles/machinery-eto/agents/eto-quote-engineer.md) · [project-engineer](profiles/machinery-eto/agents/project-engineer.md) · [commissioning-service-coordinator](profiles/machinery-eto/agents/commissioning-service-coordinator.md) |
+| Skills (3)   | [eto-quote-breakdown](profiles/machinery-eto/skills/eto-quote-breakdown.md) · [spec-freeze-and-design-review](profiles/machinery-eto/skills/spec-freeze-and-design-review.md) · [fat-sat-acceptance](profiles/machinery-eto/skills/fat-sat-acceptance.md) |
+| Know-how (3) | [eto-vs-mts-quoting](profiles/machinery-eto/know-how/eto-vs-mts-quoting.md) · [machinery-safety-ce-basics](profiles/machinery-eto/know-how/machinery-safety-ce-basics.md) · [project-handover-and-after-sales](profiles/machinery-eto/know-how/project-handover-and-after-sales.md) |
+| Hooks (1)    | [pre-quote](profiles/machinery-eto/hooks/pre-quote.md)（取代 core `pre-quote`：加 ETO 閘門 — 規格未凍結不得正式報價、未定選配標 `[需澄清]`；core 零件檢查原封保留）                                                                    |
+
+> **Alpha 警告**：內容基於公開機械安全標準摘要（ISO 12100、IEC 60204-1）與設備廠一般實務，未經設備廠專案 / 報價 / 安規工程師驗證；數字標「範例」，CE（2006/42/EC、2023/1230）與台灣安全資訊申報細節標「需驗證」。報價是工程估算；AI 不承諾交期、不簽驗收、不做安全評估或 CE 判定。零件級報價仍由 core `quote-specialist` 處理。
+
 > **重要**：`_templates/` 不會被 install.sh 複製進使用者的 plugin 安裝目錄，避免 placeholder 變成假 agent。
 
 ---
@@ -292,6 +304,7 @@ Injection profile (alpha): 1 agent + 1 skill + 2 know-how + 1 manifest
 Food profile (alpha)    : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
 PCB profile (alpha)     : 2 agents + 2 skills + 2 know-how + 1 manifest
 Pharma profile (alpha)  : 2 agents + 2 skills + 2 know-how + 1 hook + 1 manifest
+Machinery ETO (alpha)   : 3 agents + 3 skills + 3 know-how + 1 hook + 1 manifest
 Stub profiles           : 0
 Explainers (HTML)       : 4 + 4 PNG snapshots
 Quickstart for beginners: 1 doc + 7 step images (3 real screenshots + 3 mockups
