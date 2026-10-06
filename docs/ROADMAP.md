@@ -34,6 +34,12 @@
 
 - ✅ **多 profile 同時 active**（`install.sh cnc-machining,injection-molding` + refuse-on-conflict + `active-profiles.json` aggregation + `/add-profile` slash command + CI pairwise scan）— see [CHANGELOG `[0.1.5]`](../CHANGELOG.md) and [spec](superpowers/specs/2026-05-09-multi-profile-active-design.md)
 
+## v0.3 preview (unreleased)
+
+**Pulled forward from v0.3**: generic adapter shipped early as experimental.
+
+- ✅ **Generic adapter**（`adapters/generic/export.py`：core + profile overlay + `extends:` 解析後匯出成純 markdown；`files` 資料夾 + `MANIFEST.json` 或單一 `bundle` 檔）— see [adapters/generic/README.md](../adapters/generic/README.md)
+
 ## v0.2 (預計 2026-Q3)
 
 **主題：profile 多樣化 + override 機制成熟**
@@ -41,6 +47,7 @@
 - 🎯 補完一個社群 profile（最有可能：射出成型，因為下一個目標客戶可能是射出廠）
 - ✅ ~~部分內容繼承~~（v0.1.4 提早出貨）
 - ✅ ~~多 profile 同時 active~~（v0.1.5 提早出貨）
+- ✅ 設備接單設計（ETO）profile：`machinery-eto` alpha 已出貨（3 agent、3 skill、3 know-how、`pre-quote` hook override；內容需設備製造業工程師驗證）
 - ✅ GitHub Actions CI（v0.1.1 起；v0.1.3 加結構檢查；v0.1.4 加 inheritance lint；v0.1.5 加 multi-profile pairwise scan）
 - 🎯 自動產生 explainer HTML（從 plugin.json + manifests 動態 render）— 部分達成（v0.1.4 stat panel auto-regen + drift detection），更全面的 catalog 自動化仍 pending
 
@@ -53,7 +60,7 @@
 - 🎯 Cursor adapter
 - 🎯 Gemini CLI adapter
 - 🎯 Codex adapter
-- 🎯 Generic adapter（純 markdown export，給其他 LLM agent 用）
+- ✅ ~~Generic adapter（純 markdown export，給其他 LLM agent 用）~~（v0.3 preview 提早出貨，experimental）
 - 🎯 多語 explainer（簡中、英文）
 
 ---
@@ -124,7 +131,7 @@ manufacturing-cli (自建 orchestrator)
 明確 **NO** 的方向，避免使用者誤期待：
 
 - ❌ Mobile app（不是 plugin 的事）
-- ❌ 雲端 SaaS 版（違背地端優先精神）
+- ❌ 雲端 SaaS 版（地端是選配而非預設；雲端 SaaS 版不在計畫內）
 - ❌ 自家 LLM 訓練（Anthropic / Mistral / Qwen 已經做得很好）
 - ❌ 取代 ERP / MES（永遠是 add-on）
 - ❌ 客戶端的圖紙判讀 ML（pure CV 任務，不適合 LLM agent）

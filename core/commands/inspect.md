@@ -1,7 +1,7 @@
 ---
 name: inspect
 description: 啟動檢驗流程 — IQC / IPQC / FQC / OQC 任一階段
-allowed-tools: [Read, Grep, Glob, Bash]
+allowed-tools: [Read, Grep, Glob]
 argument-hint: "[檢驗階段] [工單號 或 進料單號]"
 ---
 

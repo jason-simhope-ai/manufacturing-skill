@@ -1,11 +1,17 @@
 ---
 name: order-status
 description: 查詢訂單目前狀態 — 從接單、排程、生產、檢驗到出貨各階段
-allowed-tools: [Read, Grep, Glob, Bash]
+allowed-tools: [Read, Grep, Glob, Bash, mcp__manufacturing-scheduler__list_work_orders, mcp__manufacturing-scheduler__get_work_order_status, mcp__manufacturing-scheduler__get_machine_load]
 argument-hint: "[訂單號 或 客戶名稱 或 工單號]"
 ---
 
 # /order-status — 訂單狀態查詢
+
+> **注意：沒有 MCP 連線時，輸出是模擬資料。**
+> 若 `erp-connector` / `manufacturing-scheduler` 沒有接上真實系統，本指令只會使用
+> `infra/mcp-servers/scheduler-mcp/mock-data/` 內的 mock data。此時回覆**必須**在開頭與每個數字區塊標示
+> 「模擬資料」，不得當作真實訂單 / 機台狀態呈現，也不得改用 `git log` 或其他推測方式補齊狀態。
+> 沒有任何資料來源時，直接回答「無法取得資料」。
 
 呼叫 **sales-coordinator** agent（`core/agents/sales-coordinator.md`）查詢訂單目前所在階段。
 
@@ -13,9 +19,13 @@ argument-hint: "[訂單號 或 客戶名稱 或 工單號]"
 
 1. 解析使用者給的識別資訊（訂單號 / PO / 客戶名 / 工單號）
 2. 透過 `infra/mcp-servers/erp-connector` 查 ERP 訂單 master
-3. 透過 `infra/mcp-servers/scheduler-mcp` 查生產排程
+3. 透過 MCP server `manufacturing-scheduler`（`infra/mcp-servers/scheduler-mcp`）查生產排程：
+   - 給訂單號 → `list_work_orders`（`so_id`）；給客戶名 → `list_work_orders`（`customer`）；給工單號 → `get_work_order_status`（`wo_id`）
+   - `list_work_orders` 預設回 50 筆、上限 200；`has_more` 為 true 時用 `offset` 續查
+   - 工單落在負載高的機台時，用 `get_machine_load` 看該機 `load_pct`（0–1，≥ 0.85 視為瓶頸）作為延遲風險依據
 4. 整合 6 段流程的所在位置：報價 → 接單 → 排程 → 生產 → 檢驗 → 出貨
 5. 如果有延遲風險，主動標示並建議下一步
+6. 若資料來自 mock data（無 MCP 連線），在輸出標示「模擬資料」
 
 ## 分類與分工
 

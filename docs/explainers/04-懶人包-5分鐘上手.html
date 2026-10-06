@@ -280,7 +280,7 @@ W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
 
 <span class="prompt">$</span> <span class="cmd">cd ../.. && bash adapters/claude-code/install.sh my-injection-shop</span>
 <span class="ok">✅ Installation complete.</span>
-<span class="hint"># 5 個 alpha profile 都內附 _templates/（agent-starter 等），照著填更快；完整流程見 docs/profile-development.md</span></div>
+<span class="hint"># 4 個 alpha profile（PCB/射出/食品/製藥）內附 _templates/agent-starter.md，照著填更快；完整流程見 docs/profile-development.md</span></div>
         </div>
       </div>
     </div>
@@ -313,8 +313,8 @@ W2026042100123 IPQC 巡檢（已加工 60 件，本次抽 5 件）
       <div class="panel-title">❓ 常見問題</div>
       <div class="faq-q">不是 CNC 廠也能用？</div>
       <div class="faq-a">能。跑 install.sh --core-only 純試框架</div>
-      <div class="faq-q">資料會外流嗎？</div>
-      <div class="faq-a">.gitignore 排除真實圖紙；雲端用 Claude API（Anthropic 不訓練客戶資料）；地端 Ollama 完全不出網</div>
+      <div class="faq-q">資料會送出去嗎？</div>
+      <div class="faq-a">.gitignore 排除真實圖紙不進 repo；但預設模型在 Anthropic 雲端，貼上或附上的內容會送給模型供應商，依你所用方案的條款處理（個人與商用方案不同）；地端 Ollama 為選配，未經本專案驗證，隔離須自行實測</div>
       <div class="faq-q">壞了怎麼辦？</div>
       <div class="faq-a">/manufacturing doctor 健檢，或 git pull 重裝</div>
     </div>

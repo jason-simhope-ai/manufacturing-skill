@@ -1,7 +1,7 @@
 ---
 name: bom-check
 description: 解析 BOM 並檢查完整性、單位一致性、庫存可用性、缺料風險
-allowed-tools: [Read, Grep, Glob, Bash]
+allowed-tools: [Read, Grep, Glob]
 argument-hint: "[BOM 檔路徑：xlsx/csv/pdf]"
 ---
 

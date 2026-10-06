@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上、不外流圖紙。
+> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — plugin 檔案與提示詞存在你的電腦；預設模型是 Anthropic 雲端，貼進去的內容會送給模型供應商（地端為選配，見[資料流向](#資料流向一張圖)）。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -25,6 +25,8 @@
 > ⭐ Claude Opus 4.7 對 quote-specialist prompt 的真實回應
 
 ![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo.png)
+
+> *情境示意：此為把 quote-specialist 提示詞手動貼到 claude.ai 網頁版得到的回應（見[原始紀錄](docs/demo/real-claude-response.md)），不是安裝後的 plugin 在 Claude Code 內執行的錄影；下方動畫為同一份回應的重播。*
 
 **真實場景**：客戶 RFQ 寫「SUS304 不鏽鋼支架要 RAL9005 黑陽極」 — 工程上根本做不到（陽極處理是給鋁/鈦的）。
 plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代方案、parking 在客戶書面確認上才鎖價。
@@ -117,7 +119,16 @@ sequenceDiagram
 | ----------------- | --------------------------------------- | ------------------------------------------------------------ |
 | AI 不懂製造業術語 | 自己訓 LLM、自己寫 prompt（卡在沒人會） | 5 隻內建 agent + 9 份 core know-how，AI 開箱就懂 ISO / IATF / Lean / OEE |
 | 各家流程都不一樣  | 找 SI 客製，超貴超慢                    | core + profile overlay，企業 fork 後改產業包即可             |
-| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | 預設地端 GB10/Ollama，圖紙不出公司                           |
+| IT 部門擋資安     | 雲端 SaaS 過不了客戶稽核                | plugin 本身在本機；預設模型走 Anthropic 雲端，地端 GB10/Ollama 為選配（[未經本專案端到端驗證](infra/on-prem/gb10-setup.md)） |
+
+---
+
+## 資料流向一張圖
+
+- **留在你電腦上的**：plugin 的 prompt、skill、know-how、hook，以及你的圖紙與 BOM 檔案本身。
+- **會送出去的**：預設模型是 Anthropic 雲端（Claude Code）。你貼進對話或用 `@檔案` 附上的內容，都會傳給模型供應商，依其條款處理。
+- **條款有差**：個人／消費者方案與商用方案（Team / Enterprise / API）對資料保存與訓練用途的規定不同，送客戶圖紙或機密資料前，請先讀你實際使用方案的條款。
+- **要不送出去**：改走地端模型是選配，步驟見 [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md)；該文件**未經本專案端到端驗證**，上線前請讓 IT 自行驗證隔離（文中有驗證方法）。
 
 ---
 
@@ -130,7 +141,7 @@ sequenceDiagram
 | **Anthropic 帳號**    | ✅ 必要                         | 安裝完 Claude Code 後 `claude login` 完成登入             |
 | **Git**               | ✅ 必要                         | 安裝過程要 clone repo                                     |
 | **桌面版 app（選配）**| 可不裝                          | 桌面 app 內建 terminal，CLI 跟桌面 app 兩條路擇一即可     |
-| **GPU / 地端 LLM**    | ❌ 不需要（v0.1 純雲端就能跑） | 客戶會稽核圖紙時才考慮，見下方 [Cloud first, on-prem later](#cloud-first-on-prem-later) |
+| **GPU / 地端 LLM**    | ❌ 不需要（v0.1 純雲端就能跑） | 客戶要求圖紙不可送出雲端時才考慮（未經本專案驗證），見下方 [Cloud first, on-prem later](#cloud-first-on-prem-later) |
 
 ---
 
@@ -167,12 +178,16 @@ bash adapters/claude-code/install.sh
 /manufacturing init     # ← 第一次用打這個，AI 會引導 4 個問題
 ```
 
+install.sh 把 plugin 裝到 `~/.claude/plugins/manufacturing-skill/`，再用 symlink 連進 `~/.claude/skills/` 讓 Claude Code 載入；裝完請重新啟動 Claude Code 或執行 `/reload-plugins`（用 `claude plugin list` 確認）。
+
 或者直接 skip 引導：
 
 ```bash
 /quote @examples/sample-drawing/bracket.md   # CNC 產業包 demo
 /quote 「我做不鏽鋼五金件，幫我寫一份報價流程」  # 純文字描述也可以
 ```
+
+- **不用 Claude Code？** 同一份內容可匯出成純 markdown，給 Cursor、Gemini CLI、Codex 或地端 Ollama 當 system prompt：`python3 adapters/generic/export.py --profiles cnc-machining --out ./export` — 詳見 [adapters/generic/README.md](adapters/generic/README.md)（experimental，v0.3 preview）。
 
 ---
 
@@ -189,6 +204,10 @@ A: 不一定。Claude Code **桌面 app** 內建 terminal、有圖形介面，�
 **Q: VS Code 裡也能用嗎？**
 A: 可以。Claude Code 有 VS Code 整合，安裝完 plugin 後在 VS Code 裡照樣呼叫所有 `/` 指令。
 
+**Q: 可以直接在 LINE 上用嗎？**
+A: **目前不行。** 這個 repo 沒有 LINE 整合，也沒有 LINE 閘道。現況的做法是：在 Claude Code 裡產出報價草稿、回覆訊息草稿，**由人檢視後自己複製貼到 LINE**（含對客戶的訊息，請勿讓 AI 自動發送）。
+[ROADMAP](docs/ROADMAP.md) 目前規劃的是 Telegram 通知；LINE 閘道尚未排入，需要先有多人共用與對外訊息核准的設計才會做。另外，貼進 LINE 群組的內容就離開了你的控管範圍，機密圖紙與客戶資料請不要貼。
+
 **Q: 我不是 CNC 廠也能用嗎？**
 A: 可以，三種選法 ——
 1. **Try without a profile（最快）** — 跑 `bash install.sh --core-only`，跳過所有產業包，只裝 5 隻通用 agent。直接用通用問答試「AI 懂不懂我的工廠」。
@@ -199,7 +218,7 @@ A: 可以，三種選法 ——
 
 ### Cloud first, on-prem later
 
-預設**不需要任何特殊硬體** — 用一般電腦的 Claude Code 直接跑就行（雲端 Anthropic API）。
+預設**不需要任何特殊硬體** — 用一般電腦的 Claude Code 直接跑就行，但模型在 Anthropic 雲端，你附上的檔案與貼上的文字都會送給模型供應商（見[資料流向](#資料流向一張圖)）。
 
 什麼時候才考慮地端 LLM（GB10 / Ollama）？
 
@@ -207,7 +226,7 @@ A: 可以，三種選法 ——
 |---|---|
 | 想先試試看、確認價值 | ☁️ **雲端 Claude Code，不用買硬體** |
 | 跑了 1-2 週覺得有用 | ☁️ 繼續雲端，確認團隊接受度 |
-| 客戶會稽核（IATF / ISO 醫材 / 圖紙不可外流） | 🏠 才考慮地端 — 詳見 [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
+| 客戶會稽核（IATF / ISO 醫材 / 圖紙不可外流） | 🏠 才考慮地端（選配、未經本專案端到端驗證）— 詳見 [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | 公司本來就買了 AI 硬體想物盡其用 | 🏠 直接接上就好 |
 
 **先別被「AI 要花一筆設備錢」嚇跑** — v0.1 純雲端就能跑完整流程。

@@ -197,7 +197,7 @@ status: alpha
 - 背景：profile 內容在客戶端會被送進雲端模型；權限只管「動作」，不管「資料送去哪」，所以內容規則（§7）也要遵守。
 
 CI 步驟 **「Agents — tool allowlist」** 會檢查 `core/**/agents/*.md`、`profiles/**/agents/*.md`、`profiles/**/_templates/agent-*.md`：
-`tools` 必須是 `{Read, Grep, Glob}` 的子集；`Bash` 只有在內文有上述標記時才放行；標記存在但沒宣告 `Bash` 也算錯（避免殘留）。
+`tools` 必須是 `{Read, Grep, Glob}` 的子集；`Bash` 只有在內文有上述標記時才放行；唯讀的 scheduler MCP 工具（名稱以 `mcp__manufacturing-scheduler__` 開頭，例如 `mcp__manufacturing-scheduler__list_work_orders`）依前綴放行，其他 MCP server 的工具仍不允許（要新增前綴請另開 PR 改 CI `MCP_PREFIXES`）；標記存在但沒宣告 `Bash` 也算錯（避免殘留）。
 要放寬 allowlist 請另開 PR 改 CI 並說明理由。
 
 `extends:` 的 agent（§9）：CI 檢查的是 profile 檔本身的 `tools`；合併後預設與 core 的 list **union**，不會憑空多出權限。
@@ -419,7 +419,7 @@ CI 步驟對照（失敗時看步驟名就知道去哪修）：
 | Explainer auto-sections — drift check                             | 統計面板沒 regen                                                      |
 | Multi-profile — pairwise conflict scan / helper unit tests        | 已登記 profile 之間同名檔                                             |
 | Profiles — every profiles/&lt;dir&gt; is registered in plugin.json | 資料夾沒登記、`status` 與清單不一致（§4）                             |
-| Agents — tool allowlist                                           | `tools` 超出 `Read/Grep/Glob`、`Bash` 沒有理由標記（§6）              |
+| Agents — tool allowlist                                           | `tools` 超出 `Read/Grep/Glob`（`mcp__manufacturing-scheduler__*` 除外）、`Bash` 沒有理由標記（§6） |
 | Explainer 01 — overlay rows vs stat panel                         | 手改的 overlay row / 標籤與統計面板數字不一致（§11 #4）               |
 
 除了 CI，PR 前建議再跑：

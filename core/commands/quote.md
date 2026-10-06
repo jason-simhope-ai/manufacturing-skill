@@ -1,7 +1,7 @@
 ---
 name: quote
 description: 啟動報價流程 — 從 RFQ / 圖紙 / 客戶口頭詢價產生結構化報價單
-allowed-tools: [Read, Grep, Glob, Bash]
+allowed-tools: [Read, Grep, Glob]
 argument-hint: "[圖紙路徑或 RFQ 檔案] [選用：客戶名稱]"
 ---
 

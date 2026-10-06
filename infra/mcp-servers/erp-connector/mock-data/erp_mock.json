@@ -1,0 +1,29 @@
+{
+  "_note": "Synthetic data only. No real customers, prices or contacts. Used by MockErpConnector.",
+  "customers": [
+    {"id": "C-A001", "name": "客戶A（合成）", "grade": "A", "credit_limit": "5000000", "credit_used": "1200000", "payment_terms": "T/T 30", "industry": "automotive", "requires_iatf": true,
+     "contact_name": "王小明（合成）", "contact_phone": "02-0000-0001", "contact_email": "buyer-a@example.invalid"},
+    {"id": "C-B002", "name": "客戶B（合成）", "grade": "B", "credit_limit": "2000000", "credit_used": "1900000", "payment_terms": "Net 60", "industry": "electronics", "requires_iatf": false,
+     "contact_name": "李小華（合成）", "contact_phone": "03-0000-0002", "contact_email": "buyer-b@example.invalid"},
+    {"id": "C-C003", "name": "客戶C（合成）", "grade": "C", "credit_limit": "300000", "credit_used": "50000", "payment_terms": "T/T 15", "industry": null, "requires_iatf": false,
+     "contact_name": "陳小美（合成）", "contact_phone": "04-0000-0003", "contact_email": "buyer-c@example.invalid"}
+  ],
+  "parts": [
+    {"part_no": "BR-12345", "name": "不鏽鋼支架", "spec": "SUS304 t3.0 60x40", "standard_cost": "182.50", "unit": "PCS", "abc_class": "A"},
+    {"part_no": "SH-20001", "name": "傳動軸", "spec": "S45C 直徑20 L150", "standard_cost": "96.00", "unit": "PCS", "abc_class": "B"},
+    {"part_no": "PL-30007", "name": "鋁板", "spec": "A6061 t10", "standard_cost": "310.00", "unit": "KG", "abc_class": "C"}
+  ],
+  "inventory": [
+    {"part_no": "BR-12345", "on_hand": "420", "in_transit": "100", "safety_stock": "150", "abc_class": "A", "last_movement_at": "2026-04-20T08:30:00+00:00"},
+    {"part_no": "SH-20001", "on_hand": "35", "in_transit": "0", "safety_stock": "60", "abc_class": "B", "last_movement_at": "2026-04-18T14:05:00+00:00"},
+    {"part_no": "PL-30007", "on_hand": "900.5", "in_transit": "250", "safety_stock": "300", "abc_class": "C", "last_movement_at": "2026-04-21T02:10:00+00:00"}
+  ],
+  "machine_rates": [
+    {"machine": "CNC#3", "hourly_rate": "850", "setup_rate": "600", "valid_from": "2026-01-01T00:00:00+00:00", "valid_to": null},
+    {"machine": "LATHE#1", "hourly_rate": "620", "setup_rate": "450", "valid_from": "2026-01-01T00:00:00+00:00", "valid_to": null}
+  ],
+  "purchase_prices": [
+    {"part_no": "BR-12345", "unit_price": "151.00", "currency": "TWD", "as_of": "2026-04-10T00:00:00+00:00"},
+    {"part_no": "PL-30007", "unit_price": "288.00", "currency": "TWD", "as_of": "2025-01-05T00:00:00+00:00"}
+  ]
+}

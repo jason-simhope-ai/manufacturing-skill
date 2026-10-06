@@ -51,10 +51,11 @@ bash adapters/claude-code/install.sh --list-conflicts cnc-machining,injection-mo
 
 ## 流程
 
-1. 解析 comma-separated profile list；validate 每個都存在
-2. 跨 profile 進行 conflict scan（多 profile 才跑）；任何衝突 → 不裝
-3. 備份既有 install
-4. Stage 1 core layer，Stage 2 依序 overlay 各 profile
-5. 寫 `active-profiles.json`（aggregated manifest）+ `.installed`（含 `activeProfiles` 陣列）
+1. 解析 comma-separated profile list；驗證名稱格式與每個 profile 都存在
+2. 預檢（preflight）：需要時確認 python3 / PyYAML 可用；跨 profile 進行 conflict scan（多 profile 才跑）；任何失敗 → 不動既有 install、直接結束
+3. 在暫存目錄組出新的安裝樹：Stage 1 core layer，Stage 2 依序 overlay 各 profile；接著把 `skills/<x>.md` 改成 `skills/<name>/SKILL.md`（同名 → 失敗、不動既有 install），內文的 `core/...` repo 路徑改成安裝後路徑，產生 `.claude-plugin/plugin.json`
+4. 寫 `active-profiles.json`（aggregated manifest）+ `.installed`（含 `activeProfiles` 陣列）到暫存樹
+5. 原子交換：既有 install 移到 `manufacturing-skill.bak.<timestamp>.<pid>`，暫存樹移入定位；交換失敗會自動還原備份（只保留最新 3 份備份）
+6. 確認 `~/.claude/skills/manufacturing-skill` symlink 指向 `../plugins/manufacturing-skill`（Claude Code 從這裡載入）；提醒使用者重新啟動 Claude Code 或執行 `/reload-plugins`
 
 詳細邏輯：[`docs/profile-development.md`](../../docs/profile-development.md)
