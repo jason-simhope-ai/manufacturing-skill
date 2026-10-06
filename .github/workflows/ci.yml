@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel duplicate runs on the same branch (push then PR open) to save minutes.
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs to save minutes, but never cancel runs on main
+# (two quick merges must each get a complete CI result).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -19,7 +24,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history so the PR base/head SHAs exist locally; the
+          # core heading-anchor guard (step 10b) diffs between them.
+          fetch-depth: 0
 
       # ---------------------------------------------------------------
       # Step 1: All JSON files must parse
@@ -95,7 +104,7 @@ jobs:
       # false negatives when key names appear inside markdown bodies.
       # ---------------------------------------------------------------
       - name: Install PyYAML for frontmatter parsing
-        run: pip install --quiet pyyaml
+        run: pip install --quiet 'pyyaml>=6,<7'
 
       - name: Agent / command markdown frontmatter
         run: |
@@ -361,42 +370,88 @@ jobs:
       # one of <!-- inherit --> or <!-- override-body -->),
       # replace-section heading existence, and frontmatter
       # post-merge requirements. See spec §10.1.
+      #
+      # No shipped profile uses `extends:` yet, so this ALSO lints the
+      # fixtures tests/extends/case-*/profile.md (laid out in a temp
+      # repo, as tests/extends/run.py does): cases with an
+      # expected_error.txt must make the linter exit non-zero, the
+      # rest must exit zero. The step fails if nothing was linted, so
+      # it can never pass vacuously.
       # ---------------------------------------------------------------
       - name: Profile extends — lint
         run: |
           python3 - <<'PY'
-          import os, sys, glob, subprocess
-          resolver = "adapters/claude-code/_resolve_extends.py"
+          import glob, shutil, subprocess, sys, tempfile
+          from pathlib import Path
+
+          repo = Path(".").resolve()
+          resolver = str(repo / "adapters/claude-code/_resolve_extends.py")
           fail = False
-          checked = 0
-          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
-              # Skip _templates
-              if any(p.startswith("_") for p in f.replace("\\","/").split("/")):
-                  continue
-              try:
-                  with open(f, encoding="utf-8") as fp:
-                      text = fp.read()
-              except OSError:
-                  continue
-              if not text.startswith("---"):
-                  continue
-              parts = text.split("---", 2)
-              if len(parts) < 3:
-                  continue
-              fm_block = parts[1]
-              if "\nextends:" not in "\n" + fm_block:
-                  continue
-              proc = subprocess.run(
-                  ["python3", resolver, "--repo-root", ".", "lint", f],
+          real = fixtures = 0
+
+
+          def lint(root, f):
+              return subprocess.run(
+                  ["python3", resolver, "--repo-root", str(root), "lint", str(f)],
                   capture_output=True, text=True,
               )
+
+
+          # 1. Real profiles/ files that use `extends:`.
+          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
+              if any(p.startswith("_") for p in f.replace("\\", "/").split("/")):
+                  continue
+              try:
+                  text = Path(f).read_text(encoding="utf-8")
+              except OSError:
+                  continue
+              parts = text.split("---", 2) if text.startswith("---") else []
+              if len(parts) < 3 or "\nextends:" not in "\n" + parts[1]:
+                  continue
+              proc = lint(repo, f)
               if proc.returncode != 0:
                   sys.stdout.write(proc.stderr)
                   fail = True
               else:
                   print(f"ok  {f}")
-              checked += 1
-          print(f"checked {checked} profile files with `extends:`")
+              real += 1
+
+          # 2. Fixture profiles: exercise the linter itself.
+          for case in sorted(glob.glob("tests/extends/case-*/profile.md")):
+              case = Path(case).parent
+              cfg = {}
+              if (case / "case.cfg").exists():
+                  for line in (case / "case.cfg").read_text(encoding="utf-8").splitlines():
+                      if "=" in line and not line.startswith("#"):
+                          k, v = line.split("=", 1)
+                          cfg[k.strip()] = v.strip()
+              kind = cfg.get("kind", "agents")
+              base = cfg.get("basename", "subject")
+              want_error = (case / "expected_error.txt").exists()
+              with tempfile.TemporaryDirectory() as tmp:
+                  tmp = Path(tmp)
+                  (tmp / "core" / kind).mkdir(parents=True)
+                  prof_dir = tmp / "profiles" / cfg.get("profile", "test-profile") / kind
+                  prof_dir.mkdir(parents=True)
+                  shutil.copyfile(case / "core.md", tmp / "core" / kind / f"{base}.md")
+                  prof = prof_dir / f"{base}.md"
+                  shutil.copyfile(case / "profile.md", prof)
+                  proc = lint(tmp, prof)
+              if (proc.returncode != 0) == want_error:
+                  print(f"ok  {case} (lint {'rejected' if want_error else 'accepted'} as expected)")
+              else:
+                  print(f"::error::{case}: lint exit {proc.returncode}, "
+                        f"expected {'non-zero' if want_error else 'zero'}")
+                  sys.stdout.write(proc.stderr)
+                  fail = True
+              fixtures += 1
+
+          total = real + fixtures
+          print(f"checked {total} profile files with `extends:` "
+                f"({real} real, {fixtures} fixtures)")
+          if total == 0:
+              print("::error::linted 0 files; the extends lint would pass vacuously")
+              sys.exit(1)
           sys.exit(1 if fail else 0)
           PY
 
@@ -413,54 +468,91 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          set -e
-          # Need full base history for the diff
-          git fetch --no-tags --depth=1 origin "${BASE_SHA}" || true
-          changed=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
-            -- 'core/*/**.md' || true)
-          if [[ -z "${changed}" ]]; then
-            echo "no core/ markdown files touched — skip"
-            exit 0
-          fi
-          touched_profiles=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
-            -- 'profiles/*/**.md' || true)
-          fail=0
-          while IFS= read -r core_file; do
-            [[ -z "${core_file}" ]] && continue
-            base_headings=$(git show "${BASE_SHA}:${core_file}" 2>/dev/null \
-              | grep -E '^## ' | sed 's/^## //' || true)
-            head_headings=$(grep -E '^## ' "${core_file}" \
-              | sed 's/^## //' || true)
-            removed=$(comm -23 \
-              <(printf '%s\n' "${base_headings}" | sort -u) \
-              <(printf '%s\n' "${head_headings}" | sort -u) | sed '/^$/d')
-            if [[ -z "${removed}" ]]; then
-              echo "ok  ${core_file} (no removed headings)"
-              continue
-            fi
-            # For each removed heading, check if profiles still reference
-            while IFS= read -r heading; do
-              [[ -z "${heading}" ]] && continue
-              python3 adapters/claude-code/_resolve_extends.py \
-                --repo-root . lint-anchors "${core_file}" "${heading}" \
-                || fail=1
-              # Check if any profile that references this heading is
-              # also being updated in the same PR (acceptable case)
-              referencing=$(python3 -c "
-          import sys
-          sys.path.insert(0, 'adapters/claude-code')
-          import _resolve_extends as r
+          python3 - <<'PY'
+          import os, re, subprocess, sys
           from pathlib import Path
-          for p, _ in r.find_referencing_profiles(
-                  Path('.'), Path('${core_file}'), ['${heading}']):
-              print(p)
-          " 2>/dev/null || true)
-              while IFS= read -r ref_path; do
-                [[ -z "${ref_path}" ]] && continue
-                if ! grep -qF "${ref_path}" <<< "${touched_profiles}"; then
-                  echo "::error file=${core_file}::removed heading '## ${heading}' is referenced by ${ref_path} which is NOT updated in this PR"
-                fi
-              done <<< "${referencing}"
-            done <<< "${removed}"
-          done <<< "${changed}"
-          exit $fail
+
+          sys.path.insert(0, "adapters/claude-code")
+          import _resolve_extends as r
+
+          base = os.environ.get("BASE_SHA", "")
+          head = os.environ.get("HEAD_SHA", "")
+          if not base or not head:
+              print("::error::BASE_SHA/HEAD_SHA not set; cannot compute the PR diff")
+              sys.exit(1)
+
+
+          def git(*args, check=True):
+              """Run git with an argv list (no shell, no interpolation)."""
+              proc = subprocess.run(
+                  ["git", *args], capture_output=True,
+                  text=True, encoding="utf-8",
+              )
+              if check and proc.returncode != 0:
+                  print(f"::error::git {' '.join(args)} failed "
+                        f"(rc={proc.returncode}): {proc.stderr.strip()}")
+                  sys.exit(1)
+              return proc
+
+
+          def headings(text):
+              """`## ` headings, ignoring fenced code blocks."""
+              text = re.sub(r"^```.*?^```", "", text,
+                            flags=re.DOTALL | re.MULTILINE)
+              return {m.group(1).strip()
+                      for m in re.finditer(r"^## (.+)$", text, re.MULTILINE)}
+
+
+          def show(sha, path):
+              """File content at a commit; '' if the file is absent there."""
+              proc = git("cat-file", "-e", f"{sha}:{path}", check=False)
+              if proc.returncode != 0:
+                  return ""
+              return git("show", f"{sha}:{path}").stdout
+
+
+          # A diff failure is an error, never a silent skip.
+          git("cat-file", "-e", f"{base}^{{commit}}")
+          git("cat-file", "-e", f"{head}^{{commit}}")
+          # -z: NUL-separated, unquoted paths. Without it git prints
+          # non-ASCII names (e.g. core/skills/01-報價.md) in quoted/escaped
+          # form, which `git cat-file`/`git show` cannot resolve, so those
+          # files would never be checked.
+          changed = [
+              f for f in git(
+                  "diff", "-z", "--no-renames", "--name-only",
+                  f"{base}...{head}", "--", ":(glob)core/**/*.md",
+              ).stdout.split("\0") if f
+          ]
+          if not changed:
+              print(f"core heading guard: no core/ markdown files touched "
+                    f"in {base[:12]}...{head[:12]}; nothing to check")
+              sys.exit(0)
+          print(f"core heading guard: {len(changed)} core markdown file(s) "
+                f"touched in {base[:12]}...{head[:12]}")
+
+          merge_base = git("merge-base", base, head).stdout.strip()
+          fail = False
+          for core_file in changed:
+              removed = sorted(headings(show(merge_base, core_file))
+                               - headings(show(head, core_file)))
+              if not removed:
+                  print(f"ok  {core_file} (no removed headings)")
+                  continue
+              # Profiles are read from the checked-out tree. A profile that
+              # this PR already updated no longer references the heading, so
+              # only stale references remain.
+              refs = r.find_referencing_profiles(Path("."), Path(core_file),
+                                                 removed)
+              if not refs:
+                  print(f"ok  {core_file} (removed {removed}; "
+                        f"no profile references them)")
+                  continue
+              for profile_path, heading in refs:
+                  print(f"::error file={core_file}::removed/renamed heading "
+                        f"'## {heading}' is still referenced by "
+                        f"{profile_path} via replace-section; update that "
+                        f"profile in this PR or restore the heading")
+              fail = True
+          sys.exit(1 if fail else 0)
+          PY
