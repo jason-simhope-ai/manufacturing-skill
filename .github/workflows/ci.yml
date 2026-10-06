@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel duplicate runs on the same branch (push then PR open) to save minutes.
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs to save minutes, but never cancel runs on main
+# (two quick merges must each get a complete CI result).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -19,7 +24,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history so the PR base/head SHAs exist locally; the
+          # core heading-anchor guard (step 10b) diffs between them.
+          fetch-depth: 0
 
       # ---------------------------------------------------------------
       # Step 1: All JSON files must parse
@@ -95,7 +104,7 @@ jobs:
       # false negatives when key names appear inside markdown bodies.
       # ---------------------------------------------------------------
       - name: Install PyYAML for frontmatter parsing
-        run: pip install --quiet pyyaml
+        run: pip install --quiet 'pyyaml>=6,<7'
 
       - name: Agent / command markdown frontmatter
         run: |
@@ -159,6 +168,301 @@ jobs:
             exit 1
           fi
           echo "ok  install.sh stays bash 3.2-compatible"
+
+      # ---------------------------------------------------------------
+      # Step 6b: install.sh smoke — --list, --core-only, single profile
+      # (guards against pipefail aborts on profiles without "status"),
+      # plus preflight-before-touch, atomic swap/rollback, backup count,
+      # stub-profile warning and non-TTY exit code
+      # ---------------------------------------------------------------
+      - name: install.sh — smoke (--list, --core-only, single profile, preflight, atomic swap)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          out="$(bash adapters/claude-code/install.sh --list)"
+          for d in profiles/*/; do
+            n="$(basename "$d")"
+            if ! printf '%s\n' "$out" | grep -q "$n"; then
+              echo "::error::--list output is missing profile '$n'"
+              exit 1
+            fi
+          done
+          echo "ok  --list shows every profile"
+          marker="$HOME/.claude/plugins/manufacturing-skill/.installed"
+          for args in "--core-only" "cnc-machining"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh $args </dev/null >/dev/null
+            if [ ! -f "$marker" ]; then
+              echo "::error::install.sh $args did not write $marker"
+              exit 1
+            fi
+            echo "ok  install.sh $args"
+          done
+
+          plugins="$HOME/.claude/plugins"
+          tree_hash() {
+            ( cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort ) | sha256sum
+          }
+
+          # Re-install over an existing install: succeeds, exactly one backup,
+          # no staging dir left behind
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          nbak="$(find "$plugins" -maxdepth 1 -name 'manufacturing-skill.bak.*' | wc -l | tr -d ' ')"
+          if [ "$nbak" != "1" ]; then
+            echo "::error::expected exactly 1 backup after a re-install, found $nbak"
+            exit 1
+          fi
+          if find "$plugins" -maxdepth 1 -name '.manufacturing-skill.new.*' | grep -q .; then
+            echo "::error::staging dir left behind in $plugins"
+            exit 1
+          fi
+          echo "ok  re-install succeeds and leaves exactly one backup"
+
+          # Invalid profile names fail (rc != 0) before touching the install
+          before="$(tree_hash)"
+          for bad in '../x' '..' 'a b' '*' 'cnc-machining,../profiles/cnc-machining' 'no-such-profile'; do
+            if bash adapters/claude-code/install.sh "$bad" </dev/null >/dev/null 2>&1; then
+              echo "::error::install.sh '$bad' exited 0; expected failure"
+              exit 1
+            fi
+            if [ "$(tree_hash)" != "$before" ]; then
+              echo "::error::install.sh '$bad' modified the existing install"
+              exit 1
+            fi
+          done
+          echo "ok  invalid profile names rejected; existing install untouched"
+
+          # A failure between the two renames restores the previous install
+          if MFG_INSTALL_TEST_FAIL_SWAP=1 bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1; then
+            echo "::error::simulated swap failure exited 0"
+            exit 1
+          fi
+          if [ "$(tree_hash)" != "$before" ]; then
+            echo "::error::simulated swap failure did not restore the previous install"
+            exit 1
+          fi
+          echo "ok  swap failure rolls back to the previous install"
+
+          # Maturity header on the REAL food-processing install, driven by the
+          # status currently in its profile.json (stub here; alpha once the
+          # profile PRs land), so this step does not break when it changes.
+          fp_json=profiles/food-processing/profile.json
+          fp_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("status") or "complete")' "$fp_json")"
+          fp_nwarn="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("warnings") or []))' "$fp_json")"
+          out="$(bash adapters/claude-code/install.sh food-processing </dev/null 2>&1)"
+          if [ "$fp_status" = "stub" ]; then
+            want='STUB PROFILE: food-processing'
+          else
+            if printf '%s\n' "$out" | grep -qF 'STUB PROFILE: food-processing'; then
+              echo "::error::food-processing is '$fp_status' but the install printed the STUB header"
+              exit 1
+            fi
+            want=''
+            if [ "$fp_nwarn" -gt 0 ]; then want="food-processing ($fp_status) — read before use"; fi
+          fi
+          if [ -n "$want" ] && ! printf '%s\n' "$out" | grep -qF "$want"; then
+            echo "::error::food-processing ($fp_status) install output is missing: $want"
+            exit 1
+          fi
+          echo "ok  maturity header matches profile.json status for food-processing ($fp_status)"
+
+          # Stub path, deterministically: flip food-processing to "stub" in a
+          # scratch copy of the repo and install from that copy.
+          stubrepo="$(mktemp -d)/repo"
+          mkdir -p "$stubrepo"
+          tar --exclude=.git -cf - . | tar -xf - -C "$stubrepo"
+          python3 - "$stubrepo/$fp_json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          with open(p, encoding="utf-8") as f:
+              d = json.load(f)
+          d["status"] = "stub"
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(d, f, ensure_ascii=False, indent=2)
+          PY
+          stub_home="$(mktemp -d)"; mkdir -p "$stub_home/.claude"
+          out="$(HOME="$stub_home" bash "$stubrepo/adapters/claude-code/install.sh" food-processing </dev/null 2>&1)"
+          for want in 'STUB PROFILE: food-processing' 'generic core layer only' 'HACCP / food-safety content is NOT included'; do
+            if ! printf '%s\n' "$out" | grep -qF "$want"; then
+              echo "::error::food-processing (stub, scratch copy) install output is missing: $want"
+              exit 1
+            fi
+          done
+          echo "ok  stub warning shown for food-processing flipped to stub in a scratch copy"
+
+          # ~/.claude missing + stdin not a TTY: exit 2, nothing created
+          empty_home="$(mktemp -d)"
+          rc=0
+          HOME="$empty_home" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null 2>&1 || rc=$?
+          if [ "$rc" != "2" ] || [ -e "$empty_home/.claude" ]; then
+            echo "::error::missing ~/.claude without a TTY: expected rc=2 and no dir, got rc=$rc"
+            exit 1
+          fi
+          echo "ok  missing ~/.claude without a TTY exits 2"
+
+          # CRLF profile file with `extends:` must still be resolved, and
+          # .installed must be valid JSON when both HOME and the repo path
+          # contain a space and a double quote (backslash too for the repo).
+          tmp="$(mktemp -d)"
+          repo_copy="$tmp/re\\po \"with\" space"
+          mkdir -p "$repo_copy"
+          tar --exclude=.git -cf - . | tar -xf - -C "$repo_copy"
+          printf -- '---\r\nname: crlf-agent\r\nextends: core/agents/inventory-manager\r\n---\r\n\r\n<!-- inherit -->\r\n' \
+            > "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"
+          crlf_home="$tmp/h \"q\""
+          mkdir -p "$crlf_home/.claude"
+          crlf_out="$(HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"
+          if ! printf '%s\n' "$crlf_out" | grep -qF 'resolving extends: agents/crlf-agent.md'; then
+            echo "::error::CRLF profile file with extends: was not resolved"
+            printf '%s\n' "$crlf_out"
+            exit 1
+          fi
+          crlf_target="$crlf_home/.claude/plugins/manufacturing-skill"
+          if [ ! -s "$crlf_target/agents/crlf-agent.md" ] || grep -q '^extends:' "$crlf_target/agents/crlf-agent.md"; then
+            echo "::error::CRLF extends: file was copied raw instead of resolved"
+            exit 1
+          fi
+          echo "ok  CRLF profile file with extends: is resolved"
+          python3 -m json.tool "$crlf_target/.installed" >/dev/null
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+            "$crlf_target/.installed" "$repo_copy"
+          echo "ok  .installed is valid JSON (python path) with quote/space/backslash in repo path and HOME"
+
+          # Same without python: stub interpreters that fail --version force
+          # the pure-bash fallback (single plain profile needs no python).
+          rm -f "$repo_copy/profiles/cnc-machining/agents/crlf-agent.md"   # extends: needs python
+          nopy="$tmp/nopy"; mkdir -p "$nopy"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          for args in "cnc-machining" "--core-only"; do
+            rm -rf "$crlf_home/.claude"; mkdir -p "$crlf_home/.claude"
+            PATH="$nopy:$PATH" HOME="$crlf_home" bash "$repo_copy/adapters/claude-code/install.sh" $args </dev/null >/dev/null
+            python3 -m json.tool "$crlf_target/.installed" >/dev/null
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["source"]==sys.argv[2], d["source"]' \
+              "$crlf_target/.installed" "$repo_copy"
+          done
+          echo "ok  .installed is valid JSON (no-python fallback) with quote/space/backslash in repo path and HOME"
+
+      # ---------------------------------------------------------------
+      # Step 6c: the installed tree is something Claude Code loads:
+      # .claude-plugin/plugin.json (whitelisted fields), skills as
+      # skills/<name>/SKILL.md, ~/.claude/skills/<plugin> symlink, and
+      # command bodies rewritten to installed paths (python + no-python)
+      # ---------------------------------------------------------------
+      - name: install.sh — Claude Code layout (manifest, SKILL.md dirs, symlink)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          target="$HOME/.claude/plugins/manufacturing-skill"
+          link="$HOME/.claude/skills/manufacturing-skill"
+          check_layout() {   # $1 = label, $2.. = active profiles ("" for core-only)
+            python3 - "$target" "$@" <<'PY'
+          import glob, json, os, re, sys
+          t, label, profs = sys.argv[1], sys.argv[2], [p for p in sys.argv[3:] if p]
+          def fail(msg):
+              print(f"::error::[{label}] {msg}"); sys.exit(1)
+          mpath = os.path.join(t, ".claude-plugin", "plugin.json")
+          if not os.path.isfile(mpath): fail(".claude-plugin/plugin.json missing")
+          m = json.load(open(mpath, encoding="utf-8"))
+          allowed = {"name", "displayName", "version", "description", "author",
+                     "homepage", "repository", "license", "keywords"}
+          if set(m) - allowed: fail(f"manifest has non-whitelisted fields {sorted(set(m) - allowed)}")
+          for k in ("name", "version", "description"):
+              if not m.get(k): fail(f"manifest missing {k}")
+          if m["name"] != "manufacturing-skill": fail(f"manifest name {m['name']!r}")
+          if not isinstance(m.get("repository", ""), str): fail("manifest repository is not a string")
+          root = json.load(open(os.path.join(t, "plugin.json"), encoding="utf-8"))
+          if "available" not in root.get("profiles", {}): fail("root plugin.json not copied as-is")
+          flat = glob.glob(os.path.join(t, "skills", "*.md"))
+          if flat: fail(f"flat skills/*.md left: {flat}")
+          def fm_name(path):
+              txt = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+              mm = re.match(r"---\n(.*?)\n---", txt, re.S)
+              nm = mm and re.search(r"^name:\s*(\S.*?)\s*$", mm.group(1), re.M)
+              return nm.group(1).strip("\"'") if nm else os.path.basename(path)[:-3]
+          srcs = glob.glob("core/skills/*.md")
+          for p in profs:
+              srcs += [f for f in glob.glob(f"profiles/{p}/skills/*.md") if not os.path.basename(f).startswith("_")]
+          want = {fm_name(f) for f in srcs}
+          have = {os.path.basename(d) for d in glob.glob(os.path.join(t, "skills", "*")) if os.path.isdir(d)}
+          if want != have: fail(f"skill dirs {sorted(have)} != expected {sorted(want)}")
+          for d in have:
+              if not os.path.isfile(os.path.join(t, "skills", d, "SKILL.md")): fail(f"skills/{d}/SKILL.md missing")
+          pat = re.compile(r"(?<![A-Za-z0-9_./-])core/(skills|agents|hooks|know-how)/\S*\.md")
+          for f in glob.glob(os.path.join(t, "commands", "*.md")):
+              hits = pat.findall(open(f, encoding="utf-8").read())
+              if hits: fail(f"{os.path.basename(f)} still cites core/ paths")
+          q = open(os.path.join(t, "commands", "quote.md"), encoding="utf-8").read()
+          if "skills/01-quote/SKILL.md" not in q: fail("commands/quote.md not rewritten to skills/01-quote/SKILL.md")
+          print(f"ok  [{label}] manifest, {len(have)} skills/<name>/SKILL.md, no core/ paths in commands")
+          PY
+            if [ ! -L "$link" ] || [ "$(readlink "$link")" != "../plugins/manufacturing-skill" ]; then
+              echo "::error::[$1] $link is not a symlink to ../plugins/manufacturing-skill"
+              exit 1
+            fi
+            if [ ! -f "$link/.claude-plugin/plugin.json" ]; then
+              echo "::error::[$1] $link does not resolve to the install"
+              exit 1
+            fi
+            if command -v claude >/dev/null 2>&1; then
+              claude plugin validate "$target"
+            else
+              echo "::notice::claude CLI not on PATH — skipped 'claude plugin validate' for [$1]"
+            fi
+          }
+
+          for args in "cnc-machining" "--core-only" "cnc-machining,injection-molding"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh "$args" </dev/null >/dev/null
+            case "$args" in --core-only) profs="";; *) profs="$(printf '%s' "$args" | tr ',' ' ')";; esac
+            # shellcheck disable=SC2086
+            check_layout "$args" $profs
+          done
+
+          # Re-install keeps the link and the layout
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "re-install" cnc-machining
+
+          # No python: same skill dirs and rewrites (sed fallback), minimal manifest
+          nopy="$(mktemp -d)"
+          for b in python3 python py; do
+            printf '#!/bin/sh\nexit 1\n' > "$nopy/$b"; chmod +x "$nopy/$b"
+          done
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          PATH="$nopy:$PATH" bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          check_layout "no-python" cnc-machining
+
+          # A real directory where the link goes is left alone (warning, exit 0)
+          rm -rf "$HOME/.claude"; mkdir -p "$link"; echo keep > "$link/keep"
+          out="$(bash adapters/claude-code/install.sh --core-only </dev/null 2>&1)"
+          if [ -L "$link" ] || [ "$(cat "$link/keep")" != "keep" ] || ! printf '%s\n' "$out" | grep -qF 'is not a symlink'; then
+            echo "::error::a real directory at $link was not left alone with a warning"
+            exit 1
+          fi
+          echo "ok  real directory at the link path left alone, with a warning"
+
+          # Two skills mapping to one name: fail before the swap, install untouched
+          dup="$(mktemp -d)/repo"; mkdir -p "$dup"
+          tar --exclude=.git -cf - . | tar -xf - -C "$dup"
+          printf -- '---\nname: 01-quote\ndescription: dup\n---\n' > "$dup/profiles/cnc-machining/skills/dup-quote.md"
+          rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+          bash adapters/claude-code/install.sh cnc-machining </dev/null >/dev/null
+          before="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if out="$(bash "$dup/adapters/claude-code/install.sh" cnc-machining </dev/null 2>&1)"; then
+            echo "::error::duplicate skill name installed without error"
+            exit 1
+          fi
+          after="$( (cd "$HOME/.claude" && find . | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort) | sha256sum)"
+          if [ "$before" != "$after" ] || ! printf '%s\n' "$out" | grep -qF 'both have name: 01-quote'; then
+            echo "::error::duplicate skill name did not fail cleanly before the swap"
+            printf '%s\n' "$out"
+            exit 1
+          fi
+          echo "ok  duplicate skill name fails before the swap; install untouched"
 
       # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
@@ -327,48 +631,109 @@ jobs:
       - name: Multi-profile — helper unit tests
         run: python3 tests/multiprofile/test_multiprofile.py
 
+      - name: erp-connector — contract tests
+        run: python3 tests/mcp/test_erp_contract.py
+      - name: scheduler-mcp — stdio protocol tests
+        run: python3 tests/mcp/test_scheduler_mcp.py
+
+      # ---------------------------------------------------------------
+      # Step 14: Generic adapter export tests. Exercises
+      # adapters/generic/export.py end-to-end against the real repo and
+      # synthetic mini-repos: file sets, override precedence, extends
+      # fixtures, conflict / unknown-profile exits, determinism, and
+      # MANIFEST sha256 integrity.
+      # ---------------------------------------------------------------
+      - name: Generic adapter — export tests
+        run: python3 tests/generic/test_export.py
+
       # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
       # file. Validates extends path, mode marker presence (exactly
       # one of <!-- inherit --> or <!-- override-body -->),
       # replace-section heading existence, and frontmatter
       # post-merge requirements. See spec §10.1.
+      #
+      # No shipped profile uses `extends:` yet, so this ALSO lints the
+      # fixtures tests/extends/case-*/profile.md (laid out in a temp
+      # repo, as tests/extends/run.py does): cases with an
+      # expected_error.txt must make the linter exit non-zero, the
+      # rest must exit zero. The step fails if nothing was linted, so
+      # it can never pass vacuously.
       # ---------------------------------------------------------------
       - name: Profile extends — lint
         run: |
           python3 - <<'PY'
-          import os, sys, glob, subprocess
-          resolver = "adapters/claude-code/_resolve_extends.py"
+          import glob, shutil, subprocess, sys, tempfile
+          from pathlib import Path
+
+          repo = Path(".").resolve()
+          resolver = str(repo / "adapters/claude-code/_resolve_extends.py")
           fail = False
-          checked = 0
-          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
-              # Skip _templates
-              if any(p.startswith("_") for p in f.replace("\\","/").split("/")):
-                  continue
-              try:
-                  with open(f, encoding="utf-8") as fp:
-                      text = fp.read()
-              except OSError:
-                  continue
-              if not text.startswith("---"):
-                  continue
-              parts = text.split("---", 2)
-              if len(parts) < 3:
-                  continue
-              fm_block = parts[1]
-              if "\nextends:" not in "\n" + fm_block:
-                  continue
-              proc = subprocess.run(
-                  ["python3", resolver, "--repo-root", ".", "lint", f],
+          real = fixtures = 0
+
+
+          def lint(root, f):
+              return subprocess.run(
+                  ["python3", resolver, "--repo-root", str(root), "lint", str(f)],
                   capture_output=True, text=True,
               )
+
+
+          # 1. Real profiles/ files that use `extends:`.
+          for f in sorted(glob.glob("profiles/*/**/*.md", recursive=True)):
+              if any(p.startswith("_") for p in f.replace("\\", "/").split("/")):
+                  continue
+              try:
+                  text = Path(f).read_text(encoding="utf-8")
+              except OSError:
+                  continue
+              parts = text.split("---", 2) if text.startswith("---") else []
+              if len(parts) < 3 or "\nextends:" not in "\n" + parts[1]:
+                  continue
+              proc = lint(repo, f)
               if proc.returncode != 0:
                   sys.stdout.write(proc.stderr)
                   fail = True
               else:
                   print(f"ok  {f}")
-              checked += 1
-          print(f"checked {checked} profile files with `extends:`")
+              real += 1
+
+          # 2. Fixture profiles: exercise the linter itself.
+          for case in sorted(glob.glob("tests/extends/case-*/profile.md")):
+              case = Path(case).parent
+              cfg = {}
+              if (case / "case.cfg").exists():
+                  for line in (case / "case.cfg").read_text(encoding="utf-8").splitlines():
+                      if "=" in line and not line.startswith("#"):
+                          k, v = line.split("=", 1)
+                          cfg[k.strip()] = v.strip()
+              kind = cfg.get("kind", "agents")
+              base = cfg.get("basename", "subject")
+              want_error = (case / "expected_error.txt").exists()
+              with tempfile.TemporaryDirectory() as tmp:
+                  tmp = Path(tmp)
+                  (tmp / "core" / kind).mkdir(parents=True)
+                  prof_dir = tmp / "profiles" / cfg.get("profile", "test-profile") / kind
+                  prof_dir.mkdir(parents=True)
+                  shutil.copyfile(case / "core.md", tmp / "core" / kind / f"{base}.md")
+                  prof = prof_dir / f"{base}.md"
+                  shutil.copyfile(case / "profile.md", prof)
+                  proc = lint(tmp, prof)
+              if (proc.returncode != 0) == want_error:
+                  print(f"ok  {case} (lint {'rejected' if want_error else 'accepted'} as expected)")
+              else:
+                  print(f"::error::{case}: lint exit {proc.returncode}, "
+                        f"expected {'non-zero' if want_error else 'zero'}")
+                  sys.stdout.write(proc.stderr)
+                  fail = True
+              fixtures += 1
+
+          total = real + fixtures
+          print(f"checked {total} profile files with `extends:` "
+                f"({real} real, {fixtures} fixtures)")
+          if total == 0:
+              print("::error::linted 0 files; the extends lint would pass vacuously")
+              sys.exit(1)
           sys.exit(1 if fail else 0)
           PY
 
@@ -385,60 +750,97 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          set -e
-          # Need full base history for the diff
-          git fetch --no-tags --depth=1 origin "${BASE_SHA}" || true
-          changed=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
-            -- 'core/*/**.md' || true)
-          if [[ -z "${changed}" ]]; then
-            echo "no core/ markdown files touched — skip"
-            exit 0
-          fi
-          touched_profiles=$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" \
-            -- 'profiles/*/**.md' || true)
-          fail=0
-          while IFS= read -r core_file; do
-            [[ -z "${core_file}" ]] && continue
-            base_headings=$(git show "${BASE_SHA}:${core_file}" 2>/dev/null \
-              | grep -E '^## ' | sed 's/^## //' || true)
-            head_headings=$(grep -E '^## ' "${core_file}" \
-              | sed 's/^## //' || true)
-            removed=$(comm -23 \
-              <(printf '%s\n' "${base_headings}" | sort -u) \
-              <(printf '%s\n' "${head_headings}" | sort -u) | sed '/^$/d')
-            if [[ -z "${removed}" ]]; then
-              echo "ok  ${core_file} (no removed headings)"
-              continue
-            fi
-            # For each removed heading, check if profiles still reference
-            while IFS= read -r heading; do
-              [[ -z "${heading}" ]] && continue
-              python3 adapters/claude-code/_resolve_extends.py \
-                --repo-root . lint-anchors "${core_file}" "${heading}" \
-                || fail=1
-              # Check if any profile that references this heading is
-              # also being updated in the same PR (acceptable case)
-              referencing=$(python3 -c "
-          import sys
-          sys.path.insert(0, 'adapters/claude-code')
-          import _resolve_extends as r
+          python3 - <<'PY'
+          import os, re, subprocess, sys
           from pathlib import Path
-          for p, _ in r.find_referencing_profiles(
-                  Path('.'), Path('${core_file}'), ['${heading}']):
-              print(p)
-          " 2>/dev/null || true)
-              while IFS= read -r ref_path; do
-                [[ -z "${ref_path}" ]] && continue
-                if ! grep -qF "${ref_path}" <<< "${touched_profiles}"; then
-                  echo "::error file=${core_file}::removed heading '## ${heading}' is referenced by ${ref_path} which is NOT updated in this PR"
-                fi
-              done <<< "${referencing}"
-            done <<< "${removed}"
-          done <<< "${changed}"
-          exit $fail
+
+          sys.path.insert(0, "adapters/claude-code")
+          import _resolve_extends as r
+
+          base = os.environ.get("BASE_SHA", "")
+          head = os.environ.get("HEAD_SHA", "")
+          if not base or not head:
+              print("::error::BASE_SHA/HEAD_SHA not set; cannot compute the PR diff")
+              sys.exit(1)
+
+
+          def git(*args, check=True):
+              """Run git with an argv list (no shell, no interpolation)."""
+              proc = subprocess.run(
+                  ["git", *args], capture_output=True,
+                  text=True, encoding="utf-8",
+              )
+              if check and proc.returncode != 0:
+                  print(f"::error::git {' '.join(args)} failed "
+                        f"(rc={proc.returncode}): {proc.stderr.strip()}")
+                  sys.exit(1)
+              return proc
+
+
+          def headings(text):
+              """`## ` headings, ignoring fenced code blocks."""
+              text = re.sub(r"^```.*?^```", "", text,
+                            flags=re.DOTALL | re.MULTILINE)
+              return {m.group(1).strip()
+                      for m in re.finditer(r"^## (.+)$", text, re.MULTILINE)}
+
+
+          def show(sha, path):
+              """File content at a commit; '' if the file is absent there."""
+              proc = git("cat-file", "-e", f"{sha}:{path}", check=False)
+              if proc.returncode != 0:
+                  return ""
+              return git("show", f"{sha}:{path}").stdout
+
+
+          # A diff failure is an error, never a silent skip.
+          git("cat-file", "-e", f"{base}^{{commit}}")
+          git("cat-file", "-e", f"{head}^{{commit}}")
+          # -z: NUL-separated, unquoted paths. Without it git prints
+          # non-ASCII names (e.g. core/skills/01-報價.md) in quoted/escaped
+          # form, which `git cat-file`/`git show` cannot resolve, so those
+          # files would never be checked.
+          changed = [
+              f for f in git(
+                  "diff", "-z", "--no-renames", "--name-only",
+                  f"{base}...{head}", "--", ":(glob)core/**/*.md",
+              ).stdout.split("\0") if f
+          ]
+          if not changed:
+              print(f"core heading guard: no core/ markdown files touched "
+                    f"in {base[:12]}...{head[:12]}; nothing to check")
+              sys.exit(0)
+          print(f"core heading guard: {len(changed)} core markdown file(s) "
+                f"touched in {base[:12]}...{head[:12]}")
+
+          merge_base = git("merge-base", base, head).stdout.strip()
+          fail = False
+          for core_file in changed:
+              removed = sorted(headings(show(merge_base, core_file))
+                               - headings(show(head, core_file)))
+              if not removed:
+                  print(f"ok  {core_file} (no removed headings)")
+                  continue
+              # Profiles are read from the checked-out tree. A profile that
+              # this PR already updated no longer references the heading, so
+              # only stale references remain.
+              refs = r.find_referencing_profiles(Path("."), Path(core_file),
+                                                 removed)
+              if not refs:
+                  print(f"ok  {core_file} (removed {removed}; "
+                        f"no profile references them)")
+                  continue
+              for profile_path, heading in refs:
+                  print(f"::error file={core_file}::removed/renamed heading "
+                        f"'## {heading}' is still referenced by "
+                        f"{profile_path} via replace-section; update that "
+                        f"profile in this PR or restore the heading")
+              fail = True
+          sys.exit(1 if fail else 0)
+          PY
 
       # ---------------------------------------------------------------
-      # Step 14: Registration guardrail. An unregistered profiles/<dir>
+      # Step 15: Registration guardrail. An unregistered profiles/<dir>
       # is silently skipped by Step 3 (manifest vs filesystem), Step 11
       # (explainer stat panel) and Step 12 (pairwise conflict scan), so
       # CI would stay green while the profile is invisible. Every
@@ -504,7 +906,7 @@ jobs:
           PY
 
       # ---------------------------------------------------------------
-      # Step 15: Agent tool allowlist (least privilege). Every agent
+      # Step 16: Agent tool allowlist (least privilege). Every agent
       # (core/**/agents, profiles/**/agents) and every profile
       # _templates/agent-*.md starter must declare `tools:` and keep it
       # inside ALLOWED. Bash is opt-in per agent: the body must contain
@@ -577,7 +979,7 @@ jobs:
           PY
 
       # ---------------------------------------------------------------
-      # Step 16: Explainer 01 overlay rows vs stat panel. Step 11 only
+      # Step 17: Explainer 01 overlay rows vs stat panel. Step 11 only
       # regenerates the stat panel; the agent / know-how / hook overlay
       # rows (and their "CNC a + alpha α b" labels) are hand-edited.
       # Count the item tiles per row and compare with (1) the label and

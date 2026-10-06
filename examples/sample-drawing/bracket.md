@@ -87,8 +87,11 @@
 
 跑 `/quote @bracket.md` 後，`quote-specialist` 應該：
 
-1. 觸發 `pre-quote` hook 確認以上資料齊全 → 通過
-2. 認出是 CNC 件，dispatch `cnc-programmer`
-3. cnc-programmer 提供加工方案（見 `cnc-programmer.md` 的 output 範例）
-4. quote-specialist 整合報價
-5. 產出格式：見 `examples/sample-quote-output.md`
+1. 觸發 `pre-quote` hook：欄位齊全（材料牌號、公差、Ra、數量、交期皆有）→ 完整度檢查通過
+2. **抓到本檔刻意埋的工程矛盾**：材料是 SUS304 不鏽鋼，表面處理卻要「黑色陽極氧化」；陽極處理只適用鋁／鈦，不鏽鋼做不到。quote-specialist 應該指出矛盾、提出替代方案（例如 PVD 鍍膜、發黑處理、粉體塗裝），並把報價鎖定在客戶書面確認之後，不應照單全報
+3. 認出是 CNC 件，dispatch `cnc-programmer`
+4. cnc-programmer 提供加工方案（見 `cnc-programmer.md` 的 output 範例）
+5. quote-specialist 整合報價
+6. 產出格式：見 `examples/sample-quote-output.md`
+
+> 提醒：「hook 通過」只代表欄位齊全，不代表內容合理；矛盾偵測靠的是 agent 的製造知識，與 quickstart 的描述一致。

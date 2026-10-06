@@ -14,7 +14,7 @@
   "hooks": [],
   "mcp": {
     "recommended": ["erp-connector"],
-    "optional": ["scheduler-mcp"]
+    "optional": ["manufacturing-scheduler"]
   },
   "wantedContributions": [
     "mes-connector contract (infra/mcp-servers/mes-connector/contract.py — 唯讀工單 / 設備狀態 / AOI·SPI·ICT·FCT 結果，比照 erp-connector/contract.py)",
