@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — 跑在自己的電腦上。圖紙、報價、客戶資料（T2）與受管制或客戶要求保密的專案資料（T3，例如：航太、醫療器材、簽了保密協議的客戶專案、有出口管制的品項）不出公司（要讓 AI 讀圖紙請用地端模型，見 [Cloud first, on-prem later](#cloud-first-on-prem-later)）；分身只處理 T0/T1，T1 會經聊天平台與雲端模型。
+> 把工廠的 SOP 變成會幫你看事情的 AI 同事：30 分鐘裝好，跑在自己的電腦上。圖紙、報價、客戶資料與保密專案留在公司（要讓 AI 讀圖紙，請用地端模型，[怎麼做](#cloud-first-on-prem-later)）；聊天室裡的「分身」只碰一般資料。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
