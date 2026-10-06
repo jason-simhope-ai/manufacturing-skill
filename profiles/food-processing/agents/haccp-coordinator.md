@@ -3,7 +3,7 @@ name: haccp-coordinator
 displayName: HACCP 協調員 / HACCP Coordinator
 description: 協助 HACCP 管制小組做危害分析、CCP 判定、監控紀錄檢查、偏差處理草稿與稽核準備 — 只做草稿與檢查，簽核永遠是人
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 status: alpha
 ---
 

@@ -3,7 +3,7 @@ name: traceability-officer
 displayName: 批次追溯專員 / Traceability Officer
 description: 食品批次追溯（一步向前、一步向後）、客訴批號查詢、回收演練與質量平衡 — 整理事實與影響範圍，回收決定由人做
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 status: alpha
 ---
 

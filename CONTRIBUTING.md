@@ -23,8 +23,8 @@ When in doubt, [INVENTORY.md](INVENTORY.md) is the index.
 | Contribution                                                     | Where                                                                    | Difficulty                                                              |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | Fix a typo / improve wording                                     | Anywhere                                                                 | Trivial — direct PR                                                     |
-| Add a profile starter (PCB / injection / food / pharma)          | `profiles/<vertical>/_templates/` → use as template                      | Low                                                                     |
-| Promote a stub profile to alpha (1 agent + 1 skill + 1 know-how) | `profiles/<vertical>/{agents,skills,know-how}/`                          | Medium — see [docs/profile-development.md](docs/profile-development.md) |
+| Add a profile starter template                                   | `profiles/<vertical>/_templates/` → use as template                      | Low                                                                     |
+| Add a new vertical profile as alpha (1 agent + 1 skill + 1–2 know-how) | `profiles/<vertical>/{agents,skills,know-how}/`                    | Medium — see [docs/profile-development.md](docs/profile-development.md) |
 | Complete a vertical profile to production grade                  | Same                                                                     | High — should come from a domain practitioner                           |
 | Add an ERP connector implementation                              | `infra/mcp-servers/erp-connector-<vendor>/`                              | High — see `infra/mcp-servers/erp-connector/contract.py`                |
 | Translate explainer cards                                        | `docs/explainers/`                                                       | Low                                                                     |
@@ -85,11 +85,11 @@ Body (when needed): explain _why_, not _what_. Wrap at ~72 chars.
 
 - Typos
 - Translation improvements
-- Adding a `_templates/` file inside a stub profile
+- Adding a `_templates/` file inside an alpha profile (agent starters must declare `tools: [Read, Grep, Glob]` — no `Bash`)
 
 **Needs maintainer review** (always):
 
-- Promoting a profile's `status` field (stub → alpha → beta → complete)
+- Promoting a profile's `status` field (alpha → complete)
 - Anything touching `install.sh` or CI
 - Schema changes to `plugin.json` or `profile.json`
 - New top-level files

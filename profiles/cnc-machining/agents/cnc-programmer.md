@@ -3,7 +3,7 @@ name: cnc-programmer
 displayName: CNC 程式工程師 / CNC Programmer
 description: 寫 G-code、選刀具、選夾治具、估工時、安全檢查
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # CNC 程式工程師 / CNC Programmer

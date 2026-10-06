@@ -7,7 +7,7 @@
 ## Type of change
 
 - [ ] `feat` — new agent / skill / know-how / command
-- [ ] `feat(profile)` — new vertical or stub-to-alpha promotion
+- [ ] `feat(profile)` — new vertical (alpha) or alpha-to-complete promotion
 - [ ] `fix` — bug fix
 - [ ] `docs` — docs only
 - [ ] `chore` / `refactor` / `ci` — repo housekeeping
@@ -16,7 +16,7 @@
 
 - [ ] I read [CONTRIBUTING.md](../CONTRIBUTING.md).
 - [ ] My commits follow [Conventional Commits](https://www.conventionalcommits.org/).
-- [ ] If I touched a profile, the relevant `profile.json` is updated and `INVENTORY.md` reflects the change.
+- [ ] If I touched a profile, the relevant `profile.json` is updated and `INVENTORY.md` reflects the change. New profile? I followed the checklist in [docs/profile-development.md](../docs/profile-development.md) §11 and replayed CI locally (§12).
 - [ ] If I touched `install.sh`, I tested on at least one OS / shell combination and noted it below.
 - [ ] If I added an agent / skill / command, the YAML frontmatter has the required fields (the CI will tell me if not).
 - [ ] If I added know-how with hard numbers (parameters, costs, tolerances), I noted the source or labelled it as needs-validation.

@@ -3,7 +3,7 @@ name: smt-process-engineer
 displayName: SMT 製程工程師 / SMT Process Engineer
 description: SMT 製程 — 錫膏印刷、貼片、回焊溫度曲線的參數判讀與調整建議，並把 DFM 問題回饋給客戶與 layout
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 status: alpha
 ---
 

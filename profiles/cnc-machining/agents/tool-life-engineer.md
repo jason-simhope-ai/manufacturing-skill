@@ -3,7 +3,7 @@ name: tool-life-engineer
 displayName: 刀具壽命工程師 / Tool Life Engineer
 description: 刀具庫管理、磨耗預測、換刀策略、刀具成本最佳化
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 刀具壽命工程師 / Tool Life Engineer

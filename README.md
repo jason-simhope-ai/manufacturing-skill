@@ -102,7 +102,7 @@ Three paths:
 
 1. **Try without a profile (fastest)** — `bash install.sh --core-only`. Skips all vertical profiles and installs only the 5 universal agents (quote / sales / production / quality / inventory). Useful to evaluate "does this AI understand my factory at all" before committing.
 2. **Use an alpha profile + customize** — injection molding, food processing, PCB assembly, pharma and machinery ETO are all alpha (content present, labelled needs-validation); starter templates under each profile's `_templates/` are ready to extend.
-3. **Fork the CNC profile** — CNC is the most complete reference; fork and adapt is the fastest path. See [docs/profile-development.md](docs/profile-development.md).
+3. **Build your own profile** — copy an alpha profile as the scaffold and follow [docs/profile-development.md](docs/profile-development.md) (CI-checked template, registration and checklist included).
 
 ---
 
