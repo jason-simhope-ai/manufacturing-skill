@@ -23,6 +23,15 @@ class DriverError(Exception):
     """Driver failed or timed out."""
 
 
+class DriverPolicyDenied(DriverError):
+    """The driver refused this call on policy grounds before running the model (for example T3
+    content found in a data root). The gateway audits it as `policy_denied` with `reason`."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 @dataclass(frozen=True)
 class TwinInvocation:
     twin_id: str

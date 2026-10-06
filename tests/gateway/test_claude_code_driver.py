@@ -20,6 +20,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -712,6 +713,352 @@ class TestExtFollowUp(Base):
                     self.driver().run(self.inv())
                 self.assertIn("symlink", str(cm.exception))
                 d.unlink()
+
+
+class TestPilotDriver(Base):
+    """R-01 (credential dirs under HOME), S10 (data-root content scan), S12 (CLI version reported)."""
+
+    def problems(self, **kw):
+        return self.driver(**kw).self_check()
+
+    # R-01
+    def test_r01_data_root_inside_home_credential_dirs_refused(self):
+        home = Path(self.env["HOME"])
+        for rel in (".claude", ".ssh", ".aws/sub", ".config", ".gnupg"):
+            (home / rel).mkdir(parents=True, exist_ok=True)
+        for rel, needle in ((".claude", "~/.claude"), (".ssh", "~/.ssh"), (".aws/sub", "~/.aws"),
+                            (".config", "~/.config"), (".gnupg", "~/.gnupg")):
+            with self.subTest(rel=rel):
+                msgs = self.problems(data_root=str(home / rel))
+                self.assertTrue(any("MFG_TEAM_DATA_T1 must not" in m and needle in m for m in msgs), msgs)
+                with self.assertRaises(DriverError):
+                    self.driver(data_root=str(home / rel)).run(self.inv(read_roots=(str(home / rel),)))
+        self.assertFalse((self.rec / "call.json").exists())
+        (home / "exports").mkdir()
+        self.assertEqual(self.problems(data_root=str(home / "exports")), [])   # a plain dir under HOME is fine
+
+    def test_r01_claude_dir_symlinked_elsewhere_and_the_account_home_are_checked(self):
+        root = Path(self._tmp.name)
+        home = Path(self.env["HOME"])
+        home.mkdir()
+        elsewhere = root / "claude-real"
+        elsewhere.mkdir()
+        (home / ".claude").symlink_to(elsewhere)
+        msgs = self.problems(data_root=str(elsewhere))
+        self.assertTrue(any("~/.claude" in m for m in msgs), msgs)
+        acct = root / "acct-home"
+        (acct / ".ssh").mkdir(parents=True)
+        from chat_gateway_ext import claude_code as cc
+        with unittest.mock.patch.object(cc, "_account_home", return_value=str(acct)):
+            msgs = self.problems(data_root=str(acct / ".ssh"))       # $HOME points elsewhere
+            self.assertTrue(any("~/.ssh" in m for m in msgs), msgs)
+            msgs = self.problems(data_root=str(root))                # contains the account home
+            self.assertTrue(any("$HOME" in m for m in msgs), msgs)
+
+    # S12
+    def test_s12_describe_reports_cli_version_and_flag_check(self):
+        drv = self.driver()
+        self.assertEqual(drv.describe(), {"cli_version": None, "flag_check": "not_run"})
+        self.assertEqual(drv.self_check(), [])
+        self.assertEqual(drv.describe(), {"cli_version": "2.1.289 (Claude Code)", "flag_check": "ok"})
+        self.set_help(FULL_HELP.replace("--restricted", "--other"))
+        drv = self.driver()
+        drv.self_check()
+        self.assertEqual(drv.describe()["flag_check"], "missing:--restricted")
+
+    # S10
+    def write(self, rel, text, encoding="utf-8"):
+        path = self.data / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode(encoding) if isinstance(text, str) else text)
+        return path
+
+    def test_s10_t3_file_refuses_start_with_exit_3(self):
+        self.write("ok/schedule.csv", "工單,站別,數量\nWO-1,CNC,30\n")
+        self.write("deep/x/ncr.txt", "客戶航太件的 NCR")
+        with self.assertRaises(ConfigRefused) as cm:
+            self.problems(data_root=str(self.data))
+        self.assertEqual(cm.exception.exit, 3)
+        self.assertIn("deep/x/ncr.txt (aerospace-zh)", str(cm.exception))
+        self.assertNotIn("NCR", str(cm.exception).replace("ncr.txt", ""))      # names, never content
+
+    def test_s10_t2_file_is_a_warning_and_binaries_or_big_files_are_listed(self):
+        """With the explicit opt-in (MFG_TEAM_DATA_ALLOW_UNSCANNED=1) unscannable files only warn;
+        without it they refuse (TestDataScanFailClosed)."""
+        import contextlib
+        import io
+        self.write("contacts.csv", "窗口,mail\nA,someone@example.com\n")
+        self.write("big5.txt", "這份是機密", encoding="cp950")
+        self.write("img.png", b"\x89PNG\x00\x00binary")
+        self.write("huge.log", "a" * 2_000_001)
+        err = io.StringIO()
+        drv = self.driver(data_root=str(self.data), env={**self.env, "MFG_TEAM_DATA_ALLOW_UNSCANNED": "1"})
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(drv.self_check(), [])
+        self.assertIn("2 file(s) carry T2 markers", err.getvalue())
+        self.assertIn("big5.txt (confidential-zh)", err.getvalue())
+        self.assertIn("1 binary/document file(s) and 1 file(s) over 2 MB", err.getvalue())
+        self.assertIn("MFG_TEAM_DATA_ALLOW_UNSCANNED=1, so the model may read them unchecked", err.getvalue())
+        self.assertNotIn("someone", err.getvalue())
+        self.assertEqual(drv.describe()["data_root_scan"], {"files": 4, "t2_files": 2, "t3_files": 0, "unscanned": 2})
+        cache = Path(os.path.realpath(self.state)) / "data-scan.json"
+        self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+        self.assertNotIn("someone", cache.read_text(encoding="utf-8"))
+        drv.run(self.inv(read_roots=(str(self.data),)))               # T2 at T1: warned, not refused
+        self.assertIn("--add-dir", self.call()["argv"])
+
+    def test_s10_changes_after_start_are_rescanned_before_each_call(self):
+        import contextlib
+        import io
+        from chat_gateway.drivers.base import DriverPolicyDenied
+        clean = self.write("notes.txt", "今日排程正常")
+        drv = self.driver(data_root=str(self.data))
+        self.assertEqual(drv.self_check(), [])
+        drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(drv.last_scan.reread, 0)                    # unchanged: served from the cache
+        (self.rec / "call.json").unlink()
+        st = clean.stat()
+        clean.write_text("今日排程醫材", encoding="utf-8")           # same size class, mtime put back
+        os.utime(clean, ns=(st.st_atime_ns, st.st_mtime_ns))
+        err = io.StringIO()
+        with self.assertRaises(DriverPolicyDenied) as cm, contextlib.redirect_stderr(err):
+            drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(cm.exception.reason, "data_root:T3")
+        self.assertIn("notes.txt", err.getvalue())
+        self.assertFalse((self.rec / "call.json").exists())          # the model never ran
+        clean.write_text("今日排程正常", encoding="utf-8")
+        drv.run(self.inv(read_roots=(str(self.data),)))
+        (self.rec / "call.json").unlink()
+        (self.data / "escape").symlink_to("/etc")                     # R-05: planted after start
+        with self.assertRaises(DriverPolicyDenied) as cm, contextlib.redirect_stderr(io.StringIO()):
+            drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertEqual(cm.exception.reason, "data_root:symlink")
+        self.assertFalse((self.rec / "call.json").exists())
+        (self.data / "escape").unlink()
+        drv.run(self.inv())                                          # not granted: no scan, no --add-dir
+        self.assertNotIn("--add-dir", self.call()["argv"])
+
+    def test_s10_denylist_t3_entries_apply_to_data_files(self):
+        from chat_gateway.sanitize import load_denylist
+        deny = Path(self._tmp.name) / "names.denylist"
+        deny.write_text("T3:PRJ-Q\\d{3}\nCUST-Z\\d{2}\n", encoding="utf-8")
+        self.write("a.txt", "PRJ-Q123 的排程")
+        with self.assertRaises(ConfigRefused) as cm:
+            self.driver(data_root=str(self.data), extra_dlp=load_denylist(deny)).self_check()
+        self.assertEqual(cm.exception.exit, 3)
+        self.assertIn("denylist-t3:1", str(cm.exception))
+        self.assertEqual(self.driver(data_root=str(self.data)).self_check(), [])   # without the list: passes
+
+    def test_s10_entry_cap(self):
+        from chat_gateway.datascan import MAX_FILES
+        for i in range(MAX_FILES + 1):
+            (self.data / f"f{i:05d}.txt").write_bytes(b"")
+        msgs = self.problems(data_root=str(self.data))
+        self.assertTrue(any("more than 5,000 files" in m for m in msgs), msgs)
+
+    def test_s10_cli_self_check_exit_3(self):
+        import contextlib
+        import io
+        import chat_gateway.__main__ as cli
+        self.write("ncr.txt", "ITAR item")
+        roster = REPO_ROOT / "tests" / "gateway" / "fixtures" / "roster.json"
+        env = {**self.env, "MFG_TEAM_CLAUDE_BIN": str(self.bin), "MFG_TEAM_CLAUDE_CONFIG_DIR": str(self.config_dir),
+               "MFG_TEAM_DATA_T1": str(self.data), "MFG_TEAM_AUDIT_HMAC_KEY": "k" * 20,
+               "MFG_TEAM_APPROVAL_HMAC_KEY": "a" * 20, "MFG_TEAM_DAILY_BUDGET_USD": "5"}
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env)
+        self.assertEqual(rc, 3, err.getvalue())
+        self.assertIn("refused to start (exit 3)", err.getvalue())
+        audit = Path(os.path.realpath(self.state)) / "audit" / "sys" / "audit.jsonl"
+        last = json.loads(audit.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(last["action"], "config_refused")
+        self.assertEqual(last["driver_info"]["cli_version"], "2.1.289 (Claude Code)")
+        (self.data / "ncr.txt").unlink()
+        out = io.StringIO()
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["self-check", "--roster", str(roster), "--driver", "claude-code"], env=env), 0)
+        self.assertIn("self-check: OK", out.getvalue())
+        self.assertIn("self-check: daily budget: 5 USD per twin per UTC day", out.getvalue())
+        self.assertIn("self-check: denylist: ", out.getvalue())
+        last = json.loads(audit.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(last["action"], "config_loaded")
+        self.assertEqual(last["driver_info"]["flag_check"], "ok")
+
+
+
+T3_TEXT = "客戶航太件的 NCR"          # aerospace-zh, T3
+
+
+class TestDataScanFailClosed(TestPilotDriver):
+    """P-01 (unscannable files refuse by default), P-06 (special files), P-07 (secret shapes)."""
+
+    def start(self, **env):
+        import contextlib
+        import io
+        err = io.StringIO()
+        drv = self.driver(data_root=str(self.data), env={**self.env, **env})
+        with contextlib.redirect_stderr(err):
+            try:
+                return drv, drv.self_check(), err.getvalue(), None
+            except ConfigRefused as exc:
+                return drv, None, err.getvalue(), exc
+
+    def call_reason(self, drv):
+        import contextlib
+        import io
+        from chat_gateway.drivers.base import DriverPolicyDenied
+        with self.assertRaises(DriverPolicyDenied) as cm, contextlib.redirect_stderr(io.StringIO()):
+            drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertFalse((self.rec / "call.json").exists())          # the model never ran
+        return cm.exception.reason
+
+    def assert_refused(self, needle):
+        _, _, _, exc = self.start()
+        self.assertIsNotNone(exc, "start was not refused")
+        self.assertEqual(exc.exit, 3)
+        self.assertIn(needle, str(exc))
+        self.assertNotIn("航太", str(exc))                               # names, never content
+        return exc
+
+    # P-01: encodings that used to be skipped are now decoded and scanned
+    def test_utf16_with_bom_is_decoded_and_scanned(self):
+        for enc in ("utf-16", "utf-16-be", "utf-32"):
+            with self.subTest(enc=enc):
+                data = T3_TEXT.encode(enc)
+                if enc == "utf-16-be":
+                    data = b"\xfe\xff" + data
+                self.write("ncr.txt", data)
+                self.assert_refused("ncr.txt (aerospace-zh)")
+        self.write("ncr.txt", "今日排程正常".encode("utf-16"))
+        self.assertEqual(self.start()[1], [])                          # clean UTF-16 text passes
+
+    def test_utf16_without_bom_is_unscanned_and_refused(self):
+        self.write("ncr.txt", T3_TEXT.encode("utf-16-le"))
+        self.assert_refused("cannot be scanned")
+
+    def test_utf8_with_a_stray_byte_is_scanned(self):
+        self.write("ncr.txt", T3_TEXT.encode("utf-8") + b"\x80\n")
+        self.assert_refused("ncr.txt (aerospace-zh)")
+        self.write("ncr.txt", "今日排程正常".encode("utf-8") + b"\x80\n")
+        self.assertEqual(self.start()[1], [])
+
+    def test_mostly_undecodable_bytes_count_as_binary(self):
+        import random
+        rnd = random.Random(7)
+        self.write("blob.dat", bytes(rnd.choice(range(0x80, 0x100)) for _ in range(4096)))
+        self.assert_refused("cannot be scanned")
+
+    # P-01: document formats and big files refuse by default, at start and per call
+    def test_pdf_docx_xlsx_and_large_files_refuse_by_default(self):
+        cases = (("spec.pdf", b"%PDF-1.4\x00\x00 " + T3_TEXT.encode()),
+                 ("note.pdf", T3_TEXT.encode()),                                    # by suffix, even as text
+                 ("report.docx", b"PK\x03\x04" + T3_TEXT.encode()),
+                 ("sheet.xlsx", b"PK\x03\x04\x14\x00" + T3_TEXT.encode()),
+                 ("legacy.xls", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + T3_TEXT.encode()),
+                 ("photo.jpg", b"\xff\xd8\xff\xe0" + T3_TEXT.encode()),
+                 ("huge.log", T3_TEXT.encode() + b" " * 2_000_001))
+        for name, data in cases:
+            with self.subTest(name=name):
+                path = self.write(name, data)
+                exc = self.assert_refused(name)
+                self.assertIn("MFG_TEAM_DATA_ALLOW_UNSCANNED=1", str(exc))
+                drv = self.driver(data_root=str(self.data))
+                self.assertEqual(self.call_reason(drv), "data_root:unscanned")
+                path.unlink()
+        self.assertEqual(self.start()[1], [])
+
+    def test_unscanned_file_added_after_start_refuses_the_call(self):
+        self.write("notes.txt", "今日排程正常")
+        drv, problems, _, exc = self.start()
+        self.assertEqual((problems, exc), ([], None))
+        self.write("drawing.pdf", b"%PDF-1.7\n")
+        self.assertEqual(self.call_reason(drv), "data_root:unscanned")
+        self.assertEqual(self.call_reason(drv), "data_root:unscanned")    # not only on the first call
+
+    def test_explicit_opt_in_allows_unscanned_files_with_a_warning(self):
+        self.write("spec.pdf", b"%PDF-1.4\x00\x00")
+        for value in ("0", "yes", "true", ""):
+            with self.subTest(value=value):
+                self.assertIsNotNone(self.start(MFG_TEAM_DATA_ALLOW_UNSCANNED=value)[3])   # only "1" opts in
+        drv, problems, err, exc = self.start(MFG_TEAM_DATA_ALLOW_UNSCANNED="1")
+        self.assertEqual((problems, exc), ([], None))
+        self.assertIn("spec.pdf", err)
+        self.assertIn("unchecked", err)
+        drv.run(self.inv(read_roots=(str(self.data),)))
+        self.assertIn("--add-dir", self.call()["argv"])
+        (self.rec / "call.json").unlink()
+        self.write("ncr.txt", T3_TEXT)                                    # the opt-in never covers T3 text
+        self.assertEqual(self.call_reason(drv), "data_root:T3")
+
+    # P-06: FIFO, socket
+    def test_fifo_is_refused_without_opening_it(self):
+        import threading
+        from chat_gateway.datascan import scan_tree
+        os.mkfifo(self.data / "pipe.txt")
+        box = {}
+        t = threading.Thread(target=lambda: box.setdefault("r", scan_tree(os.path.realpath(self.data))), daemon=True)
+        t.start()
+        t.join(5)
+        if t.is_alive():                                                   # unblock before failing
+            os.close(os.open(self.data / "pipe.txt", os.O_WRONLY | os.O_NONBLOCK))
+            self.fail("the scan blocked on a FIFO")
+        self.assertEqual(box["r"].problems, [("special_file", "pipe.txt")])
+        drv, problems, _, _ = self.start()
+        self.assertTrue(any("FIFO, socket or device (pipe.txt)" in p for p in problems), problems)
+        self.assertEqual(self.call_reason(drv), "data_root:special_file")
+
+    def test_fifo_added_after_start_refuses_the_call(self):
+        self.write("notes.txt", "今日排程正常")
+        drv, problems, _, _ = self.start()
+        self.assertEqual(problems, [])
+        os.mkfifo(self.data / "late.csv")
+        self.assertEqual(self.call_reason(drv), "data_root:special_file")
+
+    def test_unix_socket_is_refused(self):
+        import socket
+        sock = socket.socket(socket.AF_UNIX)
+        self.addCleanup(sock.close)
+        path = self.data / "s.sock"
+        if len(str(path)) > 100:
+            self.skipTest("socket path too long for AF_UNIX")
+        sock.bind(str(path))
+        drv, problems, _, _ = self.start()
+        self.assertTrue(any("FIFO, socket or device" in p for p in problems), problems)
+        self.assertEqual(self.call_reason(drv), "data_root:special_file")
+
+    def test_file_swapped_for_a_fifo_between_lstat_and_open_is_not_read(self):
+        from chat_gateway import datascan
+        f = self.write("a.txt", "今日排程正常")
+        st = os.lstat(f)
+        f.unlink()
+        os.mkfifo(f)
+        with self.assertRaises(datascan._NotRegular):
+            datascan._read_regular(str(f), st, 100)
+
+    # P-07: secret shapes are T3
+    def test_secret_shapes_in_data_files_refuse(self):
+        cases = {
+            "private-key-block": "-----" + "BEGIN ENCRYPTED PRIVATE KEY" + "-----\nMIIB\n",
+            "private-key": "-----" + "BEGIN OPENSSH PRIVATE KEY" + "-----\nb3Bl\n",
+            "aws-key-id-any": "id=" + "AKIA" + "ABCDEFGHIJKLMNOP" + "x",
+            "slack-token-any": "token " + "xox" + "b-" + "123456-abcdef",
+            "anthropic-key-any": "key " + "sk" + "-ant-" + "api03-abcdef",
+            "github-token-any": "gh" + "p_" + "abcdefghijklmnop1234",
+            "api-key-assignment": "API_" + "KEY = " + "'abcd1234efgh'",
+        }
+        for name, text in cases.items():
+            with self.subTest(name=name):
+                path = self.write("conf.txt", "工單,站別\n" + text + "\n")
+                exc = self.assert_refused(f"secret:{name}")
+                self.assertNotIn(text.strip()[-6:], str(exc))
+                drv = self.driver(data_root=str(self.data))
+                self.assertEqual(self.call_reason(drv), "data_root:T3")
+                path.unlink()
+        for text in ("api_key: <從保管系統取得>", "API key 由 IT 保管", "WO-1,CNC,30"):
+            with self.subTest(clean=text):
+                self.write("conf.txt", text)
+                self.assertEqual(self.start()[1], [])
 
 
 class TestWiring(unittest.TestCase):

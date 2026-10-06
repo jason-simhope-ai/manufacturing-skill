@@ -7,7 +7,8 @@ mechanism is still complete and tested:
 * Decisions come only from structured `ApprovalClick` events, never chat text.
 * A click counts only in the channel the card was posted to (`click.channel_ref`, EXT-03).
 * One approver decides; at T2+ the approver must differ from the requester.
-* Any later click on a decided / expired approval → "replay".
+* Any later click on a decided / expired approval → "replay"; on a card voided by a freeze → "void".
+* `resolve(..., may_execute=)` is asked just before the executor runs; False → "frozen" (P-03).
 * Dual-approval configurations are refused at load (see core.validate_roster).
 """
 from __future__ import annotations
@@ -24,7 +25,7 @@ from typing import Callable, Iterable, Literal, Protocol
 from . import tier_rank
 from .adapters.base import ApprovalCard, ApprovalClick
 
-Resolution = Literal["granted", "denied", "expired", "mismatch", "forbidden", "replay"]
+Resolution = Literal["granted", "denied", "expired", "mismatch", "forbidden", "replay", "void", "frozen"]
 TTL_S = 1800
 
 
@@ -63,6 +64,7 @@ class _Pending:
     expires_at: float
     canonical: str = ""          # canonical JSON of the whole action, frozen at creation
     done: bool = False
+    void: bool = False           # voided by a freeze (P-04)
 
 
 class ApprovalBook:
@@ -99,13 +101,29 @@ class ApprovalBook:
     def get(self, approval_id: str) -> _Pending | None:
         return self._book.get(approval_id)
 
+    def pending(self) -> list[tuple[str, _Pending]]:
+        """(id, record) of every card not yet decided, voided or expired."""
+        now = self._clock()
+        return [(aid, rec) for aid, rec in self._book.items() if not rec.done and now <= rec.expires_at]
+
+    def void(self, approval_id: str) -> bool:
+        """Void a pending card (freeze, P-04). A later click resolves "void"; nothing executes."""
+        rec = self._book.get(approval_id)
+        if rec is None or rec.done:
+            return False
+        rec.done = rec.void = True
+        return True
+
     def resolve(self, click: ApprovalClick, executor: Executor, *, roles: Iterable[str] = (),
-                action: dict | None = None) -> Resolution:
+                action: dict | None = None, may_execute: Callable[[], bool] | None = None) -> Resolution:
         """Decide a click. `roles` = positions of the clicking user; `action`, if given,
-        is what the caller is about to execute and must hash to the bound args."""
+        is what the caller is about to execute and must hash to the bound args. `may_execute`, if
+        given, is asked right before an approved action runs; False voids the card ("frozen")."""
         rec = self._book.get(click.approval_id)
         if rec is None:
             return "mismatch"
+        if rec.void and hmac.compare_digest(rec.mac, self._mac(click.approval_id, click.nonce, rec.args_hash)):
+            return "void"
         if rec.done:
             return "replay"
         if not hmac.compare_digest(rec.mac, self._mac(click.approval_id, click.nonce, rec.args_hash)):
@@ -130,8 +148,12 @@ class ApprovalBook:
         if now_canonical != rec.canonical or args_hash(to_run.get("args", {})) != rec.args_hash:
             rec.done = True
             return "mismatch"
-        rec.done = True
         if click.decision != "approve":
+            rec.done = True
             return "denied"
+        if may_execute is not None and not may_execute():
+            rec.done = rec.void = True
+            return "frozen"
+        rec.done = True
         executor.execute(to_run)
         return "granted"

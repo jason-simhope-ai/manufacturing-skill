@@ -3,7 +3,10 @@
 
     teamctl.py [--repo-root DIR] check [--roster PATH] [--ci|--strict] [--today YYYY-MM-DD]
     teamctl.py roster [--roster PATH] [--json] [--crontab]
-    teamctl.py audit-verify FILE_OR_DIR     (chat_gateway.audit; key from MFG_TEAM_AUDIT_HMAC_KEY)
+    teamctl.py audit-verify FILE_OR_DIR [--heads-out FILE] [--anchor FILE]
+                                              (chat_gateway.audit; key from MFG_TEAM_AUDIT_HMAC_KEY;
+                                               --heads-out writes signed heads to copy off-host,
+                                               --anchor fails if the log went backwards since one)
     teamctl.py state-reset [--confirm]        (move the gateway state dir aside, never delete)
     teamctl.py build [build.py options]       (same as build.py)
 
@@ -121,7 +124,12 @@ def cmd_audit_verify(args, root: Path) -> int:
         print(f"teamctl: no such file or directory {args.file}",
               file=sys.stderr)
         return 2
-    return 0 if print_verify(args.file, audit_key_for_verify(os.environ)) else 1
+    if args.anchor and not Path(args.anchor).is_file():
+        print(f"teamctl: no such anchor file {args.anchor}", file=sys.stderr)
+        return 2
+    ok = print_verify(args.file, audit_key_for_verify(os.environ), heads_out=args.heads_out,
+                      anchor=args.anchor)
+    return 0 if ok else 1
 
 
 def cmd_state_reset(args, root: Path) -> int:
@@ -176,6 +184,11 @@ def main(argv=None) -> int:
     r.add_argument("--crontab", action="store_true")
     a = sub.add_parser("audit-verify")
     a.add_argument("file", metavar="FILE_OR_DIR")
+    a.add_argument("--heads-out", metavar="FILE",
+                   help="after a successful verify, write the signed per-tier heads (JSON) to FILE")
+    a.add_argument("--anchor", metavar="FILE",
+                   help="an earlier --heads-out file: fail if any tier's count or seq went down or its "
+                        "head is no longer on the chain")
     sr = sub.add_parser("state-reset")
     sr.add_argument("--confirm", action="store_true")
     args = ap.parse_args(argv)
