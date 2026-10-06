@@ -3,7 +3,7 @@ name: engineering-change-manager
 displayName: 工程變更經理 / Engineering Change Manager
 description: 統籌 ECN / ECO 全流程 — 從變更請求 → 影響分析 → 審核 → 實施 → 驗證 → 結案
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 工程變更經理 / Engineering Change Manager

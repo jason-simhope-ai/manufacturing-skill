@@ -3,7 +3,7 @@ name: inventory-manager
 displayName: 倉庫管理 / Inventory Manager
 description: 物料庫存管理、缺料預警、安全庫存、盤點、BOM 健檢
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # 倉庫管理 / Inventory Manager
