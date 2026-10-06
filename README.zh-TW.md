@@ -1,6 +1,6 @@
 # manufacturing-skill
 
-> Claude Code plugin · 30 分鐘把製造業 SOP 變成 AI 助理 — plugin 檔案與提示詞存在你的電腦；預設模型是 Anthropic 雲端，貼進去的內容會送給模型供應商（地端為選配，見[資料流向](#資料流向一張圖)）。
+> 把工廠的 SOP 變成會幫你看事情的 AI 同事：30 分鐘裝好，在自己的電腦上用。預設用雲端模型，你貼給它的內容會送到雲端；圖紙、報價、客戶資料要留在公司，就不要貼給它，要讓 AI 讀圖紙請用地端模型（[怎麼做](#cloud-first-on-prem-later)）。聊天室裡的「分身」只碰一般資料。
 
 [![CI](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-simhope-ai/manufacturing-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 **這份 README 給三種人看：**
 
-- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；**要簽字導入分身前，先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判、給客戶稽核員的三行）
+- 🎯 **決策者**（老闆 / 廠長 / 接班人）→ 跳 [Demo 畫面](#demo-畫面) 跟 [這能做什麼](#這能做什麼)；想給每個職位配一個 AI 副駕，看 [分身團隊](#分身團隊)，**簽字前先讀 [董事長一頁](docs/owner-one-page.zh-TW.md)**（簽什麼、花多少、怎麼停、第 4 週怎麼判）；給客戶稽核員的三行另印一張，[給法務](docs/owner-auditor-sheet.zh-TW.md)
 - 🛠️ **導入者**（IT / 顧問 / 想動手的廠務）→ 從 [環境需求](#環境需求) 一路看到 [30 秒安裝](#30-秒安裝) 跟 [常見問題](#常見問題)
 - 🧩 **開發者**（想做新產業包）→ 跳 [Repo 結構](#repo-結構) 跟 [profile-development.md](docs/profile-development.md)
 
@@ -59,7 +59,40 @@ plugin 預載的 quote-specialist 馬上抓到這個矛盾、提出 3 個替代�
 
 ---
 
-## 虛實整合團隊（v0.2.0-alpha，實驗性）
+## 分身團隊
+
+> 🧪 **實驗版**（v0.2.0-alpha）。先在測試用的聊天室、用虛構的資料試，不要直接上線。
+
+![分身團隊 · 一張圖看懂](docs/explainers/screenshots/05-team-one-look.png)
+
+簡單說：**每個職位一個 AI 副駕，我們叫它「分身」**，住在公司的聊天室（Slack 或 Discord）。主管在聊天室 @ 它，它在同一串留言裡補資料、找反例；**判斷和簽字永遠是人**。
+
+| 🤖 分身幫你做                                   | 👤 你還是自己做                    |
+| ----------------------------------------------- | ---------------------------------- |
+| 翻出以前很像的案子，和「後來出問題」的反例      | 判斷嚴重不嚴重、合不合格           |
+| 早會前提醒：哪張工單交期很緊、哪台機器今天要保養 | 決定要不要插單、加班、停線         |
+| 每天看數字的走勢，有變壞的跡象先講一聲          | 回覆客戶、對外寄任何東西           |
+| 挑戰你的想法：「這一點可能推翻你的判斷」        | 在公司系統裡改資料（分身改不了）   |
+| 寫草稿給你改（每份都標「草稿」）                | 簽字，並為結論負責                 |
+
+**🛡️ 安全三句話**
+
+- **這些不進聊天室**：圖紙、報價、客戶資料、客戶要求保密的特殊專案。拿不準，就當作不能貼。
+- **老闆先簽一頁原則**：分身是副駕不是替身，紀錄不拿來打考績。沒簽就不開。
+- **任何人都可以說「我不同意」**：分身只回「收到」，不再給新答案，也不記是誰說的。
+
+**👀 想多看一點**
+
+- 🖨️ **一張圖看懂**（可印出來掛牆）：[docs/explainers/05-分身團隊-一張圖看懂.html](docs/explainers/05-分身團隊-一張圖看懂.html)
+- ▶ **點擊式示範**（瀏覽器打開，一步一步看分身怎麼回答、誰在判斷）：[docs/demo/team-demo.html](docs/demo/team-demo.html) · 文字版 [team-demo.md](docs/demo/team-demo.md)
+- 💻 **2 分鐘離線示範**（不用帳號、不用網路；請 IT 幫你在電腦上跑這一行）：`python3 infra/chat-gateway/demo.py --plain`
+- 🎯 **要簽字的老闆**：[董事長一頁](docs/owner-one-page.zh-TW.md)（簽什麼、花多少、怎麼喊停、第 4 週怎麼判）
+- 🧑‍🏭 **現場同仁**：[分身與我](team/for-frontline.zh-TW.md)（5 分鐘看完）
+
+![點擊式示範：主管先判斷，分身再拿相似案與反例來對照](docs/demo/screenshots/team-demo.png)
+
+<details>
+<summary>給 IT 與導入者看的細節</summary>
 
 > 每個職位一個**副駕分身**，住在公司的聊天工作區。**副駕不是替身**：判斷永遠由人做，分身只負責補資料、挑戰假設、定時提醒。
 
@@ -82,7 +115,7 @@ python3 infra/chat-gateway/demo.py
 | **AI agent** | 讀 [TEAM.md](TEAM.md)（≤ 6,000 B）：照啟動演算法 `teamctl check` → `build` → 讀 roster，再依漸進揭露地圖往下讀 |
 | **人（10 分鐘）** | 從 [team/README.zh-TW.md](team/README.zh-TW.md) 開始 → 任選一個分身檔，例如 [team/twins/qa-manager.md](team/twins/qa-manager.md) →（選讀）[TEAM.md](TEAM.md)，那是給 agent 的啟動檔 |
 
-**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 高安規客製專案。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 不處理，但做法是「拒載」不是「理解」**：roster 出現 T3 頻道或分身，gateway 啟動即拒絕（exit 3）；訊息含明顯的 T3 字樣（國防、航太、ITAR 等）會被擋下並提示改走公司 T3 程序，字樣之外的 T3 內容系統認不出來，要靠人與流程。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 掃追蹤檔；`team/local` 靠本機 pre-commit）。
+**資料分級規則**：T0 公開、T1 內部、T2 機密、T3 受管制或客戶要求保密的專案資料（例如：航太、醫療器材、簽了保密協議的客戶專案、有出口管制的品項）。Slack / Discord 與雲端模型**最高只能處理 T1**；T2 只能在本機 mock；**T3 不處理，但做法是「拒載」不是「理解」**：roster 出現 T3 頻道或分身，gateway 啟動即拒絕（exit 3）；訊息含明顯的 T3 字樣（例如「航太」「醫材」「ITAR」）會被擋下並提示改走公司 T3 程序，字樣之外的 T3 內容系統認不出來，要靠人與流程。拿不準就往上一級。repo 內只有職稱與合成資料，沒有真名、平台 id 或 secret（CI 掃追蹤檔；`team/local` 靠本機 pre-commit）。
 
 **誠實的現況（alpha）**
 
@@ -91,6 +124,8 @@ python3 infra/chat-gateway/demo.py
 - 沒有長期記憶（只有行程內的短頻道窗，重啟即清空）。
 - 沒有任何寫入動作：分身工具恆為唯讀（`Read, Grep, Glob`），上限 `draft`。
 - 完整設計與延後項目見 [設計 spec](docs/superpowers/specs/2026-10-05-digital-twin-team-design.md)、[ROADMAP](docs/ROADMAP.md)。
+
+</details>
 
 ---
 
@@ -208,7 +243,7 @@ cd manufacturing-skill
 
 # 2. 裝進 Claude Code（互動選產業包）
 bash adapters/claude-code/install.sh
-# 會出現選單，列出 5 個產業包選項 + "core-only 純試框架" 選項
+# 會出現選單，列出 6 個產業包選項 + "core-only 純試框架" 選項
 
 # 3. 試試看（在 Claude Code 內）
 /manufacturing init     # ← 第一次用打這個，AI 會引導 4 個問題
@@ -294,10 +329,12 @@ manufacturing-skill/
 ├── infra/                    # MCP server、地端 LLM 設定
 │   └── chat-gateway/         # 分身聊天 gateway（mock / Slack / Discord adapter、離線 demo）
 ├── docs/
-│   ├── explainers/           # 三張可印 A3 的繁中說明卡
+│   ├── explainers/           # 五張可印 A3 的繁中說明卡
+│   ├── demo/                 # 報價 demo 與分身點擊式示範（team-demo.html）
 │   ├── architecture.md
 │   ├── adoption-guide.md     # 給 AI 導入顧問的 playbook
 │   ├── owner-one-page.zh-TW.md  # 董事長一頁：簽什麼、花多少、怎麼停
+│   ├── owner-auditor-sheet.zh-TW.md  # 給法務與客戶稽核員的一張（三行與擋不到的情況）
 │   ├── profile-development.md  # 給想做新產業包的開發者
 │   └── ROADMAP.md
 ├── tests/
@@ -308,14 +345,15 @@ manufacturing-skill/
 
 ---
 
-## 三張 explainer 卡 — 印出來掛牆
+## 五張 explainer 卡 — 印出來掛牆
 
-本 plugin 預設有四張可印 A3 的繁中說明卡（呼應「印出來掛牆」精神）：
+本 plugin 預設有五張可印 A3 的繁中說明卡（呼應「印出來掛牆」精神）：
 
 - **`docs/explainers/01-架構總覽.html`** — 給老闆。5 分鐘看懂這能解決什麼。
 - **`docs/explainers/02-IT部門系統說明.html`** — 給 IT。把 AI 術語對照成傳統 IT（Agent ≈ RPA、MCP ≈ ESB）。
 - **`docs/explainers/03-使用者cheatsheet.html`** — 給業助 / 廠長 / 品管。每天會用到的指令快查。
 - **`docs/explainers/04-懶人包-5分鐘上手.html`** — ⭐ **給「不想看文字直接看截圖」的人**。一頁式視覺操作流程。
+- **`docs/explainers/05-分身團隊-一張圖看懂.html`** — 🤝 **給老闆、主管、現場同仁**。分身是什麼、誰做什麼、安全三句話、怎麼開始，一張看完。
 
 直接用瀏覽器打開 HTML 檔即可，無 build step、無外部依賴、印 A3 看得清楚。
 

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分身團隊 — 一張圖看懂</title>
+<style>
+  @page { size: A3 landscape; margin: 1cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 24px;
+    background: #f7f4f0; color: #2c2a26;
+    font-size: 12px; line-height: 1.5;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .title { font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .subtitle { font-size: 14px; color: #6b6856; margin-top: 4px; }
+  .subtitle strong { color: #2c2a26; }
+  .meta { font-family: "JetBrains Mono", "Consolas", monospace; font-size: 10px; color: #8a857c; margin-top: 2px; }
+
+  .container { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+  .main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+  /* ── numbered blocks, same shape as card 04's steps ─────────── */
+  .block {
+    display: grid; grid-template-columns: 60px minmax(0, 1fr);
+    border: 1px solid #d4cfb0; border-radius: 6px;
+    background: #fff; overflow: hidden;
+  }
+  .block-num {
+    background: var(--color); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; flex-direction: column;
+    padding: 8px;
+  }
+  .block-num small { font-size: 9px; opacity: 0.9; font-weight: normal; margin-top: 2px; letter-spacing: 1px; }
+  .block-content { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .block-title { font-size: 15px; font-weight: 700; color: #2c2a26; }
+  .block-caption { font-size: 12.5px; color: #4a4640; }
+  .block-caption strong { color: #2c2a26; }
+
+  .b1 { --color: #5a7892; }
+  .b2 { --color: #6b8a4c; }
+  .b3 { --color: #b07050; }
+
+  /* picture */
+  .picture { width: 100%; height: auto; display: block; margin-top: 2px; }
+
+  /* two columns: twin does / you still do */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .col {
+    border: 1px solid #d4cfb0; border-radius: 5px; padding: 8px 12px;
+  }
+  .col.twin { background: #f3f7eb; border-color: #b9cba0; }
+  .col.human { background: #fef8f0; border-color: #dcc3a4; }
+  .col-head { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .col.twin .col-head { color: #4e6a35; }
+  .col.human .col-head { color: #8a5a34; }
+  .col ul { margin: 0; padding-left: 18px; }
+  .col li { font-size: 12px; margin: 2px 0; }
+
+  /* three categories */
+  .cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .cat {
+    border: 1px solid #d4cfb0; border-radius: 5px; padding: 8px 12px; background: #fafaf7;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .cat-name { font-size: 14px; font-weight: 700; }
+  .cat-what { font-size: 11.5px; color: #4a4640; }
+  .cat-eg { font-size: 11.5px; color: #2c2a26; background: #fff; border: 1px dashed #d4cfb0; border-radius: 4px; padding: 4px 8px; margin-top: 2px; }
+  .cat-eg b { color: #6b6856; font-weight: 600; }
+  .cat.c1 .cat-name { color: #5a7892; }
+  .cat.c2 .cat-name { color: #6b8a4c; }
+  .cat.c3 { background: #f2f0ec; border-style: dashed; }
+  .cat.c3 .cat-name { color: #8a6a8c; }
+  .off {
+    display: inline-block; font-size: 10.5px; font-weight: 700; color: #fff; background: #8a857c;
+    border-radius: 3px; padding: 0 6px; margin-left: 4px; vertical-align: 2px;
+  }
+
+  /* ── sidebar ─────────────────────────────────────────────────── */
+  .sidebar { display: flex; flex-direction: column; gap: 10px; }
+  .panel { border: 1px solid #d4cfb0; border-radius: 6px; padding: 10px 12px; background: #fff; }
+  .panel.safety { border: 2px solid #a55050; background: #fdf6f4; }
+  .panel-title { font-size: 13px; font-weight: 700; color: #6b6856; margin-bottom: 6px; letter-spacing: 1px; }
+  .panel.safety .panel-title { color: #a55050; }
+  .rule { display: grid; grid-template-columns: 22px 1fr; gap: 4px; font-size: 12px; margin-bottom: 7px; }
+  .rule:last-child { margin-bottom: 0; }
+  .rule-n {
+    width: 20px; height: 20px; border-radius: 50%; background: #a55050; color: #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .rule b { color: #2c2a26; }
+  .step { display: grid; grid-template-columns: 22px 1fr; gap: 4px; font-size: 12px; margin-bottom: 7px; }
+  .step:last-child { margin-bottom: 0; }
+  .step-n {
+    width: 20px; height: 20px; border-radius: 50%; background: #5a7892; color: #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .step small { display: block; color: #6b6856; font-size: 11px; }
+  .faq-q { font-size: 12px; font-weight: 700; color: #2c2a26; margin-top: 6px; }
+  .faq-q:first-of-type { margin-top: 0; }
+  .faq-a { font-size: 11.5px; color: #5a5648; margin-top: 1px; line-height: 1.5; }
+
+  .footer { text-align: center; margin-top: 14px; font-size: 11px; color: #6b6856; }
+  .footer .url { font-family: "JetBrains Mono", "Consolas", monospace; color: #2c2a26; font-weight: 600; }
+
+  @media (max-width: 900px) {
+    body { padding: 16px; }
+    .container { grid-template-columns: minmax(0, 1fr); }
+    .two-col, .cats { grid-template-columns: minmax(0, 1fr); }
+    .block { grid-template-columns: 44px minmax(0, 1fr); }
+  }
+  @media print {
+    body { background: white; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">🤝 分身團隊 · 一張圖看懂</div>
+  <div class="subtitle">每個職位一個 AI 副駕，住在公司的聊天室裡。<strong>它幫你多看一點，判斷還是你做。</strong></div>
+  <div class="meta">給：老闆 · 廠長 · 各部門主管 · 現場同仁 ｜ 不用懂程式、不用懂 AI ｜ 實驗版，先在測試用的聊天室試</div>
+</div>
+
+<div class="container">
+  <div class="main">
+
+    <!-- 1 · 分身是什麼 -->
+    <div class="block b1">
+      <div class="block-num">1<small>是什麼</small></div>
+      <div class="block-content">
+        <div class="block-title">💡 分身是什麼？</div>
+        <div class="block-caption"><strong>分身＝某個職位的 AI 副駕。</strong>主管在聊天室裡 @ 它，它在同一串留言裡補資料、找反例，最後把決定交還給主管。</div>
+
+        <svg class="picture" viewBox="0 0 1000 250" role="img" aria-labelledby="pic-t pic-d" xmlns="http://www.w3.org/2000/svg">
+          <title id="pic-t">主管在聊天室問分身，分身在同一串留言回答，主管做決定</title>
+          <desc id="pic-d">左邊是品保主管；中間是公司聊天室，主管 @ 品保主管分身，分身在留言串裡回覆相似案與反例並寫「需要你判斷」；右邊是主管自己做決定。</desc>
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#8a857c"/>
+            </marker>
+          </defs>
+          <g font-family="Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif">
+
+            <!-- person (left) -->
+            <circle cx="80" cy="78" r="26" fill="#5a7892"/>
+            <path d="M34,172 Q34,112 80,112 Q126,112 126,172 Z" fill="#5a7892"/>
+            <rect x="66" y="128" width="28" height="22" rx="3" fill="#fff" opacity="0.9"/>
+            <text x="80" y="144" font-size="11" text-anchor="middle" fill="#5a7892" font-weight="700">品保</text>
+            <text x="80" y="198" font-size="14" text-anchor="middle" fill="#2c2a26" font-weight="700">品保主管</text>
+            <text x="80" y="216" font-size="12" text-anchor="middle" fill="#6b6856">（人）</text>
+
+            <!-- arrow: ask -->
+            <line x1="138" y1="96" x2="214" y2="96" stroke="#8a857c" stroke-width="2" marker-end="url(#arr)"/>
+            <text x="176" y="86" font-size="12" text-anchor="middle" fill="#5a7892" font-weight="700">① @ 問</text>
+
+            <!-- chat window (middle) -->
+            <rect x="222" y="14" width="540" height="222" rx="8" fill="#ffffff" stroke="#c5c0a8" stroke-width="1.5"/>
+            <rect x="222" y="14" width="540" height="28" rx="8" fill="#2a2926"/>
+            <rect x="222" y="34" width="540" height="8" fill="#2a2926"/>
+            <circle cx="238" cy="28" r="4" fill="#ff5f56"/><circle cx="251" cy="28" r="4" fill="#ffbd2e"/><circle cx="264" cy="28" r="4" fill="#27c93f"/>
+            <text x="282" y="32" font-size="12" fill="#d8d4c8">公司聊天室 · 品保頻道</text>
+
+            <!-- message from manager -->
+            <circle cx="248" cy="66" r="11" fill="#5a7892"/>
+            <text x="248" y="70" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">人</text>
+            <text x="266" y="62" font-size="11" fill="#6b6856">品保主管</text>
+            <text x="266" y="80" font-size="13" fill="#2c2a26">@品保主管分身　這張不良單，嚴重度怎麼判？我先說：判「中」。</text>
+
+            <!-- thread line -->
+            <line x1="248" y1="90" x2="248" y2="196" stroke="#d4cfb0" stroke-width="2"/>
+            <text x="262" y="104" font-size="11" fill="#6b8a4c" font-weight="700">↳ ② 分身在同一串留言裡補資料</text>
+
+            <!-- twin reply -->
+            <rect x="262" y="112" width="484" height="86" rx="6" fill="#f3f7eb" stroke="#b9cba0"/>
+            <rect x="272" y="122" width="22" height="22" rx="5" fill="#6b8a4c"/>
+            <text x="283" y="137" font-size="11" text-anchor="middle" fill="#fff" font-weight="700">分</text>
+            <text x="302" y="137" font-size="12" fill="#4e6a35" font-weight="700">【品保主管分身】建議（草稿）</text>
+            <text x="276" y="160" font-size="12.5" fill="#2c2a26">以前有 2 件很像的，都判「中」；但有 1 件後來又出問題。</text>
+            <text x="276" y="182" font-size="12.5" fill="#a55050" font-weight="700">🧭 需要你判斷：嚴重度、要不要開改善報告</text>
+
+            <!-- manager decides -->
+            <circle cx="248" cy="216" r="9" fill="#5a7892"/>
+            <text x="266" y="221" font-size="12.5" fill="#2c2a26">品保主管：好，我還是判「中」，加嚴下一批的檢驗。</text>
+
+            <!-- arrow: decide -->
+            <line x1="770" y1="125" x2="838" y2="125" stroke="#8a857c" stroke-width="2" marker-end="url(#arr)"/>
+            <text x="803" y="115" font-size="12" text-anchor="middle" fill="#b07050" font-weight="700">交還給人</text>
+
+            <!-- decision stamp (right) -->
+            <circle cx="910" cy="110" r="62" fill="#fef8f0" stroke="#b07050" stroke-width="3"/>
+            <circle cx="910" cy="110" r="54" fill="none" stroke="#b07050" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="910" y="102" font-size="15" text-anchor="middle" fill="#b07050" font-weight="700">③ 決定</text>
+            <text x="910" y="126" font-size="20" text-anchor="middle" fill="#b07050" font-weight="700">人做</text>
+            <text x="910" y="198" font-size="12" text-anchor="middle" fill="#6b6856">簽字的人負責結論</text>
+            <text x="910" y="216" font-size="12" text-anchor="middle" fill="#6b6856">分身只是參考</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 2 · 分身幫你做 / 你還是自己做 -->
+    <div class="block b2">
+      <div class="block-num">2<small>分工</small></div>
+      <div class="block-content">
+        <div class="block-title">🧭 誰做什麼？</div>
+        <div class="two-col">
+          <div class="col twin">
+            <div class="col-head">🤖 分身幫你做</div>
+            <ul>
+              <li>翻出以前很像的案子，和「後來出問題」的反例</li>
+              <li>早會前提醒：哪張工單交期很緊、哪台機器今天要保養</li>
+              <li>每天看數字的走勢，有變壞的跡象先講一聲</li>
+              <li>挑戰你的想法：「這一點可能推翻你的判斷」</li>
+              <li>寫草稿給你改（每份都標「草稿」）</li>
+            </ul>
+          </div>
+          <div class="col human">
+            <div class="col-head">👤 你還是自己做</div>
+            <ul>
+              <li>判斷：嚴重不嚴重、合不合格</li>
+              <li>決定：要不要插單、加班、停線</li>
+              <li>回覆客戶、對外寄任何東西</li>
+              <li>在公司系統裡改資料（分身改不了）</li>
+              <li>簽字，並為結論負責</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · 三種分類 -->
+    <div class="block b3">
+      <div class="block-num">3<small>三分類</small></div>
+      <div class="block-content">
+        <div class="block-title">🗂️ 分身的每一件工作，都要先標清楚是哪一種</div>
+        <div class="cats">
+          <div class="cat c1">
+            <div class="cat-name">💪 強化既有優勢</div>
+            <div class="cat-what">你本來就在做，分身幫你看得更多。判斷還是你。</div>
+            <div class="cat-eg"><b>例：</b>品保主管先判不良的嚴重度，分身再拿相似案和反例來對照。</div>
+          </div>
+          <div class="cat c2">
+            <div class="cat-name">✨ 創造新能力</div>
+            <div class="cat-what">以前大家都沒空做的事。沒有人的工作被拿走。</div>
+            <div class="cat-eg"><b>例：</b>每天早上提醒廠長：「這台機器的量測值，連續一週慢慢往上飄」。</div>
+          </div>
+          <div class="cat c3">
+            <div class="cat-name">📦 外包既有工作 <span class="off">預設關閉</span></div>
+            <div class="cat-what">今天有人在做，交給分身後那個人就不做了。要開，做這件事的人本人先同意、老闆簽字。</div>
+            <div class="cat-eg"><b>例：</b>業務助理每週把出貨進度排成固定格式的週報。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── sidebar ──────────────────────────────────────────────── -->
+  <div class="sidebar">
+
+    <div class="panel safety">
+      <div class="panel-title">🛡️ 三句話的安全規則</div>
+      <div class="rule"><span class="rule-n">1</span><span><b>不進聊天室：</b>圖紙、報價、客戶資料、客戶要求保密的特殊專案。拿不準，就當作不能貼。</span></div>
+      <div class="rule"><span class="rule-n">2</span><span><b>老闆先簽一頁原則：</b>分身是副駕不是替身，紀錄不拿來打考績。沒簽就不開。</span></div>
+      <div class="rule"><span class="rule-n">3</span><span><b>任何人都可以說「我不同意」：</b>分身只回「收到」，不再給新答案，也不記是誰說的。</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🚀 怎麼開始：三步</div>
+      <div class="step"><span class="step-n">1</span><span>先看 2 分鐘示範<small>不用帳號、不用網路；請 IT 幫你打開，或直接看瀏覽器版的點擊示範</small></span></div>
+      <div class="step"><span class="step-n">2</span><span>只挑一個職位<small>例：品保主管。一次只試一個</small></span></div>
+      <div class="step"><span class="step-n">3</span><span>拿紙筆回答 9 個問題<small>「這個職位需要分身嗎？」任何一題答「否」，就先不開，先改流程或用現有工具</small></span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">❓ 常見問題</div>
+      <div class="faq-q">會取代我嗎？</div>
+      <div class="faq-a">以老闆簽的原則為準。分身不做決定、不改系統資料、不對外發送。</div>
+      <div class="faq-q">分身答錯，誰負責？</div>
+      <div class="faq-a">簽字採用結論的人。沒有人會因為「分身這樣說」被追究，也不會因為沒用分身被追究。</div>
+      <div class="faq-q">可以用 LINE 嗎？</div>
+      <div class="faq-a">目前不行，只支援 Slack、Discord 這兩種公司聊天軟體。也不要把 LINE 的內容轉貼進來。</div>
+      <div class="faq-q">要花多少錢、怎麼喊停？</div>
+      <div class="faq-a">請導入負責人給老闆看「董事長一頁」：費用、最壞情況、一句話喊停，都寫在上面。</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  manufacturing-skill · 分身團隊（實驗版）· MIT License · 印 A3／A4 橫式、直接傳給同事都行 ·
+  完整說明 → <span class="url">github.com/jason-simhope-ai/manufacturing-skill</span>
+</div>
+
+</body>
+</html>

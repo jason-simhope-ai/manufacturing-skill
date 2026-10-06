@@ -4,6 +4,7 @@
 Targets (HTML -> PNG):
 - docs/explainers/*.html            -> docs/explainers/screenshots/*.png
 - docs/demo/slides/six-things.html  -> docs/demo/slides/six-things.png
+- docs/demo/team-demo.html?step=5   -> docs/demo/screenshots/team-demo.png
 - docs/quickstart-screenshots/mockups/stepN-*.html
                                     -> docs/quickstart-screenshots/stepN-*-mockup.png
 
@@ -26,6 +27,7 @@ uncommitted files, because a fresh checkout gives every file the same mtime).
 Capture settings (full-page, file:// URL, wait for network idle + fonts):
 - explainers: viewport width 1600 (A3 landscape), deviceScaleFactor 2
 - slide:      1920x1080 canvas, deviceScaleFactor 2
+- team demo:  1280x700 viewport, deviceScaleFactor 2, opened at step 5 (我先說 comparison)
 - mockups:    sizes from docs/quickstart-screenshots/CAPTURE-GUIDE.md, scale 2
 Any PNG over 1.5 MB is re-captured at scale 1.5, then 1, until it fits.
 """
@@ -72,6 +74,7 @@ def jobs() -> list[dict]:
         "02": "02-it-system-explanation",
         "03": "03-user-cheatsheet",
         "04": "04-quickstart-lazy-pack",
+        "05": "05-team-one-look",
     }
     for html in sorted(ex.glob("*.html")):
         key = html.name[:2]
@@ -81,6 +84,9 @@ def jobs() -> list[dict]:
     out.append(dict(html=REPO / "docs/demo/slides/six-things.html",
                     png=REPO / "docs/demo/slides/six-things.png",
                     width=1920, height=1080, wait=800))
+    out.append(dict(html=REPO / "docs/demo/team-demo.html", query="?step=5",
+                    png=REPO / "docs/demo/screenshots/team-demo.png",
+                    width=1280, height=700, wait=800))
     qs = REPO / "docs/quickstart-screenshots"
     # viewport sizes: docs/quickstart-screenshots/CAPTURE-GUIDE.md
     for stem, w, h in (("step4-main-window", 1440, 980),
@@ -128,7 +134,7 @@ def node_env() -> dict:
 
 
 def capture(j: dict, scale: float, env: dict, out: Path) -> None:
-    payload = dict(url=j["html"].resolve().as_uri(), out=str(out), width=j["width"],
+    payload = dict(url=j["html"].resolve().as_uri() + j.get("query", ""), out=str(out), width=j["width"],
                    height=j["height"], scale=scale, wait=j["wait"])
     subprocess.run(["node", "-e", NODE_JS, json.dumps(payload)], env=env, check=True)
 
