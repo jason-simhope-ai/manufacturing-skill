@@ -637,6 +637,16 @@ jobs:
         run: python3 tests/mcp/test_scheduler_mcp.py
 
       # ---------------------------------------------------------------
+      # Step 14: Generic adapter export tests. Exercises
+      # adapters/generic/export.py end-to-end against the real repo and
+      # synthetic mini-repos: file sets, override precedence, extends
+      # fixtures, conflict / unknown-profile exits, determinism, and
+      # MANIFEST sha256 integrity.
+      # ---------------------------------------------------------------
+      - name: Generic adapter — export tests
+        run: python3 tests/generic/test_export.py
+
+      # ---------------------------------------------------------------
       # Step 10a: Profile inheritance — lint every `extends:` profile
       # file. Validates extends path, mode marker presence (exactly
       # one of <!-- inherit --> or <!-- override-body -->),

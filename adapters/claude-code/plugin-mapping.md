@@ -206,6 +206,6 @@ claude plugin details manufacturing-skill                      # Skills / Agents
 - `adapters/cursor/` — Cursor IDE
 - `adapters/gemini-cli/` — Gemini CLI
 - `adapters/codex/` — Codex
-- `adapters/generic/` — 純 markdown export，給其他 LLM agent 用
+- `adapters/generic/` — 純 markdown export，給其他 LLM agent 用 —— **已出貨（experimental, v0.3 preview）**：`export.py` 直接 import 本目錄的 `_multiprofile.py` / `_resolve_extends.py`，輸出與 install.sh 相同的 overlay 結果，見 [`adapters/generic/README.md`](../generic/README.md)
 
 每個 adapter 讀取相同的 source（core/ + profiles/），只是映射到該 platform 的目錄結構。

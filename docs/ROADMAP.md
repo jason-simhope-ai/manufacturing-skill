@@ -34,6 +34,12 @@
 
 - ✅ **多 profile 同時 active**（`install.sh cnc-machining,injection-molding` + refuse-on-conflict + `active-profiles.json` aggregation + `/add-profile` slash command + CI pairwise scan）— see [CHANGELOG `[0.1.5]`](../CHANGELOG.md) and [spec](superpowers/specs/2026-05-09-multi-profile-active-design.md)
 
+## v0.3 preview (unreleased)
+
+**Pulled forward from v0.3**: generic adapter shipped early as experimental.
+
+- ✅ **Generic adapter**（`adapters/generic/export.py`：core + profile overlay + `extends:` 解析後匯出成純 markdown；`files` 資料夾 + `MANIFEST.json` 或單一 `bundle` 檔）— see [adapters/generic/README.md](../adapters/generic/README.md)
+
 ## v0.2 (預計 2026-Q3)
 
 **主題：profile 多樣化 + override 機制成熟**
@@ -53,7 +59,7 @@
 - 🎯 Cursor adapter
 - 🎯 Gemini CLI adapter
 - 🎯 Codex adapter
-- 🎯 Generic adapter（純 markdown export，給其他 LLM agent 用）
+- ✅ ~~Generic adapter（純 markdown export，給其他 LLM agent 用）~~（v0.3 preview 提早出貨，experimental）
 - 🎯 多語 explainer（簡中、英文）
 
 ---
