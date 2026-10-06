@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import posixpath
 import re
 import sys
 import unicodedata
@@ -46,16 +47,34 @@ class _IndentedDumper(yaml.Dumper):
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?", re.DOTALL)
 
 
+def _oneline(msg: object) -> str:
+    return " ".join(str(msg).split())
+
+
 def parse_file(path: Path) -> tuple[dict, str]:
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        raise ValueError(f"{path}: cannot read file ({_oneline(e)})")
     m = FRONTMATTER_RE.match(text)
     if not m:
         return {}, text
-    fm = yaml.safe_load(m.group(1)) or {}
+    try:
+        fm = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError as e:
+        raise ValueError(
+            f"{path}: frontmatter is not valid YAML ({_oneline(e)})"
+        )
     if not isinstance(fm, dict):
         raise ValueError(
             f"{path}: frontmatter must be a YAML mapping (got "
             f"{type(fm).__name__})"
+        )
+    bad_keys = [k for k in fm if not isinstance(k, str)]
+    if bad_keys:
+        raise ValueError(
+            f"{path}: frontmatter keys must be strings (got "
+            f"{bad_keys[0]!r})"
         )
     body = text[m.end():]
     return fm, body
@@ -109,24 +128,63 @@ def merge_frontmatter(core: dict, profile: dict) -> dict:
     return out
 
 
-# ---------- code-region stripping (M1) ----------
+# ---------- code-region masking (M1) ----------
+#
+# Directives and `## ` headings inside code are documentation, not
+# structure. Every scanner below works on a *masked* copy of the text in
+# which code is replaced by spaces of equal length (newlines kept), so a
+# match offset in the masked copy is the same offset in the raw text.
+# One scan therefore drives both validation (parse_directives) and
+# emission (assemble_profile_body).
 
-FENCED_CODE_RE = re.compile(r"```.*?```", re.DOTALL)
+_FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
+_FENCE_CLOSE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
 INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 
 
-def strip_code_regions(body: str) -> str:
-    """Replace fenced + inline code with placeholders preserving line counts.
+def _blank(s: str) -> str:
+    return "".join("\n" if c == "\n" else " " for c in s)
 
-    Used only for directive scanning — the original body is preserved for
-    verbatim emission of code examples (so docs that demonstrate
-    inheritance syntax don't get their examples processed).
+
+def mask_fences(text: str) -> str:
+    """Blank out fenced code blocks (``` or ~~~), keeping offsets.
+
+    A fence closes on a line of the same character, at least as long as
+    the opener, with nothing else on it. An unclosed fence runs to EOF
+    (CommonMark behaviour).
     """
-    def _placeholder(m):
-        return "\n" * m.group(0).count("\n")
-    out = FENCED_CODE_RE.sub(_placeholder, body)
-    out = INLINE_CODE_RE.sub("", out)
-    return out
+    lines = text.split("\n")
+    out: list[str] = []
+    fence_char = ""
+    fence_len = 0
+    for line in lines:
+        bare = line.rstrip("\r")
+        if fence_char:
+            out.append(_blank(line))
+            m = _FENCE_CLOSE_RE.match(bare)
+            if m and m.group(1)[0] == fence_char \
+                    and len(m.group(1)) >= fence_len:
+                fence_char = ""
+            continue
+        m = _FENCE_OPEN_RE.match(bare)
+        if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+            fence_char = m.group(1)[0]
+            fence_len = len(m.group(1))
+            out.append(_blank(line))
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def mask_code(text: str) -> str:
+    """Blank out fenced and inline code, keeping offsets."""
+    masked = mask_fences(text)
+    return INLINE_CODE_RE.sub(lambda m: " " * len(m.group(0)), masked)
+
+
+def strip_code_regions(body: str) -> str:
+    """Backward-compatible alias for :func:`mask_code`."""
+    return mask_code(body)
 
 
 # ---------- directive scanning ----------
@@ -136,10 +194,55 @@ OVERRIDE_BODY_RE = re.compile(r"<!--\s*override-body\s*-->")
 REPLACE_SECTION_RE = re.compile(
     r"<!--\s*replace-section:\s*(.+?)\s*-->"
 )
+H2_LINE_RE = re.compile(r"^## .*$", re.MULTILINE)
 
 
 def nfkc(s: str) -> str:
     return unicodedata.normalize("NFKC", s.strip())
+
+
+@dataclasses.dataclass
+class _Directive:
+    kind: str      # "inherit" | "override-body" | "replace-section"
+    start: int     # offsets into the RAW body
+    end: int
+    heading: str = ""            # replace-section only
+    block_end: int = 0           # replace-section only: end of its block
+
+
+def scan_body(body: str) -> list[_Directive]:
+    """Find every real (non-code) directive, in document order.
+
+    For replace-section, `block_end` is where its captured block stops:
+    the next real `## ` heading or the next real directive, whichever
+    comes first.
+    """
+    masked = mask_code(body)
+    fence_masked = mask_fences(body)
+    found: list[_Directive] = []
+    for m in INHERIT_RE.finditer(masked):
+        found.append(_Directive("inherit", m.start(), m.end()))
+    for m in OVERRIDE_BODY_RE.finditer(masked):
+        found.append(_Directive("override-body", m.start(), m.end()))
+    for m in REPLACE_SECTION_RE.finditer(masked):
+        found.append(_Directive(
+            "replace-section", m.start(), m.end(),
+            heading=body[m.start(1):m.end(1)].strip(),
+        ))
+    found.sort(key=lambda d: d.start)
+    for i, d in enumerate(found):
+        if d.kind != "replace-section":
+            continue
+        block_end = len(body)
+        h = H2_LINE_RE.search(fence_masked, d.end)
+        if h:
+            block_end = h.start()
+        for nd in found[i + 1:]:
+            if nd.start >= d.end:
+                block_end = min(block_end, nd.start)
+                break
+        d.block_end = block_end
+    return found
 
 
 @dataclasses.dataclass
@@ -151,14 +254,16 @@ class ParsedDirectives:
 
 
 def parse_directives(body: str) -> ParsedDirectives:
-    """Scan the (code-stripped) body for mode + replace-section directives.
+    """Scan the body for mode + replace-section directives.
 
-    Returns a ParsedDirectives or raises ValueError on structural errors
+    Directives inside fenced or inline code are ignored. Returns a
+    ParsedDirectives or raises ValueError on structural errors
     (multiple modes, no mode, etc.).
     """
-    stripped = strip_code_regions(body)
-    inherit_count = len(INHERIT_RE.findall(stripped))
-    override_count = len(OVERRIDE_BODY_RE.findall(stripped))
+    directives = scan_body(body)
+    inherit_count = sum(1 for d in directives if d.kind == "inherit")
+    override_count = sum(1 for d in directives
+                         if d.kind == "override-body")
 
     if inherit_count > 0 and override_count > 0:
         raise ValueError(
@@ -185,39 +290,21 @@ def parse_directives(body: str) -> ParsedDirectives:
     mode = "inherit" if inherit_count == 1 else "override-body"
 
     # Collect replace-section blocks. Each block runs from its directive
-    # to the next `## ` heading or directive (whichever comes first).
+    # to the next real `## ` heading or directive (whichever comes first).
+    # The block text comes from the raw body so code examples stay intact.
     replace_sections: dict[str, str] = {}
     raw_keys: dict[str, str] = {}
-    matches = list(REPLACE_SECTION_RE.finditer(stripped))
-    for i, m in enumerate(matches):
-        heading = m.group(1).strip()
-        key = nfkc(heading)
-        # Block ends at next directive or `## ` heading, whichever first
-        block_start = m.end()
-        block_end = len(stripped)
-        # Find next `## ` heading (line-anchored) after block_start
-        for line_match in re.finditer(r"^## .*$", stripped[block_start:],
-                                       re.MULTILINE):
-            block_end = block_start + line_match.start()
-            break
-        # Or next replace-section / inherit / override-body directive
-        for next_m in matches[i + 1:]:
-            if next_m.start() < block_end:
-                block_end = next_m.start()
-            break
-        for r in (INHERIT_RE, OVERRIDE_BODY_RE):
-            nm = r.search(stripped, block_start)
-            if nm and nm.start() < block_end:
-                block_end = nm.start()
-        # Use the original (un-stripped) body to grab content with code
-        # examples intact.
-        block = body[block_start:block_end].strip()
+    for d in directives:
+        if d.kind != "replace-section":
+            continue
+        key = nfkc(d.heading)
+        block = body[d.end:d.block_end].strip()
         if key in replace_sections:
             raise ValueError(
-                f"replace-section heading {heading!r} declared twice"
+                f"replace-section heading {d.heading!r} declared twice"
             )
         replace_sections[key] = block
-        raw_keys[key] = heading
+        raw_keys[key] = d.heading
 
     return ParsedDirectives(
         mode=mode,
@@ -236,12 +323,13 @@ def find_section_spans(core_body: str) -> dict[str, tuple[int, int, str]]:
     """Map nfkc(heading) -> (start_offset, end_offset, raw_heading).
 
     A section runs from its `## Heading` line to (exclusive) the next
-    `## ` heading or EOF.
+    `## ` heading or EOF. Headings inside fenced code blocks are ignored.
     """
     spans: dict[str, tuple[int, int, str]] = {}
-    matches = list(H2_RE.finditer(core_body))
+    # `## ` lines inside fenced code are not headings.
+    matches = list(H2_RE.finditer(mask_fences(core_body)))
     for i, m in enumerate(matches):
-        heading_raw = m.group(1).strip()
+        heading_raw = core_body[m.start(1):m.end(1)].strip()
         key = nfkc(heading_raw)
         if key in spans:
             raise ValueError(
@@ -309,58 +397,34 @@ def assemble_profile_body(
     `replace-section` directives + their captured blocks are skipped.
     `<!-- inherit -->` is replaced by the modified core body.
     `<!-- override-body -->` is stripped (its presence is the signal).
+
+    Uses the same scan as parse_directives, so directive-looking text in
+    code blocks is emitted verbatim and never edited.
     """
+    found = scan_body(profile_body)
+
     if directives.mode == "override-body":
-        return OVERRIDE_BODY_RE.sub("", profile_body).lstrip("\n")
+        edits = [(d.start, d.end, "") for d in found
+                 if d.kind == "override-body"]
+        return _apply_edits(profile_body, edits).lstrip("\n")
 
-    # Build a list of (start, end, replacement) edits to apply to
-    # profile_body. Sources of edits:
-    #   - <!-- inherit --> directive → replaced with modified_core_body
-    #   - each <!-- replace-section: X --> + captured block → removed
     edits: list[tuple[int, int, str]] = []
+    for d in found:
+        if d.kind == "inherit":
+            edits.append((d.start, d.end, modified_core_body.strip("\n")))
+        elif d.kind == "replace-section":
+            edits.append((d.start, d.block_end, ""))
+    return _apply_edits(profile_body, edits)
 
-    # Inherit marker
-    inherit_match = INHERIT_RE.search(strip_code_regions(profile_body))
-    if inherit_match:
-        # Use stripped position but body indices align (placeholders preserve newlines but inline code is dropped — search original instead)
-        m = INHERIT_RE.search(profile_body)
-        if m is None:
-            # The directive was inside code-stripped region but not the
-            # raw body — that means it WAS in a code block, ignore.
-            raise ValueError(
-                "inherit marker disappeared after code-strip; this "
-                "shouldn't happen — please file a bug"
-            )
-        edits.append((m.start(), m.end(), modified_core_body.strip("\n")))
 
-    # Replace-section blocks (skip them entirely)
-    matches = list(REPLACE_SECTION_RE.finditer(profile_body))
-    for i, m in enumerate(matches):
-        block_start = m.start()
-        block_end = len(profile_body)
-        for line_match in re.finditer(r"^## .*$",
-                                       profile_body[m.end():], re.MULTILINE):
-            block_end = m.end() + line_match.start()
-            break
-        for next_m in matches[i + 1:]:
-            if next_m.start() < block_end:
-                block_end = next_m.start()
-            break
-        for r in (INHERIT_RE, OVERRIDE_BODY_RE):
-            nm = r.search(profile_body, m.end())
-            if nm and nm.start() < block_end:
-                block_end = nm.start()
-        edits.append((block_start, block_end, ""))
-
-    # Apply edits in order
-    edits.sort(key=lambda e: e[0])
+def _apply_edits(text: str, edits: list[tuple[int, int, str]]) -> str:
     out = []
     cursor = 0
-    for start, end, repl in edits:
-        out.append(profile_body[cursor:start])
+    for start, end, repl in sorted(edits, key=lambda e: e[0]):
+        out.append(text[cursor:start])
         out.append(repl)
         cursor = end
-    out.append(profile_body[cursor:])
+    out.append(text[cursor:])
     return "".join(out)
 
 
@@ -372,6 +436,10 @@ class ResolveResult:
     body: str
     text: str  # full file output
     core_path: Path
+
+
+def _describe(value: object) -> str:
+    return f"{type(value).__name__} {value!r}"[:80]
 
 
 def resolve_profile_file(
@@ -406,19 +474,36 @@ def resolve_profile_file(
             f"override (no extends) for full replacement."
         )
 
-    extends_path = fm["extends"]
+    extends_raw = fm["extends"]
+    if not isinstance(extends_raw, str) or not extends_raw.strip():
+        raise ValueError(
+            f"{rel}: `extends:` must be a non-empty string path like "
+            f"core/agents/<name>, got {_describe(extends_raw)}"
+        )
+    extends_path = extends_raw.strip()
     if extends_path.endswith(".md"):
         extends_path = extends_path[:-3]
-    core_path = repo_root / f"{extends_path}.md"
+    # Normalise and check path components BEFORE touching the filesystem:
+    # a textual prefix test would let `core-evil/...` through.
+    norm = posixpath.normpath(extends_path.replace("\\", "/"))
+    norm_parts = norm.split("/")
+    if (norm.startswith("/") or len(norm_parts) < 2
+            or norm_parts[0] != "core" or ".." in norm_parts):
+        raise ValueError(
+            f"{rel}: extends must point at a core/ file, got "
+            f"{extends_raw!r}"
+        )
+    core_root = (repo_root / "core").resolve()
+    core_path = repo_root / f"{norm}.md"
+    if core_root not in core_path.resolve().parents:
+        raise ValueError(
+            f"{rel}: extends must point at a core/ file, got "
+            f"{extends_raw!r}"
+        )
     if not core_path.is_file():
         raise ValueError(
             f"{rel}: extends points to {extends_path}.md but no such "
             f"file exists in the repo"
-        )
-    if not str(core_path.resolve()).startswith(str(repo_root / "core")):
-        raise ValueError(
-            f"{rel}: extends must point at a core/ file, got "
-            f"{extends_path}"
         )
 
     core_fm, core_body = parse_file(core_path)
@@ -490,8 +575,10 @@ def find_referencing_profiles(
             continue
         if fm.get("extends") not in (extends_target, f"{extends_target}.md"):
             continue
-        for m in REPLACE_SECTION_RE.finditer(body):
-            heading = m.group(1).strip()
+        for d in scan_body(body):
+            if d.kind != "replace-section":
+                continue
+            heading = d.heading
             if nfkc(heading) in nfkc_removed:
                 out.append((pj.relative_to(repo_root), heading))
     return out
@@ -508,7 +595,14 @@ def cmd_resolve(args) -> int:
         print(f"::error file={profile_path}::{e}", file=sys.stderr)
         return 1
     if args.out:
-        Path(args.out).write_text(result.text, encoding="utf-8")
+        try:
+            out_path = Path(args.out)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(result.text, encoding="utf-8")
+        except OSError as e:
+            print(f"::error file={profile_path}::cannot write --out "
+                  f"{args.out}: {_oneline(e)}", file=sys.stderr)
+            return 1
     else:
         sys.stdout.write(result.text)
     return 0

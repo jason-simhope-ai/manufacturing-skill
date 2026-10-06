@@ -38,7 +38,7 @@
   },
   "mcp": {
     "recommended": [
-      "scheduler-mcp",
+      "manufacturing-scheduler",
       "erp-connector"
     ],
     "optional": [

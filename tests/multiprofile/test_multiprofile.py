@@ -11,7 +11,7 @@ Usage:
 from __future__ import annotations
 
 import json
-import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -24,6 +24,7 @@ sys.path.insert(
 import _multiprofile as mp  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HELPER = REPO_ROOT / "adapters" / "claude-code" / "_multiprofile.py"
 
 
 def make_fake_repo(tmp: Path, profiles_spec: dict) -> Path:
@@ -208,6 +209,115 @@ def test_scan_pair_function(tmp: Path):
     assert kinds == {"agents", "skills"}
 
 
+def test_case_insensitive_collision_pair(tmp: Path):
+    """`Quote.md` and `quote.md` collide on macOS/Windows filesystems."""
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["Quote-Specialist"]},
+        "beta":  {"agents": ["quote-specialist"]},
+    })
+    for conflicts in (mp.scan_set(tmp, ["alpha", "beta"]),
+                      mp.scan_pair(tmp, "alpha", "beta")):
+        assert len(conflicts) == 1, conflicts
+        c = conflicts[0]
+        assert c.kind == "agents"
+        assert sorted(c.profiles) == ["alpha", "beta"]
+        assert set(c.spellings) == {"Quote-Specialist", "quote-specialist"}
+        assert "differ only by case" in c.render(), c.render()
+
+
+def test_case_insensitive_three_way(tmp: Path):
+    """Three spellings of one name across three profiles = one conflict."""
+    make_fake_repo(tmp, {
+        "alpha": {"skills": ["Billing"]},
+        "beta":  {"skills": ["BILLING"]},
+        "gamma": {"skills": ["billing", "other"]},
+    })
+    conflicts = mp.scan_set(tmp, ["alpha", "beta", "gamma"])
+    assert len(conflicts) == 1, conflicts
+    assert sorted(conflicts[0].profiles) == ["alpha", "beta", "gamma"]
+
+
+def test_case_insensitive_unicode_fold(tmp: Path):
+    """casefold, not lower: German sharp s folds to `ss`."""
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["strasse"]},
+        "beta":  {"agents": ["STRASSE"]},
+    })
+    assert len(mp.scan_set(tmp, ["alpha", "beta"])) == 1
+
+
+def test_case_difference_across_kinds_is_fine(tmp: Path):
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["Foo"]},
+        "beta":  {"skills": ["foo"]},
+    })
+    assert mp.scan_set(tmp, ["alpha", "beta"]) == []
+    assert mp.scan_pair(tmp, "alpha", "beta") == []
+
+
+def test_missing_kind_dirs_do_not_crash(tmp: Path):
+    """A profile with no hooks/, skills/, know-how/ (or none at all)."""
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["foo"]},      # only agents/ exists
+        "beta":  {},                       # no kind dirs whatsoever
+    })
+    assert not (tmp / "profiles" / "alpha" / "hooks").exists()
+    assert not (tmp / "profiles" / "beta" / "agents").exists()
+    assert mp.scan_set(tmp, ["alpha", "beta"]) == []
+    assert mp.scan_pair(tmp, "alpha", "beta") == []
+    assert mp.list_profile_files(tmp / "profiles" / "beta", "hooks") == set()
+    result = mp.aggregate_profiles(tmp, ["alpha", "beta"])
+    assert [p["name"] for p in result["profiles"]] == ["alpha", "beta"]
+
+
+def test_aggregate_tolerates_non_dict_mcp(tmp: Path):
+    """A malformed manifest (`mcp` is a list) must not crash aggregation."""
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["a1"]},
+        "beta":  {"agents": ["b1"]},
+    })
+    pj = tmp / "profiles" / "alpha" / "profile.json"
+    manifest = json.loads(pj.read_text(encoding="utf-8"))
+    manifest["mcp"] = ["not", "a", "dict"]
+    pj.write_text(json.dumps(manifest), encoding="utf-8")
+    result = mp.aggregate_profiles(tmp, ["alpha", "beta"])
+    assert result["aggregated"]["mcp"]["recommended"] == [
+        "mcp-beta", "mcp-shared",
+    ], result["aggregated"]["mcp"]
+
+
+def _cli(tmp: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(HELPER), "--repo-root", str(tmp), *args],
+        capture_output=True, text=True, timeout=30, encoding="utf-8",
+    )
+
+
+def test_cli_scan_case_collision_exits_1(tmp: Path):
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["Foo"]},
+        "beta":  {"agents": ["foo"]},
+    })
+    proc = _cli(tmp, "scan", "alpha", "beta")
+    assert proc.returncode == 1, (proc.returncode, proc.stderr)
+    assert "::error::" in proc.stderr and "agents/" in proc.stderr
+    assert "Traceback" not in proc.stderr
+    proc = _cli(tmp, "scan-all")
+    assert proc.returncode == 1, (proc.returncode, proc.stderr)
+
+
+def test_cli_scan_missing_kind_dirs_exits_0(tmp: Path):
+    make_fake_repo(tmp, {
+        "alpha": {"agents": ["foo"]},
+        "beta":  {},
+    })
+    proc = _cli(tmp, "scan", "alpha", "beta")
+    assert proc.returncode == 0, (proc.returncode, proc.stderr)
+    proc = _cli(tmp, "scan-all")
+    assert proc.returncode == 0, (proc.returncode, proc.stderr)
+    assert "Traceback" not in proc.stderr
+
+
 def test_real_repo_no_conflicts(tmp: Path):
     """The real manufacturing-skill repo's profiles must scan clean —
     if this fails, a contributor introduced a basename collision."""
@@ -230,6 +340,17 @@ TESTS = [
     ("aggregate list union with dedupe", test_aggregate_list_union),
     ("aggregate N=1 still valid", test_aggregate_single_profile),
     ("scan_pair function", test_scan_pair_function),
+    ("case-insensitive collision (pair + set)",
+     test_case_insensitive_collision_pair),
+    ("case-insensitive three-way collision", test_case_insensitive_three_way),
+    ("casefold handles unicode (ss)", test_case_insensitive_unicode_fold),
+    ("case-differing names across kinds are fine",
+     test_case_difference_across_kinds_is_fine),
+    ("missing kind dirs do not crash", test_missing_kind_dirs_do_not_crash),
+    ("aggregate tolerates non-dict mcp", test_aggregate_tolerates_non_dict_mcp),
+    ("CLI scan: case collision exits 1", test_cli_scan_case_collision_exits_1),
+    ("CLI scan: missing kind dirs exits 0",
+     test_cli_scan_missing_kind_dirs_exits_0),
     ("real repo: cnc + injection clean", test_real_repo_no_conflicts),
 ]
 
