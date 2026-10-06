@@ -7,7 +7,7 @@
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](https://claude.com/claude-code)
 [![繁體中文](https://img.shields.io/badge/lang-%E7%B9%81%E4%B8%AD-red)](README.zh-TW.md)
 
-A Claude Code plugin that gives any manufacturing company a 30-minute path to a working AI assistant — tailored to their vertical, runnable on their own GPU.
+A Claude Code plugin that gives any manufacturing company a 30-minute path to a working AI assistant — tailored to their vertical. The plugin's prompts and files live on your machine, but the default model is Anthropic's cloud (Claude Code): anything you paste or attach is sent to the model provider under its terms. An on-prem model is an option, not verified end-to-end by this project (see [Data flow](#data-flow)).
 
 > 中文讀者請看 [README.zh-TW.md](README.zh-TW.md)
 
@@ -16,6 +16,8 @@ A Claude Code plugin that gives any manufacturing company a 30-minute path to a 
 ## ⭐ Live demo (real Claude Opus 4.7 acting as the `quote-specialist` persona)
 
 ![manufacturing-skill quote demo](docs/demo/screenshots/real-quote-demo-en.png)
+
+> *Illustration only: this is the response to a persona prompt pasted into the claude.ai web chat (see [capture](docs/demo/real-claude-response.md)), not a recording of the installed plugin running in Claude Code. The animation below replays the same response.*
 
 **The catch this demo highlights:** the customer RFQ asks for "RAL9005 black anodize on SUS304 stainless steel" — which is metallurgically impossible (anodizing is for aluminum/titanium). Loaded as the `quote-specialist` persona, Claude flagged the conflict, proposed three valid alternatives (PVD coating / blackening / powder coat), and parked the price on a written customer confirmation — exactly what an experienced quote engineer does.
 
@@ -59,7 +61,7 @@ Manufacturing AI adoption usually fails on three things:
 | ------------------------------ | ------------- | ------------------------ |
 | Try it out (Cloud Pro)         | $17-20 / mo   | 0                        |
 | Heavy daily use (Cloud Max)    | $100-200 / mo | 0                        |
-| Drawings can't leave (on-prem) | Electricity   | NT$200K+ (GB10 hardware) |
+| Drawings can't go to a cloud model (on-prem option, unverified) | Electricity   | NT$200K+ (GB10 hardware) |
 
 **Reference comparison**: hiring an SI to custom-build a comparable system runs **NT$300K-1M one-time** (development + integration + training). This plugin is fork-friendly open source — that's what you save.
 
@@ -80,6 +82,8 @@ bash adapters/claude-code/install.sh
 # 3. In Claude Code, run:
 /manufacturing init     # 4-question wizard for first-time users
 ```
+
+The installer puts the plugin in `~/.claude/plugins/manufacturing-skill/` and links it into `~/.claude/skills/` so Claude Code loads it; restart Claude Code or run `/reload-plugins` afterwards (check with `claude plugin list`).
 
 Or skip the wizard:
 
@@ -102,6 +106,13 @@ Three paths:
 
 ---
 
+### Data flow
+
+- **Stays on your machine:** the plugin's prompts, skills, know-how and hooks, and your drawing/BOM files themselves.
+- **Sent to the model provider:** the default model is Anthropic's cloud (Claude Code). Whatever you paste into the chat or attach with `@file` is transmitted and handled under the provider's terms.
+- **Terms differ:** consumer plans and commercial plans (Team / Enterprise / API) have different retention and training rules. Read the terms of the plan you actually use before sending customer drawings.
+- **On-prem is optional:** see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md). It is **not verified end-to-end by this project**; have IT verify isolation themselves.
+
 ### Cloud first, on-prem later
 
 By default this needs **no special hardware** — runs on regular Claude Code with Anthropic's cloud API.
@@ -112,7 +123,7 @@ When should you consider on-prem LLM (GB10 / Ollama)?
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Just want to try / evaluate value                                | ☁️ **Cloud Claude Code — no hardware needed**                               |
 | 1-2 weeks in, value confirmed                                    | ☁️ Stay on cloud, validate team adoption                                    |
-| Customer audits (IATF / medical / drawings can't leave premises) | 🏠 On-prem — see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
+| Customer audits (IATF / medical / drawings can't leave premises) | 🏠 On-prem option (unverified by this project) — see [infra/on-prem/gb10-setup.md](infra/on-prem/gb10-setup.md) |
 | Already have AI hardware, want to use it                         | 🏠 Just plug in                                                             |
 
 **Don't let "AI needs expensive hardware" scare you off** — v0.1 runs the entire flow on cloud.

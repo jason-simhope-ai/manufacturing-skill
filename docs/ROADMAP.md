@@ -130,7 +130,7 @@ manufacturing-cli (自建 orchestrator)
 明確 **NO** 的方向，避免使用者誤期待：
 
 - ❌ Mobile app（不是 plugin 的事）
-- ❌ 雲端 SaaS 版（違背地端優先精神）
+- ❌ 雲端 SaaS 版（地端是選配而非預設；雲端 SaaS 版不在計畫內）
 - ❌ 自家 LLM 訓練（Anthropic / Mistral / Qwen 已經做得很好）
 - ❌ 取代 ERP / MES（永遠是 add-on）
 - ❌ 客戶端的圖紙判讀 ML（pure CV 任務，不適合 LLM agent）

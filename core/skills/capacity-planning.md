@@ -33,7 +33,7 @@ when_to_use: New order arrives requiring delivery commitment, weekly capacity re
 
 ### 2. 盤點已承諾產能
 
-從 `scheduler-mcp` 取所有已排定工單的工時加總。
+從 `manufacturing-scheduler` 取所有已排定工單的工時加總。
 
 ### 3. 計算剩餘空間
 
