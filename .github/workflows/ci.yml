@@ -170,6 +170,34 @@ jobs:
           echo "ok  install.sh stays bash 3.2-compatible"
 
       # ---------------------------------------------------------------
+      # Step 6b: install.sh smoke — --list, --core-only, single profile
+      # (guards against pipefail aborts on profiles without "status")
+      # ---------------------------------------------------------------
+      - name: install.sh — smoke (--list, --core-only, single profile)
+        run: |
+          set -euo pipefail
+          export HOME="$(mktemp -d)"
+          out="$(bash adapters/claude-code/install.sh --list)"
+          for d in profiles/*/; do
+            n="$(basename "$d")"
+            if ! printf '%s\n' "$out" | grep -q "$n"; then
+              echo "::error::--list output is missing profile '$n'"
+              exit 1
+            fi
+          done
+          echo "ok  --list shows every profile"
+          marker="$HOME/.claude/plugins/manufacturing-skill/.installed"
+          for args in "--core-only" "cnc-machining"; do
+            rm -rf "$HOME/.claude"; mkdir -p "$HOME/.claude"
+            bash adapters/claude-code/install.sh $args </dev/null >/dev/null
+            if [ ! -f "$marker" ]; then
+              echo "::error::install.sh $args did not write $marker"
+              exit 1
+            fi
+            echo "ok  install.sh $args"
+          done
+
+      # ---------------------------------------------------------------
       # Step 7: profile.json schema sanity — every profile manifest
       # must declare the fields install.sh + adapters expect to read
       # ---------------------------------------------------------------
