@@ -43,7 +43,7 @@ W3：profile 客製
   └─ 改 know-how 內的 SOP（公司專屬）
 
 W4：MCP 接資料
-  ├─ manufacturing-scheduler（infra/mcp-servers/scheduler-mcp）接你的 MES / 排程系統：把 `infra/mcp-servers/scheduler-mcp/mock-data/`
+  ├─ manufacturing-scheduler（伺服器名稱；程式在 `infra/mcp-servers/scheduler-mcp/` 目錄）接你的 MES / 排程系統：把 `infra/mcp-servers/scheduler-mcp/mock-data/`
   │    （示範用的負載與工單）換成你 MES 的資料來源；未接上前，所有狀態類輸出都會標示「模擬資料」
   ├─ erp-connector 接你的 ERP（最花時間，常 1-2 週）：**不是換 mock data**，
   │    而是自己實作一個符合 `infra/mcp-servers/erp-connector/contract.py` 的連接器
@@ -497,9 +497,9 @@ I 下架
 | -------------------- | ------ | ---------------------------- |
 | W0 評估 + W1 環境    | 1 週   | NT$30,000                    |
 | W2-W3 安裝 + 客製    | 2 週   | NT$120,000                   |
-| W4 MCP / ERP 整合    | 2 週   | NT$150,000~300,000（看 ERP） |
+| W4 MCP / ERP 整合    | 1 週（ERP 複雜時 +1 週） | NT$150,000~300,000（看 ERP） |
 | W5-W6 試跑 + 培訓    | 2 週   | NT$80,000                    |
-| **6 週導入合計**     | 7 週   | **NT$380,000~530,000**       |
+| **W0–W6 合計**       | 6 週（最多 7 週） | **NT$380,000~530,000**       |
 | 後續每月 office hour | -      | NT$30,000/月                 |
 
 實際依公司規模、現況、客製深度浮動。
