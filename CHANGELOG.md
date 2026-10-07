@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **adoption-guide week table and scheduler naming** — the fee table summed to 7 weeks under a 6-week heading (W4 is one week, plus one when the ERP is complex); the scheduler line now says which name is the MCP server and which is the directory.
 - **INVENTORY.md gateway tables deduplicated** — the `approvals.py · audit.py …` and `tests/gateway/` rows appeared twice after the pilot-readiness merge; one row each now, carrying `spend.py`, the audit anchors and the current test counts.
 - **Resolver ignores directives and headings inside fenced code** (`_resolve_extends.py`) — `<!-- inherit -->` / `<!-- override-body -->` / `<!-- replace-section: X -->` examples inside ``` or ~~~ fences are now skipped by both validation and assembly (they previously passed validation but were substituted in the output, producing a corrupted file with exit 0). `## ` lines inside fences no longer end a replace-section block, and no longer split sections of the core body. Validation and assembly now share one offset-preserving scan.
 - **Resolver rejects bad `extends:` values with a clean error** — a list, mapping, int or empty `extends:` and unparsable YAML frontmatter now exit non-zero with a one-line `::error` instead of a Python traceback. `--out` creates missing parent directories.
